@@ -9,76 +9,81 @@ print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
 
 st.set_page_config(page_title="Portfolio View", layout="centered")
 
-assets_positions = [
-    {
-        "symbol": "CSPX.L",
-        "position": 214.6
-    },
-    {
-        "symbol": "IUSE.L",
-        "position": 969.3
-    },
-    {
-        "symbol": "IWDE.L",
-        "position": 1258.1
-    },
-    {
-        "symbol": "IWDA.L",
-        "position": 1176.8
-    }
-]
+username = st.text_input(label="Enter username", key="username_input")
+print(st.secrets["DB_USERNAME"])
 
-st.title("Portfolio Information")
+if username == st.secrets["DB_USERNAME"]:
 
-st.markdown("#### Portfolio Composition")
+    assets_positions = [
+        {
+            "symbol": "CSPX.L",
+            "position": 214.6
+        },
+        {
+            "symbol": "IUSE.L",
+            "position": 969.3
+        },
+        {
+            "symbol": "IWDE.L",
+            "position": 1258.1
+        },
+        {
+            "symbol": "IWDA.L",
+            "position": 1176.8
+        }
+    ]
 
-assets_positions_df = pd.DataFrame(assets_positions)
+    st.title("Portfolio Information")
 
-st.dataframe(assets_positions_df, hide_index=True)
+    st.markdown("#### Portfolio Composition")
 
-col1, col2 = st.columns([1, 2])
-with col1:
-    base_currency = st.selectbox(
-        "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
+    assets_positions_df = pd.DataFrame(assets_positions)
 
-st.markdown("#### Portfolio Performance")
+    st.dataframe(assets_positions_df, hide_index=True)
 
-aggregate_df = pd.DataFrame()
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        base_currency = st.selectbox(
+            "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
 
-for asset in assets_positions:
+    st.markdown("#### Portfolio Performance")
 
-    asset_info, full_asset_history = fetch_asset_info_and_history(
-        asset["symbol"])
+    aggregate_df = pd.DataFrame()
 
-    # Fetch the fx rate history for the asset currency
-    full_fx_rate_history = fetch_fx_rate_history(
-        asset_info['currency'], base_currency)
+    for asset in assets_positions:
 
-    # Add the fx rate history to the asset history
-    full_asset_base_history = generate_asset_base_value(
-        full_asset_history, full_fx_rate_history)
+        asset_info, full_asset_history = fetch_asset_info_and_history(
+            asset["symbol"])
 
-    # Add the base value to the aggregate dataframe
-    aggregate_df = pd.concat([aggregate_df, full_asset_base_history[['base_value']].rename(
-        columns={'base_value': asset['symbol']})], axis=1)
+        # Fetch the fx rate history for the asset currency
+        full_fx_rate_history = fetch_fx_rate_history(
+            asset_info['currency'], base_currency)
 
-# Drop any rows with NaN values
-aggregate_df.dropna(inplace=True)
-# Calculate the portfolio value
-aggregate_df['Portfolio'] = aggregate_df.sum(axis=1)
+        # Add the fx rate history to the asset history
+        full_asset_base_history = generate_asset_base_value(
+            full_asset_history, full_fx_rate_history)
 
-period_options = [f"Max ({round(aggregate_df['Portfolio'].shape[0]/365.25, 1)} years)"] + \
-    [str(period) + (" Year" if period == 1 else " Years")
-        for period in [10, 5, 3, 1] if aggregate_df['Portfolio'].shape[0] > period * 365.25]
+        # Add the base value to the aggregate dataframe
+        aggregate_df = pd.concat([aggregate_df, full_asset_base_history[['base_value']].rename(
+            columns={'base_value': asset['symbol']})], axis=1)
 
-col3, col4 = st.columns([1, 2])
-with col3:
-    selected_period = st.selectbox("Select period", period_options)
+    # Drop any rows with NaN values
+    aggregate_df.dropna(inplace=True)
+    # Calculate the portfolio value
+    aggregate_df['Portfolio'] = aggregate_df.sum(axis=1)
 
-periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
-    aggregate_df, selected_period, 'Portfolio')
+    period_options = [f"Max ({round(aggregate_df['Portfolio'].shape[0]/365.25, 1)} years)"] + \
+        [str(period) + (" Year" if period == 1 else " Years")
+            for period in [10, 5, 3, 1] if aggregate_df['Portfolio'].shape[0] > period * 365.25]
 
-print(f"Portfolio CAGR: {cagr}")
-print(f"Portfolio CAGR fitted: {cagr_fitted}")
-print(f"Portfolio over/under: {base_over_under}")
-st.line_chart(periodic_asset_history_with_fit[['Portfolio', 'fitted']])
+    col3, col4 = st.columns([1, 2])
+    with col3:
+        selected_period = st.selectbox("Select period", period_options)
+
+    periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
+        aggregate_df, selected_period, 'Portfolio')
+
+    print(f"Portfolio CAGR: {cagr}")
+    print(f"Portfolio CAGR fitted: {cagr_fitted}")
+    print(f"Portfolio over/under: {base_over_under}")
+    st.line_chart(periodic_asset_history_with_fit[['Portfolio', 'fitted']])
