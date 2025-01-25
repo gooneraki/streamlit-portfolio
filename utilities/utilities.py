@@ -82,23 +82,23 @@ def get_exp_fitted_data(y: List[int]) -> List[int]:
     return y_exp
 
 
-def append_fitted_data(history_data: pd.DataFrame, selected_period: str) -> pd.DataFrame:
+def append_fitted_data(history_data: pd.DataFrame, selected_period: str, col_to_fit='base_value') -> pd.DataFrame:
     """ Append the fitted data to the history data. """
 
     period_history_data = history_data.copy().tail(
         int(round(int(selected_period.split(" ")[0])*365.25))+1) if "Max" not in selected_period else history_data.copy()
 
     period_history_data['fitted'] = get_exp_fitted_data(
-        period_history_data['base_value'].values)
+        period_history_data[col_to_fit].values)
 
     days = period_history_data.shape[0]
 
-    cagr = (period_history_data['base_value'].iloc[-1] /
-            period_history_data['base_value'].iloc[0]) ** (1 / (days / 365.25)) - 1
+    cagr = (period_history_data[col_to_fit].iloc[-1] /
+            period_history_data[col_to_fit].iloc[0]) ** (1 / (days / 365.25)) - 1
     cagr_fitted = (period_history_data['fitted'].iloc[-1] /
                    period_history_data['fitted'].iloc[0]) ** (1 / (days / 365.25)) - 1
 
-    base_over_under = (period_history_data['base_value'].iloc[-1] -
+    base_over_under = (period_history_data[col_to_fit].iloc[-1] -
                        period_history_data['fitted'].iloc[-1]) / period_history_data['fitted'].iloc[-1]
 
     period_history_data['Date'] = period_history_data.index

@@ -1,6 +1,7 @@
 import yfinance as yf
 import datetime
 import streamlit as st
+from utilities.constants import BASE_CURRENCY_OPTIONS
 
 
 @st.cache_data
@@ -34,7 +35,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     base_currency = st.selectbox("Select base currency", [
-        "EUR", "USD", "GBP", "JPY", "AUD", "CAD", "CHF", "HKD"], key="base_currency_input")
+        BASE_CURRENCY_OPTIONS], key="base_currency_input")
 
 with col2:
     target_currency = st.text_input(

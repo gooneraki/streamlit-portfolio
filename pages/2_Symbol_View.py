@@ -9,6 +9,7 @@ import altair as alt
 import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_info_and_history, create_asset_info_df, \
     fetch_fx_rate_history, generate_asset_base_value, append_fitted_data
+from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
@@ -58,8 +59,8 @@ if len(symbol_name) > 0:
         col1, col2 = st.columns(2)
 
         with col1:
-            base_currency = st.selectbox("Select currency", [
-                "EUR", "USD", "GBP", "JPY", "AUD", "CAD", "CHF", "HKD"], key="currency_input")
+            base_currency = st.selectbox(
+                "Select currency", BASE_CURRENCY_OPTIONS, key="currency_input")
 
         # In this case we have one asset with a position of 1.0
         assets_positions: List[AssetDetails] = [
