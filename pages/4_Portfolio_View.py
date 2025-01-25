@@ -66,6 +66,8 @@ for asset in assets_positions:
         full_asset_history, full_fx_rate_history)
 
     # Add the base value to the aggregate dataframe
+    full_asset_base_history['base_value'] *= asset['position']
+
     aggregate_df = pd.concat([aggregate_df, full_asset_base_history[['base_value']].rename(
         columns={'base_value': asset['symbol']})], axis=1)
 
