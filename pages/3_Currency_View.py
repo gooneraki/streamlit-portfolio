@@ -34,8 +34,8 @@ st.title("Currency and Cyptocurrency Information")
 col1, col2 = st.columns(2)
 
 with col1:
-    base_currency = st.selectbox("Select base currency", [
-        BASE_CURRENCY_OPTIONS], key="base_currency_input")
+    base_currency = st.selectbox("Select base currency",
+                                 BASE_CURRENCY_OPTIONS, key="base_currency_input")
 
 with col2:
     target_currency = st.text_input(
