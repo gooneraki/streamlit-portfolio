@@ -8,7 +8,7 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_info_and_history, create_asset_info_df, \
-    fetch_fx_rate_history, generate_asset_base_value, append_fitted_data
+    fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
@@ -88,22 +88,7 @@ if len(symbol_name) > 0:
             full_asset_base_history, selected_period)
 
         # Display the CAGR and CAGR for the fitted data
-        trend_info_df = pd.DataFrame(
-            columns=['Label', 'Value'],
-            data=[
-                ['Sample Years', f"{
-                    periodic_asset_history_with_fit.shape[0] / 365.25:.1f}"],
-                ['CAGR Base', f"{cagr:.1%}"],
-                ['CAGR Fitted', f"{cagr_fitted:.1%}"],
-                ['', ''],
-                ['Date',
-                    periodic_asset_history_with_fit['Date'].iloc[-1].strftime('%Y-%m-%d')],
-                ['Base Value', f"{
-                    periodic_asset_history_with_fit['base_value'].iloc[-1]:,.2f}"],
-                ['Fitted Value', f"{
-                    periodic_asset_history_with_fit['fitted'].iloc[-1]:,.2f}"],
-                ['Base Over/Under', f"{base_over_under:.1%}"]]
-        )
+        trend_info_df = get_trend_info(periodic_asset_history_with_fit)
 
         col1, col2 = st.columns([1, 2])
 

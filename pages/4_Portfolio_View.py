@@ -1,9 +1,12 @@
+# pylint: disable=C0103
+"""Get the information of a stock symbol from Yahoo Finance API."""
 import datetime
+import json
 import pandas as pd
 import streamlit as st
-from utilities.utilities import fetch_asset_info_and_history, fetch_fx_rate_history, generate_asset_base_value, append_fitted_data
+from utilities.utilities import fetch_asset_info_and_history, fetch_fx_rate_history, generate_asset_base_value, \
+    append_fitted_data, get_trend_info
 from utilities.constants import BASE_CURRENCY_OPTIONS
-import json
 
 
 print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
@@ -12,7 +15,6 @@ st.set_page_config(page_title="Portfolio View", layout="centered")
 
 username = st.text_input(label="Enter username",
                          key="username_input", type="password")
-print(st.secrets["DB_USERNAME"])
 
 
 assets_positions = json.loads(st.secrets["ASSETS_POSITIONS_STR"]) if username == st.secrets["DB_USERNAME"] else [
@@ -87,7 +89,7 @@ with col3:
 periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
     aggregate_df, selected_period, 'Portfolio')
 
-print(f"Portfolio CAGR: {cagr}")
-print(f"Portfolio CAGR fitted: {cagr_fitted}")
-print(f"Portfolio over/under: {base_over_under}")
 st.line_chart(periodic_asset_history_with_fit[['Portfolio', 'fitted']])
+trend_info_df = get_trend_info(periodic_asset_history_with_fit, "Portfolio")
+
+st.dataframe(trend_info_df, hide_index=True)

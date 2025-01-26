@@ -84,9 +84,11 @@ def get_exp_fitted_data(y: List[int]) -> List[int]:
 
 def append_fitted_data(history_data: pd.DataFrame, selected_period: str, col_to_fit='base_value') -> pd.DataFrame:
     """ Append the fitted data to the history data. """
+    tail_n = int(round(int(selected_period.split(" ")[
+                 0])*365.25)) + 1 if "Max" not in selected_period else 0
 
     period_history_data = history_data.copy().tail(
-        int(round(int(selected_period.split(" ")[0])*365.25))+1) if "Max" not in selected_period else history_data.copy()
+        tail_n) if "Max" not in selected_period else history_data.copy()
 
     period_history_data['fitted'] = get_exp_fitted_data(
         period_history_data[col_to_fit].values)
@@ -155,3 +157,37 @@ def create_asset_info_df(asset_info: dict) -> pd.DataFrame:
             in asset_info])
 
     return asset_info_table
+
+
+def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value') -> pd.DataFrame:
+    """ Get the trend info DataFrame """
+
+    days = periodic_asset_history_with_fit.shape[0]
+    latest_base_value = periodic_asset_history_with_fit[base_column].iloc[-1]
+    latest_fitted_value = periodic_asset_history_with_fit['fitted'].iloc[-1]
+    oldest_base_value = periodic_asset_history_with_fit[base_column].iloc[0]
+    oldest_fitted_value = periodic_asset_history_with_fit['fitted'].iloc[0]
+
+    cagr = (latest_base_value / oldest_base_value) ** (1 / (days / 365.25)) - 1
+    cagr_fitted = (latest_fitted_value /
+                   oldest_fitted_value) ** (1 / (days / 365.25)) - 1
+
+    base_over_under = latest_base_value / \
+        latest_fitted_value - 1
+
+    return pd.DataFrame(
+        columns=['Label', 'Value'],
+        data=[
+            ['Sample Years', f"{days / 365.25:.1f}"],
+            ['CAGR Base', f"{cagr:.1%}"],
+            ['CAGR Fitted', f"{cagr_fitted:.1%}"],
+            ['', ''],
+            ['Date',
+                periodic_asset_history_with_fit['Date'].iloc[-1].strftime('%Y-%m-%d')],
+            ['Base Value', f"{
+                periodic_asset_history_with_fit[base_column].iloc[-1]:,.2f}"],
+            ['Fitted Value', f"{
+                periodic_asset_history_with_fit['fitted'].iloc[-1]:,.2f}"],
+            ['Base Over/Under', f"{base_over_under:.1%}"]
+        ]
+    )
