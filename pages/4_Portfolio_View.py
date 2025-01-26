@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import streamlit as st
 from utilities.utilities import fetch_asset_info_and_history, fetch_fx_rate_history, generate_asset_base_value, \
-    append_fitted_data, get_trend_info
+    append_fitted_data, get_trend_info, display_trend_line_chart
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 
@@ -89,7 +89,14 @@ with col3:
 periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
     aggregate_df, selected_period, 'Portfolio')
 
-st.line_chart(periodic_asset_history_with_fit[['Portfolio', 'fitted']])
-trend_info_df = get_trend_info(periodic_asset_history_with_fit, "Portfolio")
+col1, col2 = st.columns([1, 2])
 
-st.dataframe(trend_info_df, hide_index=True)
+with col1:
+    trend_info_df = get_trend_info(
+        periodic_asset_history_with_fit, "Portfolio")
+    st.dataframe(trend_info_df, hide_index=True)
+    st.write("*CAGR: Compound Annual Growth Rate*")
+
+# Create the line chart
+with col2:
+    display_trend_line_chart(periodic_asset_history_with_fit, "Portfolio")

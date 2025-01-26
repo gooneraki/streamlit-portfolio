@@ -8,7 +8,8 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_info_and_history, create_asset_info_df, \
-    fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info
+    fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
+    get_annual_returns_trend_info, display_trend_line_chart
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
@@ -43,6 +44,14 @@ symbol_name = convert_symbol_to_yf_format(
 if len(symbol_name) > 0:
 
     st.subheader(f"Symbol: {symbol_name}")
+
+    # test = yf.Search(symbol_name)
+    # print(test)
+    # <yfinance.search.Search object at 0x000002991F6CF4A0>
+    # print(test.all)
+    # print keys of all
+    # print(test.all.keys())
+    # print(test.all['quotes'])
 
     if validate_symbol_exists(symbol_name):
 
@@ -88,46 +97,23 @@ if len(symbol_name) > 0:
             full_asset_base_history, selected_period)
 
         # Display the CAGR and CAGR for the fitted data
-        trend_info_df = get_trend_info(periodic_asset_history_with_fit)
 
         col1, col2 = st.columns([1, 2])
 
         with col1:
+            trend_info_df = get_trend_info(periodic_asset_history_with_fit)
             st.dataframe(trend_info_df, hide_index=True)
             st.write("*CAGR: Compound Annual Growth Rate*")
 
         # Create the line chart
-
-        y_axis_padding = 0.1 * \
-            (periodic_asset_history_with_fit['base_value'].max() -
-             periodic_asset_history_with_fit['base_value'].min())
-
-        y_axis_start = periodic_asset_history_with_fit[['base_value',
-                                                        'fitted']].min().min() - y_axis_padding
-
-        y_axis_end = periodic_asset_history_with_fit[['base_value',
-                                                      'fitted']].max().max() + y_axis_padding
-
-        chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
-            x=alt.X('Date:T', title=None),
-            y=alt.Y('base_value:Q', scale=alt.Scale(
-                domain=[y_axis_start, y_axis_end]), title=f'Base Value {cagr:.1%}'),
-            color=alt.value('#14B3EB')  # Set custom color
-        )
-
-        fitted_chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
-            x=alt.X('Date:T', title=None),
-            y=alt.Y('fitted:Q', scale=alt.Scale(
-                domain=[y_axis_start, y_axis_end]), title=f'Fitted Value {cagr_fitted:.1%}'),
-            color=alt.value('#EB4C14')  # Set custom color
-        )
-
         with col2:
-            st.altair_chart(
-                (chart + fitted_chart).properties(height=425), use_container_width=True)
+            display_trend_line_chart(periodic_asset_history_with_fit)
 
         # lets show a chart of daily annual returns
         st.markdown("#### Daily Annual Returns")
+
+        annual_returns_info, geometric_mean = get_annual_returns_trend_info(
+            periodic_asset_history_with_fit)
 
         daily_returns_chart = alt.Chart(periodic_asset_history_with_fit.dropna()).mark_line().encode(
             x=alt.X('Date:T', title=None),
@@ -140,10 +126,6 @@ if len(symbol_name) > 0:
             )
         )
 
-        geometric_mean = (1 + periodic_asset_history_with_fit.dropna()['annual_base_return']).prod() \
-            ** (1/periodic_asset_history_with_fit.dropna().shape[0]) \
-            - 1
-
         # Make the line of mean
         mean_line = alt.Chart(pd.DataFrame({'mean': [geometric_mean]})).mark_rule(
             color='purple', size=2).encode(y='mean:Q')
@@ -151,20 +133,6 @@ if len(symbol_name) > 0:
         # Zero line
         zero_line = alt.Chart(pd.DataFrame({'zero': [0]})).mark_rule(
             color='red', size=1).encode(y='zero:Q')
-
-        annual_returns_info = pd.DataFrame(
-            columns=['Label', 'Value'],
-            data=[
-                ['Sample Years', f"{
-                    periodic_asset_history_with_fit.dropna().shape[0] / 365.25:.1f}"],
-                ['Mean Annual Return', f"{geometric_mean:.1%}"],
-                ['', ''],
-                ['Date',
-                    periodic_asset_history_with_fit['Date'].iloc[-1].strftime('%Y-%m-%d')],
-                ['Current Annual Return', f"{
-                    periodic_asset_history_with_fit['annual_base_return'].iloc[-1]:,.1%}"],
-            ]
-        )
 
         annual_col1, annual_col2 = st.columns([1, 2])
 

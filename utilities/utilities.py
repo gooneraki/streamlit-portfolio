@@ -4,6 +4,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import streamlit as st
+import altair as alt
 
 
 class AssetDetails(TypedDict):
@@ -159,6 +160,24 @@ def create_asset_info_df(asset_info: dict) -> pd.DataFrame:
     return asset_info_table
 
 
+def get_trend_stats(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value'):
+    """ Get the trend stats """
+    days = periodic_asset_history_with_fit.shape[0]
+    latest_base_value = periodic_asset_history_with_fit[base_column].iloc[-1]
+    latest_fitted_value = periodic_asset_history_with_fit['fitted'].iloc[-1]
+    oldest_base_value = periodic_asset_history_with_fit[base_column].iloc[0]
+    oldest_fitted_value = periodic_asset_history_with_fit['fitted'].iloc[0]
+
+    cagr = (latest_base_value / oldest_base_value) ** (1 / (days / 365.25)) - 1
+    cagr_fitted = (latest_fitted_value /
+                   oldest_fitted_value) ** (1 / (days / 365.25)) - 1
+
+    base_over_under = latest_base_value / \
+        latest_fitted_value - 1
+
+    return cagr, cagr_fitted, base_over_under
+
+
 def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value') -> pd.DataFrame:
     """ Get the trend info DataFrame """
 
@@ -191,3 +210,59 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='b
             ['Base Over/Under', f"{base_over_under:.1%}"]
         ]
     )
+
+
+def display_trend_line_chart(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value'):
+    """ Display the trend line chart """
+    cagr, cagr_fitted, _ = get_trend_stats(
+        periodic_asset_history_with_fit, base_column)
+
+    y_axis_padding = 0.1 * \
+        (periodic_asset_history_with_fit[base_column].max() -
+         periodic_asset_history_with_fit[base_column].min())
+
+    y_axis_start = periodic_asset_history_with_fit[[base_column,
+                                                    'fitted']].min().min() - y_axis_padding
+
+    y_axis_end = periodic_asset_history_with_fit[[base_column,
+                                                  'fitted']].max().max() + y_axis_padding
+
+    chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
+        x=alt.X('Date:T', title=None),
+        y=alt.Y(f'{base_column}:Q', scale=alt.Scale(
+            domain=[y_axis_start, y_axis_end]), title=f'Base Value {cagr:.1%}'),
+        color=alt.value('#14B3EB')  # Set custom color
+    )
+
+    fitted_chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
+        x=alt.X('Date:T', title=None),
+        y=alt.Y('fitted:Q', scale=alt.Scale(
+            domain=[y_axis_start, y_axis_end]), title=f'Fitted Value {cagr_fitted:.1%}'),
+        color=alt.value('#EB4C14')  # Set custom color
+    )
+
+    st.altair_chart(
+        (chart + fitted_chart).properties(height=425), use_container_width=True)
+
+
+def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame) -> pd.DataFrame:
+    """ Get the annual trend info DataFrame """
+    clean_df = periodic_asset_history_with_fit.dropna()
+
+    geometric_mean = (1 + clean_df['annual_base_return']).prod() \
+        ** (1/clean_df.shape[0]) \
+        - 1
+
+    return pd.DataFrame(
+        columns=['Label', 'Value'],
+        data=[
+            ['Sample Years', f"{
+                clean_df.shape[0] / 365.25:.1f}"],
+            ['Mean Annual Return', f"{geometric_mean:.1%}"],
+            ['', ''],
+            ['Date',
+             clean_df['Date'].iloc[-1].strftime('%Y-%m-%d')],
+            ['Current Annual Return', f"{
+                clean_df['annual_base_return'].iloc[-1]:,.1%}"],
+        ]
+    ), geometric_mean
