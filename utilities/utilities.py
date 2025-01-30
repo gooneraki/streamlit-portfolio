@@ -249,20 +249,22 @@ def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame)
     """ Get the annual trend info DataFrame """
     clean_df = periodic_asset_history_with_fit.dropna()
 
-    geometric_mean = (1 + clean_df['annual_base_return']).prod() \
-        ** (1/clean_df.shape[0]) \
-        - 1
+    # geometric_mean = (1 + clean_df['annual_base_return']).prod() \
+    #     ** (1/clean_df.shape[0]) \
+    #     - 1
+
+    mean = clean_df['annual_base_return'].mean()
 
     return pd.DataFrame(
         columns=['Label', 'Value'],
         data=[
             ['Sample Years', f"{
                 clean_df.shape[0] / 365.25:.1f}"],
-            ['Mean Annual Return', f"{geometric_mean:.1%}"],
+            ['Mean Annual Return', f"{mean:.1%}"],
             ['', ''],
             ['Date',
              clean_df['Date'].iloc[-1].strftime('%Y-%m-%d')],
             ['Current Annual Return', f"{
                 clean_df['annual_base_return'].iloc[-1]:,.1%}"],
         ]
-    ), geometric_mean
+    )
