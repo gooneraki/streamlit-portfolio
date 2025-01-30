@@ -267,4 +267,4 @@ def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame)
             ['Current Annual Return', f"{
                 clean_df['annual_base_return'].iloc[-1]:,.1%}"],
         ]
-    )
+    ), mean

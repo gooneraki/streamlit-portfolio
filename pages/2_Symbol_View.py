@@ -112,7 +112,7 @@ if len(symbol_name) > 0:
         # lets show a chart of daily annual returns
         st.markdown("#### Daily Annual Returns")
 
-        annual_returns_info = get_annual_returns_trend_info(
+        annual_returns_info, mean = get_annual_returns_trend_info(
             periodic_asset_history_with_fit)
 
         daily_returns_chart = alt.Chart(periodic_asset_history_with_fit.dropna()).mark_line().encode(
@@ -125,9 +125,6 @@ if len(symbol_name) > 0:
                 alt.value("#EB4C14")
             )
         )
-
-        mean = annual_returns_info.loc[annual_returns_info['Label']
-                                       == 'Mean Annual Return']['Value'].values[0]
 
         # Make the line of mean
         mean_line = alt.Chart(pd.DataFrame({'mean': [mean]})).mark_rule(
