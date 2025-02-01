@@ -14,6 +14,9 @@ from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
+# if 'search_results' not in st.session_state:
+#     st.session_state.search_results = None
+
 
 def convert_symbol_to_yf_format(symbol):
     """Convert the symbol to Yahoo Finance format."""
@@ -35,7 +38,21 @@ def validate_symbol_exists(symbol):
         return True
 
 
+# def search_input():
+#     symbol_input = st.session_state.symbol_input_2
+#     results = yf.Search(symbol_input)
+#     st.session_state.search_results = results.quotes
+#     st.cache_data.clear()
+#     print(f"{symbol_input}\n")
+#     print(results.quotes)
+
+
 st.title("Symbol Information")
+
+# new_input = st.text_input("Search symbol quote", "VUSA.L",
+#                           key="symbol_input_2", on_change=search_input)
+
+# st.dataframe(st.session_state.search_results)
 
 
 symbol_name = convert_symbol_to_yf_format(
