@@ -22,6 +22,13 @@ class ExpandedAssetDetails(AssetDetails):
 
 
 @st.cache_data
+def fetch_asset_info(symbol: str) -> dict:
+    """ Fetch the asset info for a given symbol """
+    y_finance_ticker = yf.Ticker(symbol)
+    return y_finance_ticker.info
+
+
+@st.cache_data
 def fetch_asset_info_and_history(symbol: str) -> Tuple[dict, pd.Series]:
     """ Fetch the asset info for a given symbol """
     y_finance_ticker = yf.Ticker(symbol)

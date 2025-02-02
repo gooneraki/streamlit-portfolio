@@ -1,6 +1,6 @@
 # pylint: disable=C0103
 """Get the information of a stock symbol from Yahoo Finance API."""
-import re
+
 from typing import List
 import datetime
 import yfinance as yf
@@ -9,20 +9,10 @@ import altair as alt
 import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_info_and_history, create_asset_info_df, \
     fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info, display_trend_line_chart
+    get_annual_returns_trend_info, display_trend_line_chart, fetch_asset_info
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
-
-
-def convert_symbol_to_yf_format(symbol):
-    """Convert the symbol to Yahoo Finance format."""
-    # remove dots at the start and end of the string and consecutive dots
-    # replace all characters except letters and dots with empty string
-    if symbol:
-        return re.sub(r'\.{2,}', '.', re.sub(r'[^A-Za-z\.]', '', symbol)).strip(".").upper()
-    else:
-        return ""
 
 
 @st.cache_data
@@ -37,8 +27,9 @@ def validate_symbol_exists(symbol):
 
 st.title("Symbol Information")
 
+st.write("### Search symbols")
 
-search_input = st.text_input("Search symbol quote",
+search_input = st.text_input("First result will be analyzed",
                              key="search_input",  placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
 
 search_results = yf.Search(search_input)
@@ -46,22 +37,31 @@ search_results = yf.Search(search_input)
 symbol_name = search_results.quotes[0]['symbol'] if search_results is not None and len(
     search_results.quotes) > 0 else None
 
-st.dataframe(search_results.quotes)
+st.write("##### Search results")
+
+if search_results is not None and len(search_results.quotes) > 0:
+    result_quotes = search_results.quotes
+
+    result_quotes_df = pd.DataFrame(
+        search_results.quotes).drop("index", axis=1)
+    result_quotes_df.set_index('symbol', inplace=True)
+
+    st.dataframe(result_quotes_df)
 
 
 if symbol_name is not None:
 
     st.subheader(f"Symbol: {symbol_name}")
 
-    sym_ticker = yf.Ticker(symbol_name)
+    asset_info_df = pd.DataFrame.from_dict(
+        fetch_asset_info(symbol_name), orient='index', columns=['Value'])
 
-    # print(sym_ticker.major_holders)
-    # print(sym_ticker.calendar)
-    # print(sym_ticker.fast_info)
-    # print(sym_ticker.sec_filings)
+    asset_info_df.index.name = "Attribute"
 
-    # symbol_info = sym_ticker.info
-    st.dataframe(sym_ticker.info, use_container_width=True)
+    st.info("Asset Information")
+
+    with st.expander("Show all info"):
+        st.dataframe(asset_info_df.dropna(), use_container_width=True)
 
     if validate_symbol_exists(symbol_name):
 
