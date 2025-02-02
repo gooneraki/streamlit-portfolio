@@ -14,9 +14,6 @@ from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
-# if 'search_results' not in st.session_state:
-#     st.session_state.search_results = None
-
 
 def convert_symbol_to_yf_format(symbol):
     """Convert the symbol to Yahoo Finance format."""
@@ -38,37 +35,33 @@ def validate_symbol_exists(symbol):
         return True
 
 
-# def search_input():
-#     symbol_input = st.session_state.symbol_input_2
-#     results = yf.Search(symbol_input)
-#     st.session_state.search_results = results.quotes
-#     st.cache_data.clear()
-#     print(f"{symbol_input}\n")
-#     print(results.quotes)
-
-
 st.title("Symbol Information")
 
-# new_input = st.text_input("Search symbol quote", "VUSA.L",
-#                           key="symbol_input_2", on_change=search_input)
 
-# st.dataframe(st.session_state.search_results)
+search_input = st.text_input("Search symbol quote",
+                             key="search_input",  placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
+
+search_results = yf.Search(search_input)
+
+symbol_name = search_results.quotes[0]['symbol'] if search_results is not None and len(
+    search_results.quotes) > 0 else None
+
+st.dataframe(search_results.quotes)
 
 
-symbol_name = convert_symbol_to_yf_format(
-    st.text_input(label="Enter a symbol", value="VUSA.L", key="symbol_input"))
-
-if len(symbol_name) > 0:
+if symbol_name is not None:
 
     st.subheader(f"Symbol: {symbol_name}")
 
-    # test = yf.Search(symbol_name)
-    # print(test)
-    # <yfinance.search.Search object at 0x000002991F6CF4A0>
-    # print(test.all)
-    # print keys of all
-    # print(test.all.keys())
-    # print(test.all['quotes'])
+    sym_ticker = yf.Ticker(symbol_name)
+
+    # print(sym_ticker.major_holders)
+    # print(sym_ticker.calendar)
+    # print(sym_ticker.fast_info)
+    # print(sym_ticker.sec_filings)
+
+    # symbol_info = sym_ticker.info
+    st.dataframe(sym_ticker.info, use_container_width=True)
 
     if validate_symbol_exists(symbol_name):
 
