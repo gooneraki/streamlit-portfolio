@@ -4,8 +4,8 @@ import datetime
 import json
 import pandas as pd
 import streamlit as st
-from utilities.utilities import fetch_asset_info_and_history, fetch_fx_rate_history, generate_asset_base_value, \
-    append_fitted_data, get_trend_info, display_trend_line_chart
+from utilities.utilities import fetch_asset_info, fetch_asset_history, fetch_fx_rate_history, \
+    generate_asset_base_value, append_fitted_data, get_trend_info, display_trend_line_chart
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 
@@ -56,8 +56,9 @@ aggregate_df = pd.DataFrame()
 
 for asset in assets_positions:
 
-    asset_info, full_asset_history = fetch_asset_info_and_history(
-        asset["symbol"])
+    asset_info = fetch_asset_info(asset["symbol"])
+
+    full_asset_history = fetch_asset_history(asset["symbol"])
 
     # Fetch the fx rate history for the asset currency
     full_fx_rate_history = fetch_fx_rate_history(

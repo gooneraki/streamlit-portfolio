@@ -1,5 +1,5 @@
 """ This module contains utility functions for the portfolio app """
-from typing import List, TypedDict, Tuple
+from typing import List, TypedDict
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -29,12 +29,16 @@ def fetch_asset_info(symbol: str):
 
 
 @st.cache_data
-def fetch_asset_info_and_history(symbol: str) -> Tuple[dict, pd.Series]:
+def fetch_asset_history(symbol: str):
     """ Fetch the asset info for a given symbol """
     y_finance_ticker = yf.Ticker(symbol)
 
     ticker_history = y_finance_ticker.history(
         period='max', auto_adjust=True)['Close']
+
+    if ticker_history.shape[0] == 0:
+        return None
+
     ticker_history.index = ticker_history.index.tz_localize(None)
     ticker_history = ticker_history.resample('D').ffill()
 
@@ -44,7 +48,7 @@ def fetch_asset_info_and_history(symbol: str) -> Tuple[dict, pd.Series]:
     ticker_history['color'] = ticker_history['annual_value_return'].apply(
         lambda x: "#14B3EB" if x > 0 else "#EB4C14")
 
-    return y_finance_ticker.info, ticker_history
+    return ticker_history
 
 
 @st.cache_data
@@ -116,7 +120,7 @@ def append_fitted_data(history_data: pd.DataFrame, selected_period: str, col_to_
     return period_history_data, cagr, cagr_fitted, base_over_under
 
 
-def create_asset_info_df(asset_info: dict) -> pd.DataFrame:
+def create_asset_info_df(asset_info: dict):
     """ Get the asset info DataFrame """
     keys_to_display = [
         {
@@ -158,11 +162,10 @@ def create_asset_info_df(asset_info: dict) -> pd.DataFrame:
     ]
 
     asset_info_table = pd.DataFrame(
-        columns=['Label', 'Value'],
+        columns=['Field', 'Value'],
         data=[
-            [item['label'],
-                asset_info[item['key']]] for item in keys_to_display if item['key']
-            in asset_info])
+            [item['label'], asset_info[item['key']]]
+            for item in keys_to_display if item['key'] in asset_info])
 
     return asset_info_table
 
