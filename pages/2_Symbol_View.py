@@ -3,13 +3,12 @@
 
 from typing import List
 import datetime
-import yfinance as yf
 import streamlit as st
 import altair as alt
 import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_history, create_asset_info_df, \
     fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info, display_trend_line_chart, fetch_asset_info
+    get_annual_returns_trend_info, display_trend_line_chart, fetch_asset_info, search_symbol
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
@@ -20,7 +19,7 @@ def reset_query_params(p_search_input: str):
     if p_search_input is None:
         st.query_params.pop("symbol", None)
     else:
-        st.query_params.update({"symbol": p_search_input.upper()})
+        st.query_params.update({"symbol": p_search_input})
 
 
 st.title("Symbol Information")
@@ -32,23 +31,20 @@ search_input = st.text_input("First result will be analyzed",
                              max_chars=10,
                              key="search_input",
                              placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
+search_input = search_input.upper() if search_input is not None else None
 
 # TODO: fix updating the query params
 # reset_query_params(search_input)
 
-search_results = yf.Search(search_input)
-symbol_name = search_results.quotes[0]['symbol'] if search_results is not None and len(
-    search_results.quotes) > 0 else None
+first_result, result_quotes_df = search_symbol(search_input)
+
+
+symbol_name = first_result['symbol'] if first_result is not None else None
 
 
 st.write("##### Search results")
 
-if search_results is not None and len(search_results.quotes) > 0:
-    result_quotes = search_results.quotes
-
-    result_quotes_df = pd.DataFrame(
-        search_results.quotes).drop("index", axis=1)
-    result_quotes_df.set_index('symbol', inplace=True)
+if result_quotes_df is not None:
 
     st.dataframe(result_quotes_df)
 else:
@@ -64,10 +60,11 @@ if symbol_name is not None:
 
     asset_info = fetch_asset_info(symbol_name)
 
+    combo_asset_info = {**asset_info, **first_result}
     with st.expander("Raw asset info (JSON)"):
-        st.json(fetch_asset_info(symbol_name))
+        st.json(combo_asset_info)
 
-    st.dataframe(create_asset_info_df(asset_info),
+    st.dataframe(create_asset_info_df(combo_asset_info),
                  hide_index=True,
                  use_container_width=True)
 
@@ -133,11 +130,11 @@ if symbol_name is not None:
         x=alt.X('Date:T', title=None),
         y=alt.Y('annual_base_return:Q', title='Annual Return',
                 axis=alt.Axis(format='.1%')),
-        color=alt.condition(
-            alt.datum.annual_base_return > 0,
-            alt.value("#14B3EB"),
-            alt.value("#EB4C14")
-        )
+        # color=alt.condition(
+        #     alt.datum.annual_base_return > 0,
+        #     alt.value("#14B3EB"),
+        #     alt.value("#EB4C14")
+        # )
     )
 
     # Make the line of mean

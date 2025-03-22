@@ -74,6 +74,23 @@ def fetch_fx_rate_history(asset_currency: str, base_currency: str) -> pd.Series:
     return fx_history
 
 
+@st.cache_data
+def search_symbol(search_input: str):
+    """ Search for a symbol """
+    search_results = yf.Search(search_input)
+
+    first_result = search_results.quotes[0] if \
+        search_results is not None and \
+        search_results.quotes is not None and \
+        len(search_results.quotes) > 0 \
+        else None
+
+    result_quotes_df = pd.DataFrame(
+        search_results.quotes).set_index('symbol') if first_result is not None else None
+
+    return first_result, result_quotes_df
+
+
 def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series):
     """ Generate the base value for an asset """
 
@@ -136,6 +153,10 @@ def create_asset_info_df(asset_info: dict):
         {
             "key": 'longName',
             "label": "Name"
+        },
+        {
+            "key": 'shortname',
+            "label": "Short Name"
         },
         {
             "key": 'currency',
