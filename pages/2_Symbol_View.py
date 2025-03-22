@@ -111,7 +111,7 @@ if symbol_name is not None:
 
     asset_info = fetch_asset_info(symbol_name)
 
-    combo_asset_info = {**asset_info, **first_result}
+    combo_asset_info = {**first_result, **asset_info}
     with st.expander("Raw asset info (JSON)"):
         st.json(combo_asset_info)
 
