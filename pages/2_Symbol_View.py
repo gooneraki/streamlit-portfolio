@@ -53,10 +53,10 @@ if symbol_name is not None:
 
     st.subheader(f"Symbol: {symbol_name}")
 
-    asset_info_df = pd.DataFrame.from_dict(
-        fetch_asset_info(symbol_name), orient='index', columns=['Value'])
+    asset_info = fetch_asset_info(symbol_name)
 
-    asset_info_df.index.name = "Attribute"
+    asset_info_df = pd.DataFrame(
+        asset_info.items(), columns=["Field", "Value"])
 
     st.info("Asset Information")
 

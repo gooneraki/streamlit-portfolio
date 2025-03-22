@@ -22,7 +22,7 @@ class ExpandedAssetDetails(AssetDetails):
 
 
 @st.cache_data
-def fetch_asset_info(symbol: str) -> dict:
+def fetch_asset_info(symbol: str):
     """ Fetch the asset info for a given symbol """
     y_finance_ticker = yf.Ticker(symbol)
     return y_finance_ticker.info
