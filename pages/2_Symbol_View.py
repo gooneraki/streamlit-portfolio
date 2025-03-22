@@ -60,8 +60,8 @@ if symbol_name is not None:
 
     st.info("Asset Information")
 
-    with st.expander("Show all info"):
-        st.dataframe(asset_info_df.dropna(), use_container_width=True)
+    with st.expander("Raw asset info (JSON)"):
+        st.json(fetch_asset_info(symbol_name))
 
     if validate_symbol_exists(symbol_name):
 
