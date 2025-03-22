@@ -77,11 +77,14 @@ for asset in assets_positions:
 
 # Drop any rows with NaN values
 aggregate_df.dropna(inplace=True)
+
+# TODO : Backwards fill
+
 # Calculate the portfolio value
-aggregate_df['Portfolio'] = aggregate_df.sum(axis=1)
+aggregate_df['base_value'] = aggregate_df.sum(axis=1)
 
 
-history_options = get_history_options(aggregate_df['Portfolio'].shape[0])
+history_options = get_history_options(aggregate_df['base_value'].shape[0])
 
 history_options_keys = list(history_options.keys())
 
@@ -94,16 +97,15 @@ with col3:
     selected_period_value = history_options[selected_period_key]
 
 periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
-    aggregate_df, selected_period_value, 'Portfolio')
+    aggregate_df, selected_period_value)
 
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    trend_info_df = get_trend_info(
-        periodic_asset_history_with_fit, "Portfolio")
+    trend_info_df = get_trend_info(periodic_asset_history_with_fit)
     st.dataframe(trend_info_df, hide_index=True)
     st.write("*CAGR: Compound Annual Growth Rate*")
 
 # Create the line chart
 with col2:
-    display_trend_line_chart(periodic_asset_history_with_fit, "Portfolio")
+    display_trend_line_chart(periodic_asset_history_with_fit)
