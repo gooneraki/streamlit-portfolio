@@ -22,6 +22,21 @@ class ExpandedAssetDetails(AssetDetails):
 
 
 @st.cache_data
+def search_symbol(search_input: str):
+    """ Search for a symbol """
+    search_results = yf.Search(search_input)
+
+    result_quotes_df = pd.DataFrame(
+        search_results.quotes).set_index('symbol') if \
+        search_results is not None and \
+        search_results.quotes is not None and \
+        len(search_results.quotes) > 0 \
+        else None
+
+    return result_quotes_df
+
+
+@st.cache_data
 def fetch_asset_info(symbol: str):
     """ Fetch the asset info for a given symbol """
     y_finance_ticker = yf.Ticker(symbol)
@@ -59,7 +74,7 @@ def fetch_asset_history(symbol: str):
 
 
 @st.cache_data
-def fetch_fx_rate_history(asset_currency: str, base_currency: str) -> pd.Series:
+def fetch_fx_rate_history(asset_currency: str, base_currency: str):
     """ Fetch the fx rate for a given currency pair """
 
     if asset_currency == base_currency:
@@ -74,19 +89,22 @@ def fetch_fx_rate_history(asset_currency: str, base_currency: str) -> pd.Series:
     return fx_history
 
 
-@st.cache_data
-def search_symbol(search_input: str):
-    """ Search for a symbol """
-    search_results = yf.Search(search_input)
+def get_history_options(history_length: int):
+    """ Get the history options """
 
-    result_quotes_df = pd.DataFrame(
-        search_results.quotes).set_index('symbol') if \
-        search_results is not None and \
-        search_results.quotes is not None and \
-        len(search_results.quotes) > 0 \
-        else None
+    year_check = [i for i in ([
+        10 * j for j in range(int(history_length / 10 / 365.25), 0, -1)] + [5, 3, 1])
+        if round(i * 365.25) < history_length
+    ]
 
-    return result_quotes_df
+    days_list = [history_length] + [round(i * 365.25) for i in year_check]
+
+    days_names = [str(round(days/365.25, 1) if (abs(round(days/365.25, 1) - round(days/365.25, 0)) > 0.1) else int(round(days/365.25, 1))) +
+                  (" Year" if days < 366 else " Years") +
+                  (' (max)' if i == 0 else '')
+                  for i, days in enumerate(days_list) if days > 0]
+
+    return dict(zip(days_names, days_list))
 
 
 def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series):
@@ -119,13 +137,10 @@ def get_exp_fitted_data(y: List[int]):
     return y_exp
 
 
-def append_fitted_data(history_data: pd.DataFrame, selected_period: str, col_to_fit='base_value') -> pd.DataFrame:
+def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_fit='base_value'):
     """ Append the fitted data to the history data. """
-    tail_n = int(round(int(selected_period.split(" ")[
-                 0])*365.25)) + 1 if "Max" not in selected_period else 0
 
-    period_history_data = history_data.copy().tail(
-        tail_n) if "Max" not in selected_period else history_data.copy()
+    period_history_data = history_data.copy().tail(selected_period)
 
     period_history_data['fitted'] = get_exp_fitted_data(
         period_history_data[col_to_fit].values)

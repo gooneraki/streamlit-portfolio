@@ -5,7 +5,8 @@ import json
 import pandas as pd
 import streamlit as st
 from utilities.utilities import fetch_asset_info, fetch_asset_history, fetch_fx_rate_history, \
-    generate_asset_base_value, append_fitted_data, get_trend_info, display_trend_line_chart
+    generate_asset_base_value, append_fitted_data, get_trend_info, display_trend_line_chart, \
+    get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 
@@ -79,16 +80,21 @@ aggregate_df.dropna(inplace=True)
 # Calculate the portfolio value
 aggregate_df['Portfolio'] = aggregate_df.sum(axis=1)
 
-period_options = [f"Max ({round(aggregate_df['Portfolio'].shape[0]/365.25, 1)} years)"] + \
-    [str(period) + (" Year" if period == 1 else " Years")
-        for period in [10, 5, 3, 1] if aggregate_df['Portfolio'].shape[0] > period * 365.25]
+
+history_options = get_history_options(aggregate_df['Portfolio'].shape[0])
+
+history_options_keys = list(history_options.keys())
 
 col3, col4 = st.columns([1, 2])
 with col3:
-    selected_period = st.selectbox("Select period", period_options)
+    selected_period_key = st.selectbox(
+        "Select period",
+        history_options_keys,
+        index=history_options_keys.index("10 Years"))
+    selected_period_value = history_options[selected_period_key]
 
 periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
-    aggregate_df, selected_period, 'Portfolio')
+    aggregate_df, selected_period_value, 'Portfolio')
 
 col1, col2 = st.columns([1, 2])
 

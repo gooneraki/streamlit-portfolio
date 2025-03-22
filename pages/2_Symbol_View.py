@@ -9,7 +9,8 @@ import altair as alt
 import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_history, create_asset_info_df, \
     fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info, display_trend_line_chart, fetch_asset_info, search_symbol
+    get_annual_returns_trend_info, display_trend_line_chart, fetch_asset_info, search_symbol, \
+    get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
@@ -146,21 +147,20 @@ if symbol_name is not None:
 
     # Fetch the historical data for the asset and info
 
-    period_options = [f"Max ({round(full_asset_base_history['base_value'].shape[0]/365.25, 1)} years)"] + \
-        [str(period) + (" Year" if period == 1 else " Years")
-            for period in [10, 5, 3, 1] if full_asset_base_history['base_value'].shape[0] > period * 365.25]
+    history_options = get_history_options(
+        full_asset_base_history['base_value'].shape[0])
 
-    # put the 10 years first
-    if "10 Years" in period_options:
-        period_options.remove("10 Years")
-        period_options.insert(0, "10 Years")
+    history_options_keys = list(history_options.keys())
 
     with col2:
-        selected_period = st.selectbox("Select period", period_options)
+        selected_period_key = st.selectbox(
+            "Select period", history_options_keys, index=history_options_keys.index("10 Years"))
+
+    selected_period_value = history_options[selected_period_key]
 
     # Generate the data for the selected period
     periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
-        full_asset_base_history, selected_period)
+        full_asset_base_history, selected_period_value)
 
     # Display the CAGR and CAGR for the fitted data
 
