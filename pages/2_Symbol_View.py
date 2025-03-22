@@ -15,21 +15,31 @@ from utilities.constants import BASE_CURRENCY_OPTIONS
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
 
+def reset_query_params(p_search_input: str):
+    """Reset the query parameters."""
+    if p_search_input is None:
+        st.query_params.pop("symbol", None)
+    else:
+        st.query_params.update({"symbol": p_search_input.upper()})
+
+
 st.title("Symbol Information")
 
 st.write("### Search symbols")
 
 search_input = st.text_input("First result will be analyzed",
                              value=st.query_params.get("symbol"),
+                             max_chars=10,
                              key="search_input",
                              placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
 
-st.query_params.update({"symbol": search_input.upper()})
+# TODO: fix updating the query params
+# reset_query_params(search_input)
 
 search_results = yf.Search(search_input)
-
 symbol_name = search_results.quotes[0]['symbol'] if search_results is not None and len(
     search_results.quotes) > 0 else None
+
 
 st.write("##### Search results")
 
@@ -41,6 +51,11 @@ if search_results is not None and len(search_results.quotes) > 0:
     result_quotes_df.set_index('symbol', inplace=True)
 
     st.dataframe(result_quotes_df)
+else:
+    if search_input is None:
+        st.info("Please enter a symbol to search.")
+    else:
+        st.warning(f"No results found for '{search_input}'.")
 
 
 if symbol_name is not None:
@@ -56,8 +71,7 @@ if symbol_name is not None:
                  hide_index=True,
                  use_container_width=True)
 
-    full_asset_history = fetch_asset_history(
-        symbol_name)
+    full_asset_history = fetch_asset_history(symbol_name)
 
     if full_asset_history is None:
         st.error(f"No historical data found for {symbol_name}.")

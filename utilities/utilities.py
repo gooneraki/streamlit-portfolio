@@ -31,10 +31,17 @@ def fetch_asset_info(symbol: str):
 @st.cache_data
 def fetch_asset_history(symbol: str):
     """ Fetch the asset info for a given symbol """
+
+    valid_periods = ['1d', '5d', '1mo', '3mo',
+                     '6mo', '1y', '2y', '5y', '10y',  'max']
     y_finance_ticker = yf.Ticker(symbol)
 
-    ticker_history = y_finance_ticker.history(
-        period='max', auto_adjust=True)['Close']
+    # Try all valid_periods (in reverse) and break if data is found
+    for period in valid_periods[::-1]:
+        ticker_history = y_finance_ticker.history(
+            period=period, auto_adjust=True)['Close']
+        if ticker_history.shape[0] > 0:
+            break
 
     if ticker_history.shape[0] == 0:
         return None
@@ -45,8 +52,8 @@ def fetch_asset_history(symbol: str):
     ticker_history = pd.concat([ticker_history, ticker_history.pct_change(365)], axis=1, keys=[
                                'value', 'annual_value_return'])
 
-    ticker_history['color'] = ticker_history['annual_value_return'].apply(
-        lambda x: "#14B3EB" if x > 0 else "#EB4C14")
+    # ticker_history['color'] = ticker_history['annual_value_return'].apply(
+    #     lambda x: "#14B3EB" if x > 0 else "#EB4C14")
 
     return ticker_history
 
@@ -67,7 +74,7 @@ def fetch_fx_rate_history(asset_currency: str, base_currency: str) -> pd.Series:
     return fx_history
 
 
-def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series) -> pd.DataFrame:
+def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series):
     """ Generate the base value for an asset """
 
     asset_history['fx_history'] = fx_history
@@ -83,8 +90,11 @@ def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series
     return asset_history
 
 
-def get_exp_fitted_data(y: List[int]) -> List[int]:
+def get_exp_fitted_data(y: List[int]):
     """ Fit the value data to an exponential curve. """
+    if len(y) < 2:
+        return y
+
     x = np.arange(len(y))
 
     y_log = np.log(y)
@@ -255,13 +265,13 @@ def display_trend_line_chart(periodic_asset_history_with_fit: pd.DataFrame, base
         (chart + fitted_chart).properties(height=425), use_container_width=True)
 
 
-def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame) -> pd.DataFrame:
+def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame):
     """ Get the annual trend info DataFrame """
+
     clean_df = periodic_asset_history_with_fit.dropna()
 
-    # geometric_mean = (1 + clean_df['annual_base_return']).prod() \
-    #     ** (1/clean_df.shape[0]) \
-    #     - 1
+    if clean_df is None or clean_df.shape[0] == 0:
+        return None, None
 
     mean = clean_df['annual_base_return'].mean()
 
