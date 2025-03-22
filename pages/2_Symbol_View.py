@@ -26,20 +26,25 @@ st.title("Symbol Information")
 
 st.write("### Search symbols")
 
-search_input = st.text_input("First result will be analyzed",
-                             value=st.query_params.get("symbol"),
-                             max_chars=10,
-                             key="search_input",
-                             placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
-search_input = search_input.upper() if search_input is not None else None
 
-# TODO: fix updating the query params
-# reset_query_params(search_input)
+with st.form(key="search_form"):
+    search_input = st.text_input("First result will be analyzed",
+                                 value=st.query_params.get("symbol"),
+                                 max_chars=10,
+                                 key="search_input",
+                                 placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
+    search_input = search_input.upper() if search_input is not None else None
+    search_button = st.form_submit_button("Search")
 
-first_result, result_quotes_df = search_symbol(search_input)
+if search_button:
+    reset_query_params(search_input)
+    st.rerun()
 
+result_quotes_df = search_symbol(search_input)
 
-symbol_name = first_result['symbol'] if first_result is not None else None
+first_result = result_quotes_df.iloc[0] if result_quotes_df is not None and result_quotes_df.shape[0] > 0 else None
+
+symbol_name = first_result.name if first_result is not None else None
 
 
 st.write("##### Search results")
