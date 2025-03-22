@@ -72,18 +72,19 @@ if symbol_name is not None:
             #copy-btn {
                 background-color: #f0fcec;
                 color: #177233;
-                padding: 10px 20px;
-                font-size: 16px;
+                padding: 8px 16px;
+                font-size: 14px;
                 font-weight: 500;
-                border: none;
-                border-radius: 10px;
+                border: 1px solid #e0f5e7;
+                border-radius: 8px;
                 cursor: pointer;
-                transition: background-color 0.3s ease, transform 0.1s ease;
+                transition: all 0.3s ease;
                 box-shadow: 0 2px 6px rgba(33, 195, 84, 0.1);
             }
 
             #copy-btn:hover {
                 background-color: #f0fcec;
+                border-color: #21c354;
             }
 
             #copy-btn:active {
@@ -105,7 +106,7 @@ if symbol_name is not None:
 
         <button id="copy-btn" onclick="copyURL()">📋 Copy current URL</button>
         """,
-        height=60)
+        height=50)
 
     asset_info = fetch_asset_info(symbol_name)
 
@@ -148,6 +149,11 @@ if symbol_name is not None:
     period_options = [f"Max ({round(full_asset_base_history['base_value'].shape[0]/365.25, 1)} years)"] + \
         [str(period) + (" Year" if period == 1 else " Years")
             for period in [10, 5, 3, 1] if full_asset_base_history['base_value'].shape[0] > period * 365.25]
+
+    # put the 10 years first
+    if "10 Years" in period_options:
+        period_options.remove("10 Years")
+        period_options.insert(0, "10 Years")
 
     with col2:
         selected_period = st.selectbox("Select period", period_options)
