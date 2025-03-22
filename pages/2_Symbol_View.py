@@ -4,6 +4,7 @@
 from typing import List
 import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 import altair as alt
 import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_history, create_asset_info_df, \
@@ -33,12 +34,14 @@ with st.form(key="search_form"):
                                  max_chars=10,
                                  key="search_input",
                                  placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
-    search_input = search_input.upper() if search_input is not None else None
+    search_input = search_input.upper() if search_input is not None and len(
+        search_input) > 0 else None
     search_button = st.form_submit_button("Search")
 
 if search_button:
     reset_query_params(search_input)
     st.rerun()
+
 
 result_quotes_df = search_symbol(search_input)
 
@@ -62,6 +65,47 @@ else:
 if symbol_name is not None:
 
     st.subheader(f"Symbol: {symbol_name}")
+
+    components.html(
+        """
+        <style>
+            #copy-btn {
+                background-color: #f0fcec;
+                color: #177233;
+                padding: 10px 20px;
+                font-size: 16px;
+                font-weight: 500;
+                border: none;
+                border-radius: 10px;
+                cursor: pointer;
+                transition: background-color 0.3s ease, transform 0.1s ease;
+                box-shadow: 0 2px 6px rgba(33, 195, 84, 0.1);
+            }
+
+            #copy-btn:hover {
+                background-color: #f0fcec;
+            }
+
+            #copy-btn:active {
+                transform: scale(0.97);
+            }
+        </style>
+
+        <script>
+            function copyURL() {
+                navigator.clipboard.writeText(window.parent.location.href)
+                    .then(() => {
+                        const btn = document.getElementById("copy-btn");
+                        btn.innerText = "✅ Copied!";
+                        setTimeout(() => btn.innerText = "📋 Copy current URL", 2000);
+                    })
+                    .catch(err => alert("Failed to copy URL: " + err));
+            }
+        </script>
+
+        <button id="copy-btn" onclick="copyURL()">📋 Copy current URL</button>
+        """,
+        height=60)
 
     asset_info = fetch_asset_info(symbol_name)
 
