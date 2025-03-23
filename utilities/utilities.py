@@ -100,7 +100,7 @@ def get_history_options(history_length: int):
     days_list = [history_length] + [round(i * 365.25) for i in year_check]
 
     days_names = [str(round(days/365.25, 1) if
-                      (abs(round(days/365.25, 1) - round(days/365.25, 0)) > 0.1) else
+                      (abs(round(days/365.25, 1) - round(days/365.25, 0)) > 0.05) else
                       int(round(days/365.25, 1))) +
                   (" Year" if days < 366 else " Years") +
                   (' (max)' if i == 0 else '')

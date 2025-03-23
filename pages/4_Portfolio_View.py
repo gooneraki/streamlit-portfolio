@@ -93,7 +93,7 @@ with col3:
     selected_period_key = st.selectbox(
         "Select period",
         history_options_keys,
-        index=history_options_keys.index("10 Years"))
+        index=history_options_keys.index("10 Years") if "10 Years" in history_options_keys else 0)
     selected_period_value = history_options[selected_period_key]
 
 periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(

@@ -154,7 +154,8 @@ if symbol_name is not None:
 
     with col2:
         selected_period_key = st.selectbox(
-            "Select period", history_options_keys, index=history_options_keys.index("10 Years"))
+            "Select period", history_options_keys, index=history_options_keys.index("10 Years") if
+            "10 Years" in history_options_keys else 0)
 
     selected_period_value = history_options[selected_period_key]
 
