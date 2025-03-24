@@ -3,3 +3,4 @@ yfinance==0.2.55
 pandas==2.2.3
 numpy==2.2.4
 altair==5.5.0
+plotly==6.0.1

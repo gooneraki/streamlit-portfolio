@@ -5,13 +5,13 @@ from typing import List
 import datetime
 import streamlit as st
 import streamlit.components.v1 as components
-import altair as alt
-import pandas as pd
 from utilities.utilities import AssetDetails, fetch_asset_history, create_asset_info_df, \
     fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info, display_trend_line_chart, fetch_asset_info, search_symbol, \
+    get_annual_returns_trend_info,  fetch_asset_info, search_symbol, \
     get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
+from utilities.go_charts import display_trend_go_chart
+from utilities.go_charts import display_daily_annual_returns_chart
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
@@ -174,32 +174,16 @@ if symbol_name is not None:
 
     # Create the line chart
     with col2:
-        display_trend_line_chart(periodic_asset_history_with_fit)
+        value_fig = display_trend_go_chart(periodic_asset_history_with_fit)
+        if value_fig is None:
+            st.warning("No valid data to plot.")
+        else:
+            st.plotly_chart(value_fig, use_container_width=True)
 
-    # lets show a chart of daily annual returns
     st.markdown("#### Daily Annual Returns")
 
     annual_returns_info, mean = get_annual_returns_trend_info(
         periodic_asset_history_with_fit)
-
-    daily_returns_chart = alt.Chart(periodic_asset_history_with_fit.dropna()).mark_line().encode(
-        x=alt.X('Date:T', title=None),
-        y=alt.Y('annual_base_return:Q', title='Annual Return',
-                axis=alt.Axis(format='.1%')),
-        # color=alt.condition(
-        #     alt.datum.annual_base_return > 0,
-        #     alt.value("#14B3EB"),
-        #     alt.value("#EB4C14")
-        # )
-    )
-
-    # Make the line of mean
-    mean_line = alt.Chart(pd.DataFrame({'mean': [mean]})).mark_rule(
-        color='purple', size=2).encode(y='mean:Q')
-
-    # Zero line
-    zero_line = alt.Chart(pd.DataFrame({'zero': [0]})).mark_rule(
-        color='red', size=1).encode(y='zero:Q')
 
     annual_col1, annual_col2 = st.columns([1, 2])
 
@@ -207,6 +191,12 @@ if symbol_name is not None:
         st.dataframe(annual_returns_info, hide_index=True)
 
     with annual_col2:
-        st.altair_chart((daily_returns_chart+mean_line +
-                        zero_line).properties(height=250),
-                        use_container_width=True)
+        annual_returns_fig = display_daily_annual_returns_chart(
+            df=periodic_asset_history_with_fit,
+            annual_column='annual_base_return',
+            mean_value=mean
+        )
+        if annual_returns_fig is None:
+            st.warning("No valid data to plot.")
+        else:
+            st.plotly_chart(annual_returns_fig, use_container_width=True)

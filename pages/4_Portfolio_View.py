@@ -5,9 +5,10 @@ import json
 import pandas as pd
 import streamlit as st
 from utilities.utilities import fetch_asset_info, fetch_asset_history, fetch_fx_rate_history, \
-    generate_asset_base_value, append_fitted_data, get_trend_info, display_trend_line_chart, \
+    generate_asset_base_value, append_fitted_data, get_trend_info, \
     get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
+from utilities.go_charts import display_trend_go_chart
 
 
 print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
@@ -108,4 +109,9 @@ with col1:
 
 # Create the line chart
 with col2:
-    display_trend_line_chart(periodic_asset_history_with_fit)
+    value_fig = display_trend_go_chart(periodic_asset_history_with_fit)
+
+    if value_fig is None:
+        st.warning("No valid data to plot.")
+    else:
+        st.plotly_chart(value_fig, use_container_width=True)
