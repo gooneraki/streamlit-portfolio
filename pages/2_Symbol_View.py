@@ -187,7 +187,8 @@ if view == "Symbol Information":
         if value_fig is None:
             st.warning("No valid data to plot.")
         else:
-            st.plotly_chart(value_fig, use_container_width=True)
+            st.plotly_chart(value_fig, config={
+                            "displayModeBar": False}, use_container_width=True)
 
     st.markdown("#### Daily Annual Returns")
 
@@ -208,7 +209,8 @@ if view == "Symbol Information":
         if annual_returns_fig is None:
             st.warning("No valid data to plot.")
         else:
-            st.plotly_chart(annual_returns_fig, use_container_width=True)
+            st.plotly_chart(annual_returns_fig, use_container_width=True, config={
+                            "displayModeBar": False})
 
 elif view == "Industry Information":
 
