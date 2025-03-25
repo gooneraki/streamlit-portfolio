@@ -80,6 +80,7 @@ def display_daily_annual_returns_chart(df: pd.DataFrame, annual_column='annual_b
     ))
 
     # Mean line
+    # Mean line (no hover)
     fig.add_trace(go.Scatter(
         x=[df[date_column].min(), df[date_column].max()],
         y=[mean_value, mean_value],
@@ -88,6 +89,17 @@ def display_daily_annual_returns_chart(df: pd.DataFrame, annual_column='annual_b
         hoverinfo='skip',
         showlegend=False
     ))
+
+    # fig.add_annotation(
+    #     x=df[date_column].max(),
+    #     y=mean_value,
+    #     text=f"Mean: {mean_value:.2%}",
+    #     showarrow=False,
+    #     font=dict(color="purple"),
+    #     xanchor='left',
+    #     yanchor='bottom',
+    #     bgcolor="white"
+    # )
 
     # Zero line
     fig.add_trace(go.Scatter(

@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 from utilities.utilities import AssetDetails, fetch_asset_history, create_asset_info_df, \
     fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
     get_annual_returns_trend_info,  fetch_asset_info, search_symbol, \
-    get_history_options
+    get_history_options, sector_info
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart
 from utilities.go_charts import display_daily_annual_returns_chart
@@ -18,38 +18,34 @@ print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
 def reset_query_params(p_search_input: str):
     """Reset the query parameters."""
-    if p_search_input is None:
+    if p_search_input is None or len(p_search_input.strip()) == 0:
         st.query_params.pop("symbol", None)
     else:
-        st.query_params.update({"symbol": p_search_input})
+        st.query_params.update({"symbol": p_search_input.strip().upper()})
 
 
 st.title("Symbol Information")
 
 st.write("### Search symbols")
 
-
 with st.form(key="search_form"):
     search_input = st.text_input("First result will be analyzed",
                                  value=st.query_params.get("symbol"),
-                                 max_chars=10,
+                                 max_chars=20,
                                  key="search_input",
                                  placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
-    search_input = search_input.upper() if search_input is not None and len(
-        search_input) > 0 else None
+
     search_button = st.form_submit_button("Search")
 
 if search_button:
     reset_query_params(search_input)
     st.rerun()
 
-
 result_quotes_df = search_symbol(search_input)
 
 first_result = result_quotes_df.iloc[0] if result_quotes_df is not None and result_quotes_df.shape[0] > 0 else None
 
 symbol_name = first_result.name if first_result is not None else None
-
 
 st.write("##### Search results")
 
@@ -62,8 +58,24 @@ else:
     else:
         st.warning(f"No results found for '{search_input}'.")
 
+if symbol_name is None:
+    st.stop()
 
-if symbol_name is not None:
+st.divider()
+
+
+st.sidebar.title("Select View")
+
+view = st.sidebar.radio(
+    "Choose a section:",
+    ("Symbol Information", "Industry Information")
+)
+
+asset_info = fetch_asset_info(symbol_name)
+
+combo_asset_info = {**first_result, **asset_info}
+
+if view == "Symbol Information":
 
     st.subheader(f"Symbol: {symbol_name}")
 
@@ -109,9 +121,6 @@ if symbol_name is not None:
         """,
         height=50)
 
-    asset_info = fetch_asset_info(symbol_name)
-
-    combo_asset_info = {**first_result, **asset_info}
     with st.expander("Raw asset info (JSON)"):
         st.json(combo_asset_info)
 
@@ -200,3 +209,37 @@ if symbol_name is not None:
             st.warning("No valid data to plot.")
         else:
             st.plotly_chart(annual_returns_fig, use_container_width=True)
+
+elif view == "Industry Information":
+
+    symbol_sector = combo_asset_info.get("sector", None)
+    st.write(f"### Sector: {symbol_sector}")
+    symbol_sector_key = combo_asset_info.get(
+        "sectorKey", None)
+
+    overview, top_companies, top_etfs, research_reports = sector_info(
+        symbol_sector_key)
+
+    if overview is None:
+        st.warning(f"No sector overview found. '{symbol_sector_key}'")
+    else:
+        st.write("#### Sector Overview")
+        st.write(overview)
+
+        if top_companies is None:
+            st.warning(f"No top companies found. '{symbol_sector_key}'")
+        else:
+            st.write("#### Top Companies")
+            st.dataframe(top_companies)
+
+        if top_etfs is None:
+            st.warning(f"No top ETFs found. '{symbol_sector_key}'")
+        else:
+            st.write("#### Top ETFs")
+            st.dataframe(top_etfs)
+
+        if research_reports is None:
+            st.warning(f"No research reports found. '{symbol_sector_key}'")
+        else:
+            st.write("#### Research Reports")
+            st.dataframe(research_reports)
