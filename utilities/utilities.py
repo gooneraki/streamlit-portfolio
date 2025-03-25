@@ -1,4 +1,5 @@
 """ This module contains utility functions for the portfolio app """
+from yfinance import Market, const as yf_const
 from typing import List, TypedDict
 import yfinance as yf
 import pandas as pd
@@ -87,6 +88,39 @@ def fetch_fx_rate_history(asset_currency: str, base_currency: str):
     fx_history.index = fx_history.index.tz_localize(None)
 
     return fx_history
+
+
+@st.cache_data
+def sector_info(sector_name: str):
+    """ Get the sector info """
+    if sector_name in yf_const.SECTOR_INDUSTY_MAPPING:
+        sector = yf.Sector(sector_name)
+        return sector.overview, sector.top_companies, sector.top_etfs, sector.research_reports
+    return None, None, None, None
+
+
+def random_stuff():
+    market = Market("US")
+    status = market.status
+    print(f"\nstatus: >>>\n{status}\n<<<")
+    summary = market.summary
+    print(f"\nsummary: >>>\n{summary}\n<<<")
+
+    print(f"\nyf_const: >>>\n{yf_const}\n<<<")
+    yf_sector_industry_mapping = yf_const.SECTOR_INDUSTY_MAPPING
+
+    print(f"\nSECTOR_INDUSTY_MAPPING: >>>\n{yf_sector_industry_mapping}\n<<<")
+
+    if 'technology' in yf_sector_industry_mapping:
+        technology = yf.Sector('technology')
+        print(
+            f"\ntechnology.top_companies: >>>\n{technology.top_companies}\n<<<")
+        print(
+            f"\ntechnology.top_etfs: >>>\n{technology.top_etfs}\n<<<")
+        print(
+            f"\ntechnology.research_reports: >>>\n{technology.research_reports}\n<<<")
+        print(
+            f"\ntechnology.overview: >>>\n{technology.overview}\n<<<")
 
 
 def get_history_options(history_length: int):

@@ -80,7 +80,6 @@ def display_daily_annual_returns_chart(df: pd.DataFrame, annual_column='annual_b
     ))
 
     # Mean line
-    # Mean line (no hover)
     fig.add_trace(go.Scatter(
         x=[df[date_column].min(), df[date_column].max()],
         y=[mean_value, mean_value],
