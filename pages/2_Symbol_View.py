@@ -120,9 +120,11 @@ with tab1:
     with st.expander("Raw asset info (JSON)"):
         st.json(combo_asset_info)
 
-    st.dataframe(create_asset_info_df(combo_asset_info),
-                 hide_index=True,
-                 use_container_width=True)
+    # st.dataframe(create_asset_info_df(combo_asset_info),
+    #              hide_index=True,
+    #              use_container_width=True)
+    for label, value in create_asset_info_df(combo_asset_info):
+        st.markdown(f"**{label}**: {value}")
 
     full_asset_history = fetch_asset_history(symbol_name)
 

@@ -196,7 +196,7 @@ def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_
     return period_history_data, cagr, cagr_fitted, base_over_under
 
 
-def create_asset_info_df(asset_info: dict):
+def create_asset_info_df(asset_info: dict) -> list[tuple[str, str]]:
     """ Get the asset info DataFrame """
     keys_to_display = [
         {
@@ -204,8 +204,12 @@ def create_asset_info_df(asset_info: dict):
             "label": "Name"
         },
         {
-            "key": 'shortname',
-            "label": "Short Name"
+            "key": 'legalType',
+            "label": "Type"
+        },
+        {
+            "key": 'quoteType',
+            "label": "Quote Type"
         },
         {
             "key": 'currency',
@@ -214,10 +218,6 @@ def create_asset_info_df(asset_info: dict):
         {
             "key": 'fundFamily',
             "label": "Fund Family"
-        },
-        {
-            "key": 'legalType',
-            "label": "Type"
         },
         {
             "key": 'exchange',
@@ -236,18 +236,13 @@ def create_asset_info_df(asset_info: dict):
             "label": "Country"
         },
         {
-            "key": 'quoteType',
-            "label": "Quote Type"
+            "key": 'longBusinessSummary',
+            "label": "Business Summary"
         }
     ]
 
-    asset_info_table = pd.DataFrame(
-        columns=['Field', 'Value'],
-        data=[
-            [item['label'], asset_info[item['key']]]
-            for item in keys_to_display if item['key'] in asset_info])
-
-    return asset_info_table
+    return [[item['label'], asset_info[item['key']]]
+            for item in keys_to_display if item['key'] in asset_info]
 
 
 def get_trend_stats(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value'):
