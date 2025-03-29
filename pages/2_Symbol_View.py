@@ -41,6 +41,7 @@ if search_button:
     reset_query_params(search_input)
     st.rerun()
 
+
 result_quotes_df = search_symbol(search_input)
 
 first_result = result_quotes_df.iloc[0] if result_quotes_df is not None and result_quotes_df.shape[0] > 0 else None
@@ -64,18 +65,13 @@ if symbol_name is None:
 st.divider()
 
 
-st.sidebar.title("Select View")
-
-view = st.sidebar.radio(
-    "Choose a section:",
-    ("Symbol Information", "Industry Information")
-)
+tab1, tab2 = st.tabs(["Symbol Information", "Industry Information"])
 
 asset_info = fetch_asset_info(symbol_name)
 
 combo_asset_info = {**first_result, **asset_info}
 
-if view == "Symbol Information":
+with tab1:
 
     st.subheader(f"Symbol: {symbol_name}")
 
@@ -212,7 +208,7 @@ if view == "Symbol Information":
             st.plotly_chart(annual_returns_fig, use_container_width=True, config={
                             "displayModeBar": False})
 
-elif view == "Industry Information":
+with tab2:
 
     symbol_sector = combo_asset_info.get("sector", None)
     st.write(f"### Sector: {symbol_sector}")
