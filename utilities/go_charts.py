@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-def display_trend_go_chart(df: pd.DataFrame, base_column='base_value'):
+def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', title_name: str | None = None):
     """Display a clean trend chart using Plotly."""
     df = df.copy()
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
@@ -31,12 +31,19 @@ def display_trend_go_chart(df: pd.DataFrame, base_column='base_value'):
     ))
 
     fig.update_layout(
+        title=dict(
+            text=title_name,
+            x=0.5,
+            y=0.98,
+            xanchor='center',
+            yanchor='top'
+        ) if title_name else None,
         xaxis_title='Date',
         yaxis_title='Value',
         template='plotly_white',
         height=450,
         margin=dict(t=0, b=0, l=0, r=0),
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.90, xanchor="left", x=0.01)
     )
 
     return fig

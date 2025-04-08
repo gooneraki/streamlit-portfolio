@@ -181,7 +181,8 @@ with tab1:
 
     # Create the line chart
     with col2:
-        value_fig = display_trend_go_chart(periodic_asset_history_with_fit)
+        value_fig = display_trend_go_chart(
+            periodic_asset_history_with_fit,  title_name=f"{symbol_name} - {base_currency} - {selected_period_key}")
         if value_fig is None:
             st.warning("No valid data to plot.")
         else:
