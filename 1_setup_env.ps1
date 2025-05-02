@@ -1,3 +1,13 @@
+# Step 0: Display python version (streamlit uses 3.12)
+Write-Host "Checking Python version..." -ForegroundColor Cyan
+$pythonVersion = python --version 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Python is not installed or not found in PATH." -ForegroundColor Red
+    exit 1
+} else {
+    Write-Host "Python version: $pythonVersion" -ForegroundColor Green
+}
+
 # Step 1: Check if 'venv' folder exists
 if (-Not (Test-Path -Path "./venv")) {
     Write-Host "Creating virtual environment..." -ForegroundColor Cyan
