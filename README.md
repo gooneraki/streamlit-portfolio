@@ -11,7 +11,7 @@ This repository contains a Streamlit-based application for analyzing historical 
 ## Project Structure
 
 ```
-1_Home.py
+Home.py
 1_setup_env.ps1
 2_run_streamlit_app.ps1
 requirements.txt
@@ -27,7 +27,7 @@ utilities/
 
 ### Key Files
 
-- `1_Home.py`: The home page of the application.
+- `Home.py`: The home page of the application.
 - `pages/`: Contains individual pages for symbol, currency, and portfolio views.
 - `utilities/`: Utility functions and constants used across the app.
 - `requirements.txt`: Lists the Python dependencies for the project.

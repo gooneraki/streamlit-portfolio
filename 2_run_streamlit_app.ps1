@@ -9,5 +9,5 @@ Write-Host "Activating virtual environment..." -ForegroundColor Cyan
 & .\venv\Scripts\Activate.ps1
 
 # Run the Streamlit app
-Write-Host "Running Streamlit app: 1_Home.py" -ForegroundColor Cyan
-streamlit run 1_Home.py
+Write-Host "Running Streamlit app: Home.py" -ForegroundColor Cyan
+streamlit run Home.py
