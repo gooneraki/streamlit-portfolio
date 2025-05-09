@@ -1,3 +1,5 @@
+""" Streamlit app to display sector and industry information using yfinance """
+# pylint: disable=C0103
 # import datetime
 import streamlit as st
 import pandas as pd
@@ -14,16 +16,20 @@ st.write("This page displays the market share of all sectors in the US.")
 
 
 sector_data = sorted([get_sector_details(sectorInfo) for sectorInfo in sectors],
-                     key=lambda x: x.get('overview', {}).get("market_weight", 0), reverse=True)
+                     key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
 
 st.write("### Sector Overview")
-columns = ['Sector', 'Market Weight']
-data = [[sector.get('sector_name').replace('-', ' ').title(), sector.get(
-    'overview', {}).get("market_weight", -9.99)] for sector in sector_data]
-df = pd.DataFrame(data, columns=columns)
-
-st.dataframe(df.style.format(
+st.dataframe(pd.DataFrame(
+    data=[[sector.get('sector_name').replace('-', ' ').title(), sector.get(
+        'overview', {}).get("market_weight", -9.99)] for sector in sector_data],
+    columns=['Sector', 'Market Weight']).style.format(
     {'Market Weight': '{:.1%}'}), hide_index=True)
+
+
+for faulty_sector in [
+        sector for sector in sector_data if isinstance(sector, str)]:
+    st.warning(faulty_sector)
+
 
 for sector in sector_data:
     sector_key = sector.get('sector_name')
