@@ -9,13 +9,13 @@ from utilities.app_yfinance import retrieve_sector_industry_keys, get_sector_det
 
 st.set_page_config(page_title="Sector Market Share", layout="centered")
 
-sectors = retrieve_sector_industry_keys()
+
 st.title("Sector Market Share in US")
 
 st.write("This page displays the market share of all sectors in the US.")
 
 
-sector_data = sorted([get_sector_details(sectorInfo) for sectorInfo in sectors],
+sector_data = sorted([get_sector_details(sectorInfo) for sectorInfo in retrieve_sector_industry_keys()],
                      key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
 
 st.write("### Sectors Overview")
@@ -32,7 +32,7 @@ for faulty_sector in [
 
 
 for sector in sector_data:
-    sector_name = sector.get('sector_name')
+    sector_name = sector.get('name', 'UNDEFINED')
     overview = sector.get('overview')
     top_companies = sector.get('top_companies')
     top_etfs = sector.get('top_etfs')
