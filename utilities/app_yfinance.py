@@ -10,12 +10,19 @@ def get_sector_details(sector_key: str):
     try:
         sector = yf.Sector(sector_key)
 
-        return ({
-            'sector_key': sector_key,
-            'sector_name': sector.name,
-            'overview': sector.overview,
-            'top_companies': sector.top_companies,
-            'top_etfs': sector.top_etfs})
+        keys = [key[1:]
+                for key in sector.__dict__ if key.startswith('_')]
+
+        result = {}
+        for key in keys:
+            try:
+                value = getattr(sector, key)
+                result[key] = value
+            except Exception:
+                continue
+
+        return result
+
     except Exception as err:
         error_message = f"Error retrieving sector details for '{sector_key}': {err}"
         return error_message
