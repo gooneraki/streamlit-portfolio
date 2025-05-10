@@ -3,6 +3,8 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 
+valid_periods = ['1d', '5d', '1mo', '3mo',
+                 '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
 
 # def is_yf_type(value):
 #     """ Check if the value is a yfinance type """
@@ -65,19 +67,16 @@ def search_yf(search_input: str):
 
 
 @st.cache_data
-def ticker_yf(symbol: str):
+def ticker_yf_info(symbol: str):
     """ Fetch the asset info for a given symbol """
     y_finance_ticker = yf.Ticker(symbol)
 
-    return {'info': y_finance_ticker.info}
+    return y_finance_ticker.info
 
 
 @st.cache_data
-def fetch_asset_history_2(symbol: str):
+def ticker_yf_history(symbol: str):
     """ Fetch the asset info for a given symbol """
-
-    valid_periods = ['1d', '5d', '1mo', '3mo',
-                     '6mo', '1y', '2y', '5y', '10y',  'max']
     y_finance_ticker = yf.Ticker(symbol)
 
     # Try all valid_periods (in reverse) and break if data is found
@@ -91,19 +90,16 @@ def fetch_asset_history_2(symbol: str):
         return None
 
     ticker_history.index = ticker_history.index.tz_localize(None)
+
     ticker_history = ticker_history.resample('D').ffill()
 
     ticker_history = pd.concat([ticker_history, ticker_history.pct_change(365)], axis=1, keys=[
                                'value', 'annual_value_return'])
 
-    # ticker_history['color'] = ticker_history['annual_value_return'].apply(
-    #     lambda x: "#14B3EB" if x > 0 else "#EB4C14")
-
     return ticker_history
 
 
-@st.cache_data
-def fetch_fx_rate_history_2(asset_currency: str, base_currency: str):
+def fetch_fx_rate_history(asset_currency: str, base_currency: str):
     """ Fetch the fx rate for a given currency pair """
 
     if asset_currency == base_currency:

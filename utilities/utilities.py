@@ -6,8 +6,7 @@ import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
-from utilities.app_yfinance import search_yf, ticker_yf, \
-    fetch_asset_history_2, fetch_fx_rate_history_2
+from utilities.app_yfinance import search_yf
 
 
 class AssetDetails(TypedDict):
@@ -39,24 +38,6 @@ def get_quotes_by_symbol(search_input: str):
                 else None
 
             return result_quotes_df
-
-
-def fetch_asset_info(symbol: str):
-    """ Fetch the asset info for a given symbol """
-
-    return ticker_yf(symbol)['info']
-
-
-def fetch_asset_history(symbol: str):
-    """ Fetch the asset info for a given symbol """
-
-    return fetch_asset_history_2(symbol)
-
-
-def fetch_fx_rate_history(asset_currency: str, base_currency: str):
-    """ Fetch the fx rate for a given currency pair """
-
-    return fetch_fx_rate_history_2(asset_currency, base_currency)
 
 
 def get_history_options(history_length: int):

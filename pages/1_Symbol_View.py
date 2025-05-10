@@ -5,13 +5,12 @@ from typing import List
 import datetime
 import streamlit as st
 import streamlit.components.v1 as components
-from utilities.utilities import AssetDetails, fetch_asset_history, create_asset_info_df, \
-    fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info,  fetch_asset_info, get_quotes_by_symbol, \
-    get_history_options
+from utilities.utilities import AssetDetails,  create_asset_info_df, \
+    generate_asset_base_value, append_fitted_data, get_trend_info, \
+    get_annual_returns_trend_info, get_quotes_by_symbol, get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart, display_daily_annual_returns_chart
-from utilities.app_yfinance import sector_yf
+from utilities.app_yfinance import sector_yf, ticker_yf_history, fetch_fx_rate_history,  ticker_yf_info
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
@@ -67,7 +66,7 @@ st.divider()
 
 tab1, tab2 = st.tabs(["Symbol Information", "Industry Information"])
 
-asset_info = fetch_asset_info(symbol_name)
+asset_info = ticker_yf_info(symbol_name)
 
 combo_asset_info = {**first_result, **asset_info}
 
@@ -126,7 +125,7 @@ with tab1:
     for label, value in create_asset_info_df(combo_asset_info):
         st.markdown(f"**{label}**: {value}")
 
-    full_asset_history = fetch_asset_history(symbol_name)
+    full_asset_history = ticker_yf_history(symbol_name)
 
     if full_asset_history is None:
         st.error(f"No historical data found for {symbol_name}.")
