@@ -1,31 +1,8 @@
-import yfinance as yf
+
 import datetime
 import streamlit as st
 from utilities.constants import BASE_CURRENCY_OPTIONS
-
-
-@st.cache_data
-def get_fx_history(base_currency, target_currency):
-    """Get the historical data of a currency pair from Yahoo Finance API."""
-    currency_symbol = target_currency + base_currency + "=X"
-    crypto_symbol = target_currency + "-" + base_currency
-
-    currency_rate_history = yf.Ticker(
-        currency_symbol).history(period='max')['Close']
-    crypto_rate_history = yf.Ticker(
-        crypto_symbol).history(period='max')['Close']
-
-    # final_fx_rate_history = None
-    # final_symbol = None
-    # if currency_rate_history.empty and crypto_rate_history.empty:
-    #     return final_fx_rate_history, final_symbol
-    # elif currency_rate_history.empty:
-    #     return crypto_rate_history, crypto_symbol
-    # else:
-    #     return currency_rate_history, currency_symbol
-
-    # return final_fx_rate_history, final_symbol
-    return currency_rate_history if not currency_rate_history.empty else crypto_rate_history, currency_symbol if not currency_rate_history.empty else crypto_symbol
+from utilities.app_yfinance import get_fx_history_2
 
 
 print(f"\n--- Currency view {datetime.datetime.now()} ---\n")
@@ -43,7 +20,7 @@ with col2:
 
 if target_currency:
 
-    history, symbol = get_fx_history(base_currency, target_currency)
+    history, symbol = get_fx_history_2(base_currency, target_currency)
 
     if history.empty:
         st.error("Currency not found.")

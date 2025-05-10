@@ -1,11 +1,13 @@
 """ This module contains utility functions for the portfolio app """
-from yfinance import Market, const as yf_const
+
 from typing import List, TypedDict
-import yfinance as yf
+
 import pandas as pd
 import numpy as np
-import streamlit as st
-import altair as alt
+# import streamlit as st
+# import altair as alt
+from utilities.app_yfinance import search_yf, fetch_asset_info_2, \
+    fetch_asset_history_2, fetch_fx_rate_history_2
 
 
 class AssetDetails(TypedDict):
@@ -22,105 +24,38 @@ class ExpandedAssetDetails(AssetDetails):
     history: pd.DataFrame
 
 
-@st.cache_data
-def search_symbol(search_input: str):
+def get_quotes_by_symbol(search_input: str):
     """ Search for a symbol """
-    search_results = yf.Search(search_input)
+    search_results = search_yf(search_input)
 
-    result_quotes_df = pd.DataFrame(
-        search_results.quotes).set_index('symbol') if \
-        search_results is not None and \
-        search_results.quotes is not None and \
-        len(search_results.quotes) > 0 \
-        else None
+    if isinstance(search_results, dict):
+        quotes = search_results.get('quotes', None)
+        if quotes:
+            result_quotes_df = pd.DataFrame(
+                quotes).set_index('symbol') if \
+                search_results is not None and \
+                quotes is not None and \
+                len(quotes) > 0 \
+                else None
 
-    return result_quotes_df
+            return result_quotes_df
 
 
-@st.cache_data
 def fetch_asset_info(symbol: str):
     """ Fetch the asset info for a given symbol """
-    y_finance_ticker = yf.Ticker(symbol)
-    return y_finance_ticker.info
+    return fetch_asset_info_2(symbol)
 
 
-@st.cache_data
 def fetch_asset_history(symbol: str):
     """ Fetch the asset info for a given symbol """
 
-    valid_periods = ['1d', '5d', '1mo', '3mo',
-                     '6mo', '1y', '2y', '5y', '10y',  'max']
-    y_finance_ticker = yf.Ticker(symbol)
-
-    # Try all valid_periods (in reverse) and break if data is found
-    for period in valid_periods[::-1]:
-        ticker_history = y_finance_ticker.history(
-            period=period, auto_adjust=True)['Close']
-        if ticker_history.shape[0] > 0:
-            break
-
-    if ticker_history.shape[0] == 0:
-        return None
-
-    ticker_history.index = ticker_history.index.tz_localize(None)
-    ticker_history = ticker_history.resample('D').ffill()
-
-    ticker_history = pd.concat([ticker_history, ticker_history.pct_change(365)], axis=1, keys=[
-                               'value', 'annual_value_return'])
-
-    # ticker_history['color'] = ticker_history['annual_value_return'].apply(
-    #     lambda x: "#14B3EB" if x > 0 else "#EB4C14")
-
-    return ticker_history
+    return fetch_asset_history_2(symbol)
 
 
-@st.cache_data
 def fetch_fx_rate_history(asset_currency: str, base_currency: str):
     """ Fetch the fx rate for a given currency pair """
 
-    if asset_currency == base_currency:
-        return pd.Series(1, index=pd.date_range(start='1950-01-01', end=pd.Timestamp.today(), freq='D'))
-
-    currency_ticker_name = asset_currency + base_currency + "=X"
-    fx_ticker = yf.Ticker(currency_ticker_name)
-    fx_history = fx_ticker.history(period='max')['Close']
-    fx_history = fx_history.resample('D').ffill()
-    fx_history.index = fx_history.index.tz_localize(None)
-
-    return fx_history
-
-
-@st.cache_data
-def sector_info(sector_name: str):
-    """ Get the sector info """
-    if sector_name in yf_const.SECTOR_INDUSTY_MAPPING:
-        sector = yf.Sector(sector_name)
-        return sector.overview, sector.top_companies, sector.top_etfs, sector.research_reports
-    return None, None, None, None
-
-
-def random_stuff():
-    market = Market("US")
-    status = market.status
-    print(f"\nstatus: >>>\n{status}\n<<<")
-    summary = market.summary
-    print(f"\nsummary: >>>\n{summary}\n<<<")
-
-    print(f"\nyf_const: >>>\n{yf_const}\n<<<")
-    yf_sector_industry_mapping = yf_const.SECTOR_INDUSTY_MAPPING
-
-    print(f"\nSECTOR_INDUSTY_MAPPING: >>>\n{yf_sector_industry_mapping}\n<<<")
-
-    if 'technology' in yf_sector_industry_mapping:
-        technology = yf.Sector('technology')
-        print(
-            f"\ntechnology.top_companies: >>>\n{technology.top_companies}\n<<<")
-        print(
-            f"\ntechnology.top_etfs: >>>\n{technology.top_etfs}\n<<<")
-        print(
-            f"\ntechnology.research_reports: >>>\n{technology.research_reports}\n<<<")
-        print(
-            f"\ntechnology.overview: >>>\n{technology.overview}\n<<<")
+    return fetch_fx_rate_history_2(asset_currency, base_currency)
 
 
 def get_history_options(history_length: int):
@@ -305,37 +240,37 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='b
     )
 
 
-def display_trend_line_chart(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value'):
-    """ Display the trend line chart """
-    cagr, cagr_fitted, _ = get_trend_stats(
-        periodic_asset_history_with_fit, base_column)
+# def display_trend_line_chart(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value'):
+#     """ Display the trend line chart """
+#     cagr, cagr_fitted, _ = get_trend_stats(
+#         periodic_asset_history_with_fit, base_column)
 
-    y_axis_padding = 0.1 * \
-        (periodic_asset_history_with_fit[base_column].max() -
-         periodic_asset_history_with_fit[base_column].min())
+#     y_axis_padding = 0.1 * \
+#         (periodic_asset_history_with_fit[base_column].max() -
+#          periodic_asset_history_with_fit[base_column].min())
 
-    y_axis_start = periodic_asset_history_with_fit[[base_column,
-                                                    'fitted']].min().min() - y_axis_padding
+#     y_axis_start = periodic_asset_history_with_fit[[base_column,
+#                                                     'fitted']].min().min() - y_axis_padding
 
-    y_axis_end = periodic_asset_history_with_fit[[base_column,
-                                                  'fitted']].max().max() + y_axis_padding
+#     y_axis_end = periodic_asset_history_with_fit[[base_column,
+#                                                   'fitted']].max().max() + y_axis_padding
 
-    chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
-        x=alt.X('Date:T', title=None),
-        y=alt.Y(f'{base_column}:Q', scale=alt.Scale(
-            domain=[y_axis_start, y_axis_end]), title=f'Base Value {cagr:.1%}'),
-        color=alt.value('#14B3EB')  # Set custom color
-    )
+#     chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
+#         x=alt.X('Date:T', title=None),
+#         y=alt.Y(f'{base_column}:Q', scale=alt.Scale(
+#             domain=[y_axis_start, y_axis_end]), title=f'Base Value {cagr:.1%}'),
+#         color=alt.value('#14B3EB')  # Set custom color
+#     )
 
-    fitted_chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
-        x=alt.X('Date:T', title=None),
-        y=alt.Y('fitted:Q', scale=alt.Scale(
-            domain=[y_axis_start, y_axis_end]), title=f'Fitted Value {cagr_fitted:.1%}'),
-        color=alt.value('#EB4C14')  # Set custom color
-    )
+#     fitted_chart = alt.Chart(periodic_asset_history_with_fit).mark_line().encode(
+#         x=alt.X('Date:T', title=None),
+#         y=alt.Y('fitted:Q', scale=alt.Scale(
+#             domain=[y_axis_start, y_axis_end]), title=f'Fitted Value {cagr_fitted:.1%}'),
+#         color=alt.value('#EB4C14')  # Set custom color
+#     )
 
-    st.altair_chart(
-        (chart + fitted_chart).properties(height=425), use_container_width=True)
+#     st.altair_chart(
+#         (chart + fitted_chart).properties(height=425), use_container_width=True)
 
 
 def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame):

@@ -7,11 +7,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 from utilities.utilities import AssetDetails, fetch_asset_history, create_asset_info_df, \
     fetch_fx_rate_history, generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info,  fetch_asset_info, search_symbol, \
-    get_history_options, sector_info
+    get_annual_returns_trend_info,  fetch_asset_info, get_quotes_by_symbol, \
+    get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
-from utilities.go_charts import display_trend_go_chart
-from utilities.go_charts import display_daily_annual_returns_chart
+from utilities.go_charts import display_trend_go_chart, display_daily_annual_returns_chart
+from utilities.app_yfinance import get_sector_details
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
@@ -42,7 +42,7 @@ if search_button:
     st.rerun()
 
 
-result_quotes_df = search_symbol(search_input)
+result_quotes_df = get_quotes_by_symbol(search_input)
 
 first_result = result_quotes_df.iloc[0] if result_quotes_df is not None and result_quotes_df.shape[0] > 0 else None
 
@@ -218,29 +218,23 @@ with tab2:
     symbol_sector_key = combo_asset_info.get(
         "sectorKey", None)
 
-    overview, top_companies, top_etfs, research_reports = sector_info(
+    sector_data = get_sector_details(
         symbol_sector_key)
 
-    if overview is None:
+    if sector_data.get('overview') is None:
         st.warning(f"No sector overview found. '{symbol_sector_key}'")
     else:
         st.write("#### Sector Overview")
-        st.write(overview)
+        st.write(sector_data.get('overview'))
 
-        if top_companies is None:
+        if sector_data.get('top_companies') is None:
             st.warning(f"No top companies found. '{symbol_sector_key}'")
         else:
             st.write("#### Top Companies")
-            st.dataframe(top_companies)
+            st.dataframe(sector_data.get('top_companies'))
 
-        if top_etfs is None:
+        if sector_data.get('top_etfs') is None:
             st.warning(f"No top ETFs found. '{symbol_sector_key}'")
         else:
             st.write("#### Top ETFs")
-            st.dataframe(top_etfs)
-
-        if research_reports is None:
-            st.warning(f"No research reports found. '{symbol_sector_key}'")
-        else:
-            st.write("#### Research Reports")
-            st.dataframe(research_reports)
+            st.dataframe(sector_data.get('top_etfs'))

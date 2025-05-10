@@ -1,4 +1,4 @@
-""" Streamlit app to display sector and industry information using yfinance """
+""" Streamlit app to display sector and industry information """
 # pylint: disable=C0103
 # import datetime
 import streamlit as st
@@ -18,9 +18,9 @@ st.write("This page displays the market share of all sectors in the US.")
 sector_data = sorted([get_sector_details(sectorInfo) for sectorInfo in sectors],
                      key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
 
-st.write("### Sector Overview")
+st.write("### Sectors Overview")
 st.dataframe(pd.DataFrame(
-    data=[[sector.get('sector_name').replace('-', ' ').title(), sector.get(
+    data=[[sector.get('sector_name'), sector.get(
         'overview', {}).get("market_weight", -9.99)] for sector in sector_data],
     columns=['Sector', 'Market Weight']).style.format(
     {'Market Weight': '{:.1%}'}), hide_index=True)
@@ -32,16 +32,16 @@ for faulty_sector in [
 
 
 for sector in sector_data:
-    sector_key = sector.get('sector_name')
+    sector_name = sector.get('sector_name')
     overview = sector.get('overview')
     top_companies = sector.get('top_companies')
     top_etfs = sector.get('top_etfs')
 
     st.write(
-        f"### {sector_key.replace('-', ' ').title()}")
+        f"### {sector_name}")
 
     if overview is None:
-        st.warning(f"No sector overview found. '{sector_key}'")
+        st.warning(f"No sector overview found. '{sector_name}'")
     else:
         st.write(
             f'**Market Weight**: {100*overview.get('market_weight', -9.99):.1f}%')
@@ -50,13 +50,13 @@ for sector in sector_data:
             f'**Description**: {overview.get("description", "No description available.")}')
 
     if top_companies is None:
-        st.warning(f"No top companies found. '{sector_key}'")
+        st.warning(f"No top companies found. '{sector_name}'")
     else:
         st.write("**Top Companies**")
         st.dataframe(top_companies)
 
     if top_etfs is None:
-        st.warning(f"No top ETFs found. '{sector_key}'")
+        st.warning(f"No top ETFs found. '{sector_name}'")
     else:
         # convert dict to pandas
         top_etfs_df = pd.DataFrame.from_dict(
