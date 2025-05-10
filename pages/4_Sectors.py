@@ -20,7 +20,7 @@ sector_data = sorted([get_sector_details(sectorInfo) for sectorInfo in retrieve_
 
 st.write("### Sectors Overview")
 st.dataframe(pd.DataFrame(
-    data=[[sector.get('sector_name'), sector.get(
+    data=[[sector.get('name', 'UNDEFINED'), sector.get(
         'overview', {}).get("market_weight", -9.99)] for sector in sector_data],
     columns=['Sector', 'Market Weight']).style.format(
     {'Market Weight': '{:.1%}'}), hide_index=True)
