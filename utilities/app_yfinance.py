@@ -4,34 +4,53 @@ import streamlit as st
 import pandas as pd
 
 
-@st.cache_data
-def get_sector_details(sector_key: str):
-    """ Get the sector info """
-    try:
-        sector = yf.Sector(sector_key)
+# def is_yf_type(value):
+#     """ Check if the value is a yfinance type """
+#     return 'yfinance' in str(type(value))
 
-        keys = [key[1:]
-                for key in sector.__dict__ if key.startswith('_')]
 
-        result = {}
-        for key in keys:
-            try:
-                value = getattr(sector, key)
-                result[key] = value
-            except Exception:
-                continue
+# def extract_private_attributes(instance: object):
+#     """ Extract private attributes from a given instance """
 
-        return result
+#     result = {}
 
-    except Exception as err:
-        error_message = f"Error retrieving sector details for '{sector_key}': {err}"
-        return error_message
+#     for key in [el for el in dir(instance) if not el.startswith('_')]:
+#         try:
+
+#             value = getattr(instance, key)
+
+#             if not is_yf_type(value):
+#                 result[key] = value
+#             else:
+#                 print(f"Skipping yfinance type: {key} - {value}")
+#         except Exception:
+#             continue
+
+#     return result
 
 
 @st.cache_data
 def retrieve_sector_industry_keys():
     """ Get the sector and industry keys """
     return list(yf.const.SECTOR_INDUSTY_MAPPING.keys())
+
+
+@st.cache_data
+def sector_yf(sector_key: str):
+    """ Get the sector info """
+    try:
+        sector = yf.Sector(sector_key)
+
+        return {
+            'name': sector.name,
+            'overview': sector.overview,
+            'top_companies': sector.top_companies,
+            'top_etfs': sector.top_etfs
+        }
+
+    except Exception as err:
+        error_message = f"Error retrieving sector details for '{sector_key}': {err}"
+        return error_message
 
 
 @st.cache_data
@@ -46,10 +65,11 @@ def search_yf(search_input: str):
 
 
 @st.cache_data
-def fetch_asset_info_2(symbol: str):
+def ticker_yf(symbol: str):
     """ Fetch the asset info for a given symbol """
     y_finance_ticker = yf.Ticker(symbol)
-    return y_finance_ticker.info
+
+    return {'info': y_finance_ticker.info}
 
 
 @st.cache_data

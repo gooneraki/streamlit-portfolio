@@ -1,11 +1,11 @@
 """ Streamlit app to display sector and industry information """
 # pylint: disable=C0103
-# import datetime
+import datetime
 import streamlit as st
 import pandas as pd
-from utilities.app_yfinance import retrieve_sector_industry_keys, get_sector_details
+from utilities.app_yfinance import retrieve_sector_industry_keys, sector_yf
 
-# print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
+print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 
 st.set_page_config(page_title="Sector Market Share", layout="centered")
 
@@ -15,7 +15,7 @@ st.title("Sector Market Share in US")
 st.write("This page displays the market share of all sectors in the US.")
 
 
-sector_data = sorted([get_sector_details(sectorInfo) for sectorInfo in retrieve_sector_industry_keys()],
+sector_data = sorted([sector_yf(sectorInfo) for sectorInfo in retrieve_sector_industry_keys()],
                      key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
 
 st.write("### Sectors Overview")

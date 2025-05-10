@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
-from utilities.app_yfinance import search_yf, fetch_asset_info_2, \
+from utilities.app_yfinance import search_yf, ticker_yf, \
     fetch_asset_history_2, fetch_fx_rate_history_2
 
 
@@ -43,7 +43,8 @@ def get_quotes_by_symbol(search_input: str):
 
 def fetch_asset_info(symbol: str):
     """ Fetch the asset info for a given symbol """
-    return fetch_asset_info_2(symbol)
+
+    return ticker_yf(symbol)['info']
 
 
 def fetch_asset_history(symbol: str):
