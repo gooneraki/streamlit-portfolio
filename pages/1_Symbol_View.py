@@ -10,7 +10,7 @@ from utilities.utilities import AssetDetails,  create_asset_info_df, \
     get_annual_returns_trend_info, get_quotes_by_symbol, get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart, display_daily_annual_returns_chart
-from utilities.app_yfinance import sector_yf, ticker_yf_history, fetch_fx_rate_history,  ticker_yf_info
+from utilities.app_yfinance import sector_yf, ticker_yf_history, fetch_fx_rate_history, yf_ticket_info
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 
@@ -66,7 +66,7 @@ st.divider()
 
 tab1, tab2 = st.tabs(["Symbol Information", "Industry Information"])
 
-asset_info = ticker_yf_info(symbol_name)
+asset_info = yf_ticket_info(symbol_name)
 
 combo_asset_info = {**first_result, **asset_info}
 

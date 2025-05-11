@@ -3,7 +3,7 @@
 import datetime
 import streamlit as st
 import pandas as pd
-from utilities.app_yfinance import retrieve_sector_industry_keys, sector_yf
+from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 
@@ -15,7 +15,7 @@ st.title("Sector Market Share in US")
 st.write("This page displays the market share of all sectors in the US.")
 
 
-sector_data = sorted([sector_yf(sectorInfo) for sectorInfo in retrieve_sector_industry_keys()],
+sector_data = sorted([sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS],
                      key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
 
 st.write("### Sectors Overview")
