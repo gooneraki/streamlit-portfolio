@@ -4,11 +4,10 @@ import datetime
 import json
 import pandas as pd
 import streamlit as st
-from utilities.utilities import fetch_asset_info, fetch_asset_history, fetch_fx_rate_history, \
-    generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_history_options
+from utilities.utilities import generate_asset_base_value, append_fitted_data, get_trend_info, get_history_options
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart
+from utilities.app_yfinance import ticker_yf,  fetch_fx_rate_history, ticker_yf_history
 
 
 print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
@@ -58,9 +57,9 @@ aggregate_df = pd.DataFrame()
 
 for asset in assets_positions:
 
-    asset_info = fetch_asset_info(asset["symbol"])
-
-    full_asset_history = fetch_asset_history(asset["symbol"])
+    asset_data = ticker_yf(asset["symbol"], info=True, history=True)
+    asset_info = asset_data['info']
+    full_asset_history = ticker_yf_history(asset['symbol'])
 
     # Fetch the fx rate history for the asset currency
     full_fx_rate_history = fetch_fx_rate_history(

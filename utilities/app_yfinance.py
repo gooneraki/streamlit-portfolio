@@ -39,7 +39,7 @@ def retrieve_sector_industry_keys():
 
 @st.cache_data
 def sector_yf(sector_key: str):
-    """ Get the sector info """
+    """ Fetch the sector data """
     try:
         sector = yf.Sector(sector_key)
 
@@ -146,9 +146,13 @@ def get_fx_history_2(base_currency, target_currency):
 @st.cache_data
 def market_yf(market: str):
     """ Fetch the market info for a given market """
-    market_data = yf.Market(market)
+    try:
+        market_data = yf.Market(market)
 
-    return {
-        'summary': market_data.summary,
-        'status': market_data.status
-    }
+        return {
+            'summary': market_data.summary,
+            'status': market_data.status
+        }
+    except Exception as err:
+        error_message = f"Error retrieving market details for '{market}': {err}"
+        return error_message
