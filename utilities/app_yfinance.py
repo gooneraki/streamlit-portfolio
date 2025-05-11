@@ -1,4 +1,5 @@
 """ Yfinance utilities for Streamlit app """
+import pandas as pd
 import yfinance as yf
 import streamlit as st
 
@@ -74,6 +75,28 @@ def yf_ticket_history(symbol: str, period='max'):
     except Exception as err:
         return f"Error retrieving ticker details for '{symbol}': {err}"
 
+
+@st.cache_data
+def get_fx_history(base_currency, target_currency):
+    """Get the historical data of a currency pair from Yahoo Finance API."""
+
+    if base_currency == target_currency:
+        return pd.Series(1, index=pd.date_range(start='1980-01-01', end=pd.Timestamp.today(), freq='D'))
+
+    fx_symbol = target_currency + base_currency + "=X"
+    fx_history = yf_ticket_history(fx_symbol)
+
+    if not isinstance(fx_history, str):
+        return fx_history
+
+    crypto_symbol = target_currency + "-" + base_currency
+
+    crypto_history = yf_ticket_history(crypto_symbol)
+
+    if not isinstance(crypto_history, str):
+        return crypto_history
+
+    return f"Error retrieving historical data for either '{fx_symbol}' or '{crypto_symbol}'"
 
 # ^^^^^^^^^ #
 # yf.Ticker #

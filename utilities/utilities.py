@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
-from utilities.app_yfinance import search_yf, yf_ticket_history
+from utilities.app_yfinance import search_yf, yf_ticket_history, yf_ticket_info, yf_ticket_history, get_fx_history
 
 
 class AssetDetails(TypedDict):
@@ -323,5 +323,62 @@ def ticker_yf_history(symbol: str):
 
     ticker_history = pd.concat([ticker_history, ticker_history.pct_change(365)], axis=1, keys=[
                                'value', 'annual_value_return'])
+
+    return ticker_history
+
+
+def localize_and_fill(ticker_history: pd.DataFrame | pd.Series):
+    """ Localize and fill the ticker history """
+    if ticker_history.shape[0] == 0:
+        return None
+
+    ticker_history.index = ticker_history.index.tz_localize(None)
+    ticker_history = ticker_history.resample('D').ffill()
+
+    return ticker_history
+
+
+def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
+    """ Fetch the asset info for a given symbol """
+    ticker_info = yf_ticket_info(symbol)
+
+    if isinstance(ticker_info, str):
+        return ticker_info
+
+    asset_currency = ticker_info.get('currency')
+
+    ticker_history = yf_ticket_history(symbol)
+
+    if isinstance(ticker_history, str):
+        return ticker_history
+    if ticker_history.shape[0] == 0:
+        return f"Retrieved ticker history is empty for {symbol}"
+
+    start_date = ticker_history.index[-1] - pd.DateOffset(years=years)
+    ticker_history = ticker_history[ticker_history.index >= start_date]
+
+    ticker_history = localize_and_fill(ticker_history)
+
+    fx_history = get_fx_history(base_currency, asset_currency)
+
+    if isinstance(fx_history, str):
+        return fx_history
+    if fx_history.shape[0] == 0:
+        return f"Retrieved fx history is empty for {base_currency} and {asset_currency}"
+
+    fx_history = localize_and_fill(fx_history)
+
+    ticker_history = pd.concat([ticker_history, fx_history], axis=1, keys=[
+        'value', 'fx_history'])
+
+    ticker_history['base_value'] = ticker_history['value'] * \
+        ticker_history['fx_history']
+
+    # remove rows with any NaN values
+    ticker_history.dropna(inplace=True, how='any')
+
+    # do the fitted data
+    ticker_history['fitted'] = get_exp_fitted_data(
+        ticker_history['base_value'].values)
 
     return ticker_history

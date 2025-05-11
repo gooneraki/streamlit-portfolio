@@ -4,6 +4,9 @@ import datetime
 import streamlit as st
 import pandas as pd
 from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf, market_yf, yf_ticket_info
+from utilities.utilities import fully_analyze_symbol
+from utilities.go_charts import display_trend_go_chart
+
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 
@@ -20,10 +23,21 @@ market_symbol = market['summary'][list(market['summary'].keys())[
     0]].get('symbol', 'UNDEFINED')
 
 market_info = yf_ticket_info(market_symbol)
-print(f"Market info: {market_info}")
-
+analysis = fully_analyze_symbol(market_symbol, 'EUR', 10)
+# reset index and set it as Date
+analysis = analysis.reset_index()
+analysis['Date'] = pd.to_datetime(analysis['Date'], errors='coerce')
+value_fig = display_trend_go_chart(
+    analysis,  title_name="US Market Value - 10 years",)
 
 st.title("Sector Market Share in US")
+
+
+if value_fig is None:
+    st.warning("No valid data to plot.")
+else:
+    st.plotly_chart(value_fig, config={
+                    "displayModeBar": False}, use_container_width=True)
 
 
 st.write("This page displays the market share of all sectors in the US.")
