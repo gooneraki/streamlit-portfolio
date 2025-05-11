@@ -7,10 +7,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 from utilities.utilities import AssetDetails,  create_asset_info_df, \
     generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info, get_quotes_by_symbol, get_history_options
+    get_annual_returns_trend_info, get_quotes_by_symbol, get_history_options, \
+    fetch_fx_rate_history, ticker_yf_history
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart, display_daily_annual_returns_chart
-from utilities.app_yfinance import sector_yf, ticker_yf_history, fetch_fx_rate_history, yf_ticket_info
+from utilities.app_yfinance import sector_yf,   yf_ticket_info
 
 print(f"\n--- Now: {datetime.datetime.now()} ---\n")
 

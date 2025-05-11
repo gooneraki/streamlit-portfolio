@@ -2,7 +2,7 @@
 import datetime
 import streamlit as st
 from utilities.constants import BASE_CURRENCY_OPTIONS
-from utilities.app_yfinance import get_fx_history_2
+from utilities.utilities import get_fx_history_2
 
 
 print(f"\n--- Currency view {datetime.datetime.now()} ---\n")

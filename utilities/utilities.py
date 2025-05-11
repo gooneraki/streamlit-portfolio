@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
-from utilities.app_yfinance import search_yf
+from utilities.app_yfinance import search_yf, yf_ticket_history
 
 
 class AssetDetails(TypedDict):
@@ -278,3 +278,50 @@ def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame)
                 clean_df['annual_base_return'].iloc[-1]:,.1%}"],
         ]
     ), mean
+
+
+def get_fx_history_2(base_currency, target_currency):
+    """Get the historical data of a currency pair from Yahoo Finance API."""
+    currency_symbol = target_currency + base_currency + "=X"
+    crypto_symbol = target_currency + "-" + base_currency
+
+    currency_rate_history = yf_ticket_history(
+        currency_symbol)
+    crypto_rate_history = yf_ticket_history(
+        crypto_symbol)
+
+    return currency_rate_history if not currency_rate_history.empty else crypto_rate_history, \
+        currency_symbol if not currency_rate_history.empty else crypto_symbol
+
+
+def fetch_fx_rate_history(asset_currency: str, base_currency: str):
+    """ Fetch the fx rate for a given currency pair """
+
+    if asset_currency == base_currency:
+        return pd.Series(1, index=pd.date_range(start='1950-01-01', end=pd.Timestamp.today(), freq='D'))
+
+    currency_ticker_name = asset_currency + base_currency + "=X"
+
+    fx_history = yf_ticket_history(currency_ticker_name)
+
+    fx_history = fx_history.resample('D').ffill()
+    fx_history.index = fx_history.index.tz_localize(None)
+
+    return fx_history
+
+
+def ticker_yf_history(symbol: str):
+    """ Fetch the asset info for a given symbol """
+    ticker_history = yf_ticket_history(symbol)
+
+    if ticker_history.shape[0] == 0:
+        return None
+
+    ticker_history.index = ticker_history.index.tz_localize(None)
+
+    ticker_history = ticker_history.resample('D').ffill()
+
+    ticker_history = pd.concat([ticker_history, ticker_history.pct_change(365)], axis=1, keys=[
+                               'value', 'annual_value_return'])
+
+    return ticker_history
