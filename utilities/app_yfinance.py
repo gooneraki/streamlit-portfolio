@@ -67,24 +67,41 @@ def search_yf(search_input: str):
 
 
 @st.cache_data
+def ticker_yf(symbol: str, info: bool, history: bool):
+    """ Fetch the asset info for a given symbol """
+    if info is False and history is False:
+        error_message = "Both info and history cannot be False."
+        return error_message
+    try:
+        result = {}
+
+        ticker = yf.Ticker(symbol)
+
+        if info:
+            result['info'] = ticker.info
+        if history:
+            result['history'] = ticker.history(
+                period='max', auto_adjust=True)['Close']
+
+        return result
+    except Exception as err:
+        error_message = f"Error retrieving ticker details for '{symbol}': {err}"
+        return error_message
+
+
 def ticker_yf_info(symbol: str):
     """ Fetch the asset info for a given symbol """
-    y_finance_ticker = yf.Ticker(symbol)
+    ticker = ticker_yf(symbol, info=True, history=False)
 
-    return y_finance_ticker.info
+    if isinstance(ticker, str):
+        return ticker
+
+    return ticker['info']
 
 
-@st.cache_data
 def ticker_yf_history(symbol: str):
     """ Fetch the asset info for a given symbol """
-    y_finance_ticker = yf.Ticker(symbol)
-
-    # Try all valid_periods (in reverse) and break if data is found
-    for period in valid_periods[::-1]:
-        ticker_history = y_finance_ticker.history(
-            period=period, auto_adjust=True)['Close']
-        if ticker_history.shape[0] > 0:
-            break
+    ticker_history = ticker_yf(symbol, info=False, history=True)['history']
 
     if ticker_history.shape[0] == 0:
         return None
