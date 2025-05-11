@@ -93,10 +93,7 @@ def ticker_yf_info(symbol: str):
     """ Fetch the asset info for a given symbol """
     ticker = ticker_yf(symbol, info=True, history=False)
 
-    if isinstance(ticker, str):
-        return ticker
-
-    return ticker['info']
+    return ticker['info'] if isinstance(ticker, dict) else ticker
 
 
 def ticker_yf_history(symbol: str):
@@ -143,3 +140,14 @@ def get_fx_history_2(base_currency, target_currency):
         crypto_symbol).history(period='max')['Close']
 
     return currency_rate_history if not currency_rate_history.empty else crypto_rate_history, currency_symbol if not currency_rate_history.empty else crypto_symbol
+
+
+@st.cache_data
+def market_yf(market: str):
+    """ Fetch the market info for a given market """
+    market_data = yf.Market(market)
+
+    return {
+        'summary': market_data.summary,
+        'status': market_data.status
+    }
