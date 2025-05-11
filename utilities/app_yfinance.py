@@ -139,7 +139,8 @@ def get_fx_history_2(base_currency, target_currency):
     crypto_rate_history = yf.Ticker(
         crypto_symbol).history(period='max')['Close']
 
-    return currency_rate_history if not currency_rate_history.empty else crypto_rate_history, currency_symbol if not currency_rate_history.empty else crypto_symbol
+    return currency_rate_history if not currency_rate_history.empty else crypto_rate_history, \
+        currency_symbol if not currency_rate_history.empty else crypto_symbol
 
 
 @st.cache_data
