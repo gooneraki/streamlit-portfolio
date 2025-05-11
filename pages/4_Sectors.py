@@ -3,14 +3,28 @@
 import datetime
 import streamlit as st
 import pandas as pd
-from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf
+from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf, market_yf, yf_ticket_info
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 
 st.set_page_config(page_title="Sector Market Share", layout="centered")
 
 
+market = market_yf('US')
+if market is None:
+    st.error("Error retrieving US market data.")
+    st.stop()
+
+
+market_symbol = market['summary'][list(market['summary'].keys())[
+    0]].get('symbol', 'UNDEFINED')
+
+market_info = yf_ticket_info(market_symbol)
+print(f"Market info: {market_info}")
+
+
 st.title("Sector Market Share in US")
+
 
 st.write("This page displays the market share of all sectors in the US.")
 
