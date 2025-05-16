@@ -10,7 +10,10 @@ from utilities.go_charts import display_trend_go_chart
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 
-st.set_page_config(page_title="Sector Market Share", layout="centered")
+st.set_page_config(page_title="US Market Overview", layout="centered")
+
+home_currency = "EUR"
+data_years = 10
 
 
 market = market_yf('US')
@@ -23,28 +26,60 @@ market_symbol = market['summary'][list(market['summary'].keys())[
     0]].get('symbol', 'UNDEFINED')
 
 market_info = yf_ticket_info(market_symbol)
-analysis = fully_analyze_symbol(market_symbol, 'EUR', 10)
+
+market_analysis = fully_analyze_symbol(
+    market_symbol, home_currency, data_years)
+
+
 # reset index and set it as Date
-analysis = analysis.reset_index()
-analysis['Date'] = pd.to_datetime(analysis['Date'], errors='coerce')
+market_history = market_analysis.get('ticker_history').reset_index()
+market_history['Date'] = pd.to_datetime(
+    market_history['Date'], errors='coerce')
+
+
+st.title("US Market Overview")
+
+# st.write(
+#     f"Symbol: **{market_symbol}** || Name: **{market_info['longName']}** || Trade Currency: **{market_info['currency']}** || Home currency: **{home_currency}** || Data window: **{data_years} years**")
+st.write(
+    f"Home currency: **{home_currency}** || Data window: **{data_years} years**")
+
+
+col1, _ = st.columns([1, 3])
+with col1:
+    years_to_show = st.selectbox(
+        "Years displayed",
+        options=[1, 2, 3, 5, 7, 10],
+    )
+
 value_fig = display_trend_go_chart(
-    analysis,  title_name="US Market Value - 10 years",)
-
-st.title("Sector Market Share in US")
-
+    market_history.tail(round(years_to_show*365.25)), fitted_column='base_fitted', title_name=f"{market_info['longName']}",)
 
 if value_fig is None:
     st.warning("No valid data to plot.")
 else:
+
     st.plotly_chart(value_fig, config={
                     "displayModeBar": False}, use_container_width=True)
 
 
-st.write("This page displays the market share of all sectors in the US.")
+# st.caption(f"*Based on {data_years} years of data.")
+st.dataframe(pd.DataFrame(
+    data=[[market_analysis.get('trade_currency_cagr'), market_analysis.get('trade_cur_fitted_cagr'), market_analysis.get('trade_cur_over_under')],
+          [market_analysis.get('home_currency_cagr'), market_analysis.get('home_cur_fitted_cagr'), market_analysis.get('home_cur_over_under')]],
+    columns=['Annual Growth Rate',
+             'Fitted Annual Growth Rate', 'Latest Over/Under'],
+    index=[f'Trade cur ({market_info.get('currency')})',
+           f'Home cur ({home_currency})']
+).style.format(formatter=lambda x: f"{x:.1%}"))
+
+
+# st.write("This page displays the market share of all sectors in the US.")
 
 
 sector_data = sorted([sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS],
                      key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
+
 
 st.write("### Sectors Overview")
 st.dataframe(pd.DataFrame(
@@ -65,7 +100,7 @@ for sector in sector_data:
     top_companies = sector.get('top_companies')
     top_etfs = sector.get('top_etfs')
 
-    with st.expander(sector_name, expanded=True):
+    with st.expander(sector_name, expanded=False):
 
         st.write(
             f"### {sector_name}")

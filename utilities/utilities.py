@@ -87,6 +87,7 @@ def get_exp_fitted_data(y: List[int]):
     z_exp = np.polyfit(x, y_log, 1)
     p_exp = np.poly1d(z_exp)
     y_exp = np.exp(p_exp(x))
+
     return y_exp
 
 
@@ -340,6 +341,7 @@ def localize_and_fill(ticker_history: pd.DataFrame | pd.Series):
 
 def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
     """ Fetch the asset info for a given symbol """
+    # Get asset info to get the currency
     ticker_info = yf_ticket_info(symbol)
 
     if isinstance(ticker_info, str):
@@ -347,6 +349,7 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
 
     asset_currency = ticker_info.get('currency')
 
+    # Get asset history
     ticker_history = yf_ticket_history(symbol)
 
     if isinstance(ticker_history, str):
@@ -354,11 +357,13 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
     if ticker_history.shape[0] == 0:
         return f"Retrieved ticker history is empty for {symbol}"
 
+    # Filter data window
     start_date = ticker_history.index[-1] - pd.DateOffset(years=years)
     ticker_history = ticker_history[ticker_history.index >= start_date]
 
     ticker_history = localize_and_fill(ticker_history)
 
+    # Get the fx rate history
     fx_history = get_fx_history(base_currency, asset_currency)
 
     if isinstance(fx_history, str):
@@ -368,17 +373,49 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
 
     fx_history = localize_and_fill(fx_history)
 
-    ticker_history = pd.concat([ticker_history, fx_history], axis=1, keys=[
-        'value', 'fx_history'])
+    # Combine the asset history, fitted history and fx history
+    ticker_history = pd.concat([
+        ticker_history,
+        pd.Series(get_exp_fitted_data(ticker_history.values),
+                  index=ticker_history.index, name='value_fitted'),
+        fx_history],
+        axis=1,
+        keys=['value', 'value_fitted', 'fx_history'])
+
+    # remove rows with any NaN values (relevant also because of data window)
+    ticker_history.dropna(inplace=True, how='any')
+
+    # do the base (home currency) data
 
     ticker_history['base_value'] = ticker_history['value'] * \
         ticker_history['fx_history']
 
-    # remove rows with any NaN values
-    ticker_history.dropna(inplace=True, how='any')
-
-    # do the fitted data
-    ticker_history['fitted'] = get_exp_fitted_data(
+    ticker_history['base_fitted'] = get_exp_fitted_data(
         ticker_history['base_value'].values)
 
-    return ticker_history
+    trade_currency_cagr = (ticker_history['value'].iloc[-1] /
+                           ticker_history['value'].iloc[0]) ** (1 / (ticker_history.shape[0] / 365.25)) - 1
+    trade_cur_fitted_cagr = (ticker_history['value_fitted'].iloc[-1] /
+                             ticker_history['value_fitted'].iloc[0]) ** (1 / (ticker_history.shape[0] / 365.25)) - 1
+    trade_cur_over_under = (ticker_history['value'].iloc[-1] -
+                            ticker_history['value_fitted'].iloc[-1]) / ticker_history['value_fitted'].iloc[-1]
+
+    home_currency_cagr = (ticker_history['base_value'].iloc[-1] /
+                          ticker_history['base_value'].iloc[0]) ** (1 / (ticker_history.shape[0] / 365.25)) - 1
+    home_cur_fitted_cagr = (ticker_history['base_fitted'].iloc[-1] /
+                            ticker_history['base_fitted'].iloc[0]) ** (1 / (ticker_history.shape[0] / 365.25)) - 1
+
+    home_cur_over_under = (ticker_history['base_value'].iloc[-1] -
+                           ticker_history['base_fitted'].iloc[-1]) / ticker_history['base_fitted'].iloc[-1]
+
+    return {
+        'ticker_history': ticker_history,
+
+        'trade_currency_cagr': trade_currency_cagr,
+        'trade_cur_fitted_cagr': trade_cur_fitted_cagr,
+        'trade_cur_over_under': trade_cur_over_under,
+
+        'home_currency_cagr': home_currency_cagr,
+        'home_cur_fitted_cagr': home_cur_fitted_cagr,
+        'home_cur_over_under': home_cur_over_under
+    }

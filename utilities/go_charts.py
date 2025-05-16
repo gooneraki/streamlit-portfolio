@@ -3,11 +3,11 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', title_name: str | None = None):
+def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', fitted_column='fitted', title_name: str | None = None):
     """Display a clean trend chart using Plotly."""
     df = df.copy()
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-    df = df.dropna(subset=['Date', base_column, 'fitted'])
+    df = df.dropna(subset=['Date', base_column, fitted_column])
 
     if df.empty:
         return
@@ -24,7 +24,7 @@ def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', title_nam
 
     fig.add_trace(go.Scatter(
         x=df['Date'],
-        y=df['fitted'],
+        y=df[fitted_column],
         mode='lines',
         name='Fitted Value',
         line=dict(color='#EB4C14', dash='dash')
