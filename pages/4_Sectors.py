@@ -59,8 +59,11 @@ if value_fig is None:
     st.warning("No valid data to plot.")
 else:
 
-    st.plotly_chart(value_fig, config={
-                    "displayModeBar": False}, use_container_width=True)
+    st.plotly_chart(
+        value_fig,
+        config={
+            'staticPlot': True},
+        use_container_width=True)
 
 
 # st.caption(f"*Based on {data_years} years of data.")
