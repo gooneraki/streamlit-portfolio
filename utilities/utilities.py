@@ -1,12 +1,10 @@
 """ This module contains utility functions for the portfolio app """
-
 from typing import List, TypedDict
-
 import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
-from utilities.app_yfinance import search_yf, yf_ticket_history, yf_ticket_info, yf_ticket_history, get_fx_history
+from utilities.app_yfinance import search_yf, yf_ticket_info, yf_ticket_history, get_fx_history
 
 
 class AssetDetails(TypedDict):
