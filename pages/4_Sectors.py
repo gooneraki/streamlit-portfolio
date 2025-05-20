@@ -23,6 +23,8 @@ if market is None:
     st.error("Error retrieving US market data.")
     st.stop()
 
+st.dataframe(market['summary'])
+
 # Get first market symbol
 market_symbol = market['summary'][list(market['summary'].keys())[
     0]].get('symbol', 'UNDEFINED')
@@ -54,8 +56,9 @@ st.write(
 #
 st.write("### Market as a whole")
 
+
 st.write(
-    f"Name: **{market_info['longName']}** || " +
+    f"Name: **{market_info['shortName']}** || " +
     f"Trade Currency: **{market_info['currency']}** || " +
     f"Symbol: **{market_symbol}**")
 
@@ -70,7 +73,7 @@ with col1:
 value_fig = display_trend_go_chart(
     market_history.tail(round(years_to_show*365.25)),
     fitted_column='base_fitted',
-    title_name=f"{market_info['longName']}")
+    title_name=f"{market_info['shortName']}")
 
 if value_fig is None:
     st.warning("No valid data to plot.")
