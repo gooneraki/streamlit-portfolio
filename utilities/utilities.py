@@ -366,60 +366,93 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
     if fx_history.shape[0] == 0:
         return f"Retrieved fx history is empty for {base_currency} and {asset_currency}"
 
-    # Filter data window
+    ###############################
+    # Localize and Filter data window
+    ticker_history.index = ticker_history.index.tz_localize(None)
+    fx_history.index = fx_history.index.tz_localize(None)
+
     start_date = ticker_history.index[-1] - pd.DateOffset(years=years)
     ticker_history = ticker_history[ticker_history.index >= start_date]
-
-    # Calculate the actual number of years of data available after filtering
-    final_years = round(
-        (ticker_history.index[-1] - ticker_history.index[0]).days/365.25, 2)
-
-    # Estimate the average number of trading days per year in the dataset
-    avg_points_in_a_year = round(ticker_history.shape[0]/final_years)
 
     ###############################
     # Trade Value
     trade_value_col = f'Trade Value ({asset_currency})'
     trade_value_return_col = 'Trade Value Return'
     trade_value_fitted_col = 'Trade Value Fitted'
-    result_df = pd.DataFrame(
+
+    trade_df = pd.DataFrame(
         ticker_history.values, index=ticker_history.index, columns=[trade_value_col])
+    trade_df[trade_value_return_col] = trade_df[trade_value_col].pct_change()
+    trade_df[trade_value_fitted_col] = get_exp_fitted_data(
+        trade_df[trade_value_col].values)
 
-    # Step 1: Calculate Daily Returns
-    result_df[trade_value_return_col] = result_df[trade_value_col].pct_change()
-    result_df[trade_value_fitted_col] = get_exp_fitted_data(
-        result_df[trade_value_col].values)
+    # Home value - TODO: if the same then just copy the trade_df
+    fx_col = f'FX Rate ({asset_currency}/{base_currency})'
+    home_value_col = f'Home Value ({base_currency})'
+    home_value_return_col = 'Home Value Return'
+    home_value_fitted_col = 'Home Value Fitted'
 
-    result_dict = {
-        'trade_value_date': result_df.index[-1],
-        'trade_value': result_df[trade_value_col].iloc[-1],
-        'trade_value_fitted': result_df[trade_value_fitted_col].iloc[-1],
-        'trade_value_return': result_df[trade_value_return_col].iloc[-1],
-        'trade_value_cagr': (result_df[trade_value_col].iloc[-1] /
-                             result_df[trade_value_col].iloc[0]) ** (1 / (result_df.shape[0] / 365.25)) - 1,
-        'trade_value_fitted_cagr': (result_df[trade_value_fitted_col].iloc[-1] /
-                                    result_df[trade_value_fitted_col].iloc[0]) ** (1 / (result_df.shape[0] / 365.25)) - 1,
-    }
+    home_df = pd.concat(
+        [trade_df[trade_value_col], fx_history.rename(fx_col)],
+        axis=1,
+        join='inner')
 
-    print(result_dict)
+    home_df[home_value_col] = home_df[trade_value_col] * home_df[fx_col]
+    home_df[home_value_return_col] = home_df[home_value_col].pct_change()
+    home_df[home_value_fitted_col] = get_exp_fitted_data(
+        home_df[home_value_col].values)
 
-    # print(result_df)
+    # print(trade_df)
+    # print(home_df)
 
-    daily_returns = ticker_history.pct_change().dropna()
-    # Step 2: Average Annual Return (Method 1: Daily Returns)
-    average_daily_return = daily_returns.mean()
-    average_annual_return_from_daily = (
-        1 + average_daily_return) ** avg_points_in_a_year - 1
+    def show_stats(df: pd.DataFrame, value_col: str, fitted_col: str, return_col: str):
+        """ Show the stats for the given DataFrame """
+        last_date = df.index[-1]
+        actual_days_duration = (last_date - df.index[0]).days
+        actual_years_duration = actual_days_duration / 365.25
+        avg_points_per_year = df.shape[0]/actual_years_duration
 
-    # Step 3: Annualized Risk from Daily Returns
-    daily_std = daily_returns.std()
-    annualized_risk_from_daily = daily_std * np.sqrt(avg_points_in_a_year)
+        cagr = (df[value_col].iloc[-1] /
+                df[value_col].iloc[0]) ** (1 / actual_years_duration) - 1
+        cagr_fitted = (df[fitted_col].iloc[-1] /
+                       df[fitted_col].iloc[0]) ** (1 / actual_years_duration) - 1
 
-    print(f"Daily Returns: {average_daily_return}")
-    print(f"Daily Risk: {daily_std}")
-    print(
-        f"Average Annual Return (Method 1): {average_annual_return_from_daily}")
-    print(f"Annualized Risk (Method 1): {annualized_risk_from_daily}")
+        over_under = (df[value_col].iloc[-1] -
+                      df[fitted_col].iloc[-1]) / df[fitted_col].iloc[-1]
+
+        daily_returns_mean = df[return_col].mean()
+        daily_return_std = df[return_col].std()
+
+        geo_annualized_daily_returns_mean = (
+            1 + daily_returns_mean) ** avg_points_per_year - 1
+        linear_annualized_daily_returns_mean = daily_returns_mean * avg_points_per_year
+        annualized_risk = daily_return_std * np.sqrt(avg_points_per_year)
+        annualized_sharpe_ratio = linear_annualized_daily_returns_mean / annualized_risk
+
+        res = {
+            'last_date': last_date,
+            'actual_years_duration': actual_years_duration,
+            'cagr': cagr,
+            'cagr_fitted': cagr_fitted,
+            'over_under': over_under,
+            'geo_annualized_daily_returns_mean': geo_annualized_daily_returns_mean,
+            'linear_annualized_daily_returns_mean': linear_annualized_daily_returns_mean,
+            'annualized_risk': annualized_risk,
+            'annualized_sharpe_ratio': annualized_sharpe_ratio
+        }
+
+        print(f"\nStats for {value_col} ({asset_currency})")
+        for key, value in res.items():
+            print(f"{key}: {value:.2}" if isinstance(
+                value, float) else f"{key}: {value}")
+
+        return res
+
+    show_stats(trade_df, trade_value_col,
+               trade_value_fitted_col, trade_value_return_col)
+
+    show_stats(home_df, home_value_col,
+               home_value_fitted_col, home_value_return_col)
 
     ticker_history = localize_and_fill(ticker_history)
 
