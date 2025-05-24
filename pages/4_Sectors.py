@@ -23,7 +23,9 @@ if market is None:
     st.error("Error retrieving US market data.")
     st.stop()
 
-st.dataframe(market['summary'])
+# # print market keys
+# print(f"Market keys: {list(market.keys())}")
+
 
 # Get first market symbol
 market_symbol = market['summary'][list(market['summary'].keys())[
@@ -87,23 +89,27 @@ else:
 
 
 # Market Table
-st.dataframe(pd.DataFrame(
+st.write(pd.DataFrame(
     data=[
         [
             market_analysis.get('trade_currency_cagr'),
             market_analysis.get('trade_cur_fitted_cagr'),
-            market_analysis.get('trade_cur_over_under')],
+            market_analysis.get('trade_cur_over_under'),
+            market_analysis.get('trade_cur_annual_returns_variance')],
         [market_analysis.get('home_currency_cagr'),
          market_analysis.get('home_cur_fitted_cagr'),
-         market_analysis.get('home_cur_over_under')]],
+         market_analysis.get('home_cur_over_under'),
+         market_analysis.get('home_cur_annual_returns_variance')]],
     columns=[
         'Annual Growth Rate',
         'Fitted Annual Growth Rate',
         'Over/Under valued as at ' +
-        pd.to_datetime(market_history.tail(1)['Date'].values[0]).strftime('%d/%m/%y')],
+        pd.to_datetime(market_history.tail(
+            1)['Date'].values[0]).strftime('%d/%m/%y'),
+        'Annual Returns Variance'],
     index=[f'Trade cur ({market_info.get('currency')})',
            f'Home cur ({home_currency})']
-).style.format(formatter=lambda x: f"{x:.1%}"))
+).T.style.format(formatter=lambda x: f"{x:.1%}"))
 
 
 st.write("### Sectors")

@@ -339,35 +339,89 @@ def localize_and_fill(ticker_history: pd.DataFrame | pd.Series):
 
 def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
     """ Fetch the asset info for a given symbol """
+
+    ###############################
+    # Fetch from Yahoo Finance API
+
     # Get asset info to get the currency
     ticker_info = yf_ticket_info(symbol)
-
     if isinstance(ticker_info, str):
         return ticker_info
 
     asset_currency = ticker_info.get('currency')
+    if not asset_currency:
+        return f"Asset currency for {symbol} is not defined in the ticker info"
 
     # Get asset history
     ticker_history = yf_ticket_history(symbol)
-
     if isinstance(ticker_history, str):
         return ticker_history
     if ticker_history.shape[0] == 0:
         return f"Retrieved ticker history is empty for {symbol}"
 
-    # Filter data window
-    start_date = ticker_history.index[-1] - pd.DateOffset(years=years)
-    ticker_history = ticker_history[ticker_history.index >= start_date]
-
-    ticker_history = localize_and_fill(ticker_history)
-
     # Get the fx rate history
     fx_history = get_fx_history(base_currency, asset_currency)
-
     if isinstance(fx_history, str):
         return fx_history
     if fx_history.shape[0] == 0:
         return f"Retrieved fx history is empty for {base_currency} and {asset_currency}"
+
+    # Filter data window
+    start_date = ticker_history.index[-1] - pd.DateOffset(years=years)
+    ticker_history = ticker_history[ticker_history.index >= start_date]
+
+    # Calculate the actual number of years of data available after filtering
+    final_years = round(
+        (ticker_history.index[-1] - ticker_history.index[0]).days/365.25, 2)
+
+    # Estimate the average number of trading days per year in the dataset
+    avg_points_in_a_year = round(ticker_history.shape[0]/final_years)
+
+    ###############################
+    # Trade Value
+    trade_value_col = f'Trade Value ({asset_currency})'
+    trade_value_return_col = 'Trade Value Return'
+    trade_value_fitted_col = 'Trade Value Fitted'
+    result_df = pd.DataFrame(
+        ticker_history.values, index=ticker_history.index, columns=[trade_value_col])
+
+    # Step 1: Calculate Daily Returns
+    result_df[trade_value_return_col] = result_df[trade_value_col].pct_change()
+    result_df[trade_value_fitted_col] = get_exp_fitted_data(
+        result_df[trade_value_col].values)
+
+    result_dict = {
+        'trade_value_date': result_df.index[-1],
+        'trade_value': result_df[trade_value_col].iloc[-1],
+        'trade_value_fitted': result_df[trade_value_fitted_col].iloc[-1],
+        'trade_value_return': result_df[trade_value_return_col].iloc[-1],
+        'trade_value_cagr': (result_df[trade_value_col].iloc[-1] /
+                             result_df[trade_value_col].iloc[0]) ** (1 / (result_df.shape[0] / 365.25)) - 1,
+        'trade_value_fitted_cagr': (result_df[trade_value_fitted_col].iloc[-1] /
+                                    result_df[trade_value_fitted_col].iloc[0]) ** (1 / (result_df.shape[0] / 365.25)) - 1,
+    }
+
+    print(result_dict)
+
+    # print(result_df)
+
+    daily_returns = ticker_history.pct_change().dropna()
+    # Step 2: Average Annual Return (Method 1: Daily Returns)
+    average_daily_return = daily_returns.mean()
+    average_annual_return_from_daily = (
+        1 + average_daily_return) ** avg_points_in_a_year - 1
+
+    # Step 3: Annualized Risk from Daily Returns
+    daily_std = daily_returns.std()
+    annualized_risk_from_daily = daily_std * np.sqrt(avg_points_in_a_year)
+
+    print(f"Daily Returns: {average_daily_return}")
+    print(f"Daily Risk: {daily_std}")
+    print(
+        f"Average Annual Return (Method 1): {average_annual_return_from_daily}")
+    print(f"Annualized Risk (Method 1): {annualized_risk_from_daily}")
+
+    ticker_history = localize_and_fill(ticker_history)
 
     fx_history = localize_and_fill(fx_history)
 
@@ -383,6 +437,10 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
     # remove rows with any NaN values (relevant also because of data window)
     ticker_history.dropna(inplace=True, how='any')
 
+    # get annual change
+    ticker_history['annual_value_return'] = ticker_history['value'].pct_change(
+        365)
+
     # do the base (home currency) data
 
     ticker_history['base_value'] = ticker_history['value'] * \
@@ -391,12 +449,18 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
     ticker_history['base_fitted'] = get_exp_fitted_data(
         ticker_history['base_value'].values)
 
+    ticker_history['annual_base_value_return'] = ticker_history['base_value'].pct_change(
+        365)
+
     trade_currency_cagr = (ticker_history['value'].iloc[-1] /
                            ticker_history['value'].iloc[0]) ** (1 / (ticker_history.shape[0] / 365.25)) - 1
     trade_cur_fitted_cagr = (ticker_history['value_fitted'].iloc[-1] /
                              ticker_history['value_fitted'].iloc[0]) ** (1 / (ticker_history.shape[0] / 365.25)) - 1
     trade_cur_over_under = (ticker_history['value'].iloc[-1] -
                             ticker_history['value_fitted'].iloc[-1]) / ticker_history['value_fitted'].iloc[-1]
+
+    trade_cur_annual_returns_variance = ticker_history['annual_value_return'].var(
+    )
 
     home_currency_cagr = (ticker_history['base_value'].iloc[-1] /
                           ticker_history['base_value'].iloc[0]) ** (1 / (ticker_history.shape[0] / 365.25)) - 1
@@ -405,6 +469,8 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
 
     home_cur_over_under = (ticker_history['base_value'].iloc[-1] -
                            ticker_history['base_fitted'].iloc[-1]) / ticker_history['base_fitted'].iloc[-1]
+    home_cur_annual_returns_variance = ticker_history['annual_base_value_return'].var(
+    )
 
     return {
         'ticker_history': ticker_history,
@@ -412,8 +478,10 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
         'trade_currency_cagr': trade_currency_cagr,
         'trade_cur_fitted_cagr': trade_cur_fitted_cagr,
         'trade_cur_over_under': trade_cur_over_under,
+        'trade_cur_annual_returns_variance': trade_cur_annual_returns_variance,
 
         'home_currency_cagr': home_currency_cagr,
         'home_cur_fitted_cagr': home_cur_fitted_cagr,
-        'home_cur_over_under': home_cur_over_under
+        'home_cur_over_under': home_cur_over_under,
+        'home_cur_annual_returns_variance': home_cur_annual_returns_variance,
     }
