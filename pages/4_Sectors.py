@@ -101,12 +101,16 @@ metrics_df = pd.DataFrame({
     "Trade Currency": trade_metrics,
     "Home Currency": home_metrics
 })
-# metrics_df.index = metrics_df.index.apply(
-#     lambda x: metrics[x].label if x in metrics else x)
-metrics_df.index = metrics_df.index.map(lambda x: metrics[x].label)
-# metrics_df = metrics_df.T
+metrics_df.drop([metrics['start_date'].key,
+                 metrics['actual_years_duration'].key,
+                metrics['last_date'].key], inplace=True)
 
-st.dataframe(metrics_df)
+metrics_df.index = metrics_df.index.map(lambda x: metrics[x].label)
+
+st.dataframe(metrics_df.style.format(
+    formatter=lambda x: f"{x:.1%}" if isinstance(x, float) else x
+))
+
 
 # print(summary_data)
 # print(f"Summary data: {summary_data}")
