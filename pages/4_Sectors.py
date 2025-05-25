@@ -4,7 +4,7 @@ import datetime
 import streamlit as st
 import pandas as pd
 from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf, market_yf, yf_ticket_info
-from utilities.utilities import fully_analyze_symbol
+from utilities.utilities import fully_analyze_symbol, metrics
 from utilities.go_charts import display_trend_go_chart_2
 
 
@@ -71,8 +71,10 @@ with col1:
         "Years displayed",
         options=[1, 2, 3, 5, 7, 10],
     )
+
 currency_options = ['Trade (USD)', 'Home (' + home_currency + ')']
 selected_currency = currency_options[1]
+
 with col2:
     selected_currency = st.selectbox(
         "Currency",
@@ -80,7 +82,6 @@ with col2:
         index=1
     )
 
-print(home_metrics['last_date'], trade_metrics['last_date'])
 filtered_first_date = trade_metrics['last_date'] - pd.DateOffset(
     years=years_to_show) if selected_currency == currency_options[0] else home_metrics['last_date'] - pd.DateOffset(years=years_to_show)
 
@@ -96,12 +97,27 @@ st.plotly_chart(
         'staticPlot': True},
     use_container_width=True)
 
+metrics_df = pd.DataFrame({
+    "Trade Currency": trade_metrics,
+    "Home Currency": home_metrics
+})
+# metrics_df.index = metrics_df.index.apply(
+#     lambda x: metrics[x].label if x in metrics else x)
+metrics_df.index = metrics_df.index.map(lambda x: metrics[x].label)
+# metrics_df = metrics_df.T
 
-st.dataframe(pd.DataFrame(
-    data={
-        "Trade Currency": trade_metrics,
-        "Home Currency": home_metrics
-    }))
+st.dataframe(metrics_df)
+
+# print(summary_data)
+# print(f"Summary data: {summary_data}")
+
+
+# st.dataframe(pd.DataFrame(
+#     data={
+#         "Trade Currency": trade_metrics,
+#         "Home Currency": home_metrics
+#     }))
+
 # st.dataframe(pd.DataFrame(
 #     trade_metrics if selected_currency ==
 #              currency_options[0] else home_metrics))

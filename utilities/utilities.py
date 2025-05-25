@@ -6,6 +6,39 @@ import numpy as np
 # import altair as alt
 from utilities.app_yfinance import search_yf, yf_ticket_info, yf_ticket_history, get_fx_history
 
+from dataclasses import dataclass
+
+from enum import Enum
+
+
+class FormatType(Enum):
+    FLOAT_1 = ".1f"
+    FLOAT_2 = ".2f"
+    PERCENTAGE_1 = ".1%"
+    INTEGER = "d"
+    DATE = "%Y-%m-%d"
+
+
+@dataclass
+class Metric:
+    key: str
+    label: str
+    fmt: FormatType
+
+
+metrics = {
+    'start_date': Metric('start_date', 'Start Date', FormatType.DATE),
+    'last_date': Metric('last_date', 'Last Date', FormatType.DATE),
+    'actual_years_duration': Metric('actual_years_duration', 'Years', FormatType.FLOAT_1),
+    'cagr': Metric('cagr', 'CAGR', FormatType.PERCENTAGE_1),
+    'cagr_fitted': Metric('cagr_fitted', 'CAGR Fitted', FormatType.PERCENTAGE_1),
+    'over_under': Metric('over_under', 'Over/Under', FormatType.PERCENTAGE_1),
+    'annualized_return': Metric('annualized_return', 'Annualized Return', FormatType.PERCENTAGE_1),
+    'annualized_risk': Metric('annualized_risk', 'Annualized Risk', FormatType.PERCENTAGE_1),
+    'annualized_returns_to_risk_ratio': Metric('annualized_returns_to_risk_ratio', 'Return/Risk Ratio', FormatType.FLOAT_2)
+
+}
+
 
 class AssetDetails(TypedDict):
     """ TypedDict for asset details sent by the user"""
@@ -364,15 +397,15 @@ def calculate_financial_metrics(df: pd.DataFrame, value_col: str, fitted_col: st
     annualized_risk = daily_return_std * np.sqrt(avg_points_per_year)
 
     return {
-        'start_date': start_date,
-        'last_date': last_date,
-        'actual_years_duration': actual_years_duration,
-        'cagr': cagr,
-        'cagr_fitted': cagr_fitted,
-        'over_under': over_under,
-        'annualized_return': annualized_return,
-        'annualized_risk': annualized_risk,
-        'annualized_returns_to_risk_ratio': annualized_returns_to_risk_ratio
+        metrics['start_date'].key: start_date,
+        metrics['last_date'].key: last_date,
+        metrics['actual_years_duration'].key: actual_years_duration,
+        metrics['cagr'].key: cagr,
+        metrics['cagr_fitted'].key: cagr_fitted,
+        metrics['over_under'].key: over_under,
+        metrics['annualized_return'].key: annualized_return,
+        metrics['annualized_risk'].key: annualized_risk,
+        metrics['annualized_returns_to_risk_ratio'].key: annualized_returns_to_risk_ratio,
     }
 
 
