@@ -49,6 +49,47 @@ def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', fitted_co
     return fig
 
 
+def display_trend_go_chart_2(df: pd.DataFrame, value_column: str, fitted_column: str, title_name: str | None = None):
+    """Display a clean trend chart using Plotly."""
+    df = df.copy()
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df[value_column],
+        mode='lines',
+        name='Base Value',
+        line=dict(color='#14B3EB')
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df[fitted_column],
+        mode='lines',
+        name='Fitted Value',
+        line=dict(color='#EB4C14', dash='dash')
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=title_name,
+            x=0.5,
+            y=0.98,
+            xanchor='center',
+            yanchor='top'
+        ) if title_name else None,
+        xaxis_title='Date',
+        yaxis_title='Value',
+        template='plotly_white',
+        height=450,
+        margin=dict(t=0, b=0, l=0, r=0),
+        legend=dict(yanchor="top", y=0.90, xanchor="left", x=0.01)
+    )
+
+    return fig
+
+
 def display_daily_annual_returns_chart(df: pd.DataFrame, annual_column='annual_base_return', date_column='Date', mean_value=None):
     """Display clean daily annual returns chart (no legend, title, or modebar)."""
     df = df.copy()

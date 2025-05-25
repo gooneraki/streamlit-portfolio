@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf, market_yf, yf_ticket_info
 from utilities.utilities import fully_analyze_symbol
-from utilities.go_charts import display_trend_go_chart
+from utilities.go_charts import display_trend_go_chart_2
 
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
@@ -33,7 +33,7 @@ market_symbol = market['summary'][list(market['summary'].keys())[
 # Fetch market info of the first symbol
 market_info = yf_ticket_info(market_symbol)
 # Fetch market history of the first symbol and stats
-market_analysis = fully_analyze_symbol(
+trade_df, trade_metrics, home_df, home_metrics = fully_analyze_symbol(
     market_symbol, home_currency, data_years)
 
 # Fetch sector data
@@ -42,9 +42,9 @@ sector_data = sorted([sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS],
 
 
 # Adjust for Chart
-market_history = market_analysis.get('ticker_history').reset_index()
-market_history['Date'] = pd.to_datetime(
-    market_history['Date'], errors='coerce')
+# market_history = market_analysis.get('ticker_history').reset_index()
+# market_history['Date'] = pd.to_datetime(
+#     market_history['Date'], errors='coerce')
 
 
 # UI
@@ -65,51 +65,69 @@ st.write(
     f"Symbol: **{market_symbol}**")
 
 # Market Chart
-col1, _ = st.columns([1, 3])
+col1, col2, _ = st.columns([1, 1, 2])
 with col1:
     years_to_show = st.selectbox(
         "Years displayed",
         options=[1, 2, 3, 5, 7, 10],
     )
+currency_options = ['Trade (USD)', 'Home (' + home_currency + ')']
+selected_currency = currency_options[1]
+with col2:
+    selected_currency = st.selectbox(
+        "Currency",
+        options=currency_options,
+        index=1
+    )
 
-value_fig = display_trend_go_chart(
-    market_history.tail(round(years_to_show*365.25)),
-    fitted_column='base_fitted',
+print(home_metrics['last_date'], trade_metrics['last_date'])
+filtered_first_date = trade_metrics['last_date'] - pd.DateOffset(
+    years=years_to_show) if selected_currency == currency_options[0] else home_metrics['last_date'] - pd.DateOffset(years=years_to_show)
+
+value_fig = display_trend_go_chart_2(
+    trade_df[trade_df.index >= filtered_first_date] if selected_currency == currency_options[0] else home_df[home_df.index >= filtered_first_date],
+    'Trade Value' if selected_currency == currency_options[0] else 'Home Value',
+    'Trade Value Fitted' if selected_currency == currency_options[0] else 'Home Value Fitted',
     title_name=f"{market_info['shortName']}")
 
-if value_fig is None:
-    st.warning("No valid data to plot.")
-else:
+st.plotly_chart(
+    value_fig,
+    config={
+        'staticPlot': True},
+    use_container_width=True)
 
-    st.plotly_chart(
-        value_fig,
-        config={
-            'staticPlot': True},
-        use_container_width=True)
 
+st.dataframe(pd.DataFrame(
+    data={
+        "Trade Currency": trade_metrics,
+        "Home Currency": home_metrics
+    }))
+# st.dataframe(pd.DataFrame(
+#     trade_metrics if selected_currency ==
+#              currency_options[0] else home_metrics))
 
 # Market Table
-st.write(pd.DataFrame(
-    data=[
-        [
-            market_analysis.get('trade_currency_cagr'),
-            market_analysis.get('trade_cur_fitted_cagr'),
-            market_analysis.get('trade_cur_over_under'),
-            market_analysis.get('trade_cur_annual_returns_variance')],
-        [market_analysis.get('home_currency_cagr'),
-         market_analysis.get('home_cur_fitted_cagr'),
-         market_analysis.get('home_cur_over_under'),
-         market_analysis.get('home_cur_annual_returns_variance')]],
-    columns=[
-        'Annual Growth Rate',
-        'Fitted Annual Growth Rate',
-        'Over/Under valued as at ' +
-        pd.to_datetime(market_history.tail(
-            1)['Date'].values[0]).strftime('%d/%m/%y'),
-        'Annual Returns Variance'],
-    index=[f'Trade cur ({market_info.get('currency')})',
-           f'Home cur ({home_currency})']
-).T.style.format(formatter=lambda x: f"{x:.1%}"))
+# st.write(pd.DataFrame(
+#     data=[
+#         [
+#             market_analysis.get('trade_currency_cagr'),
+#             market_analysis.get('trade_cur_fitted_cagr'),
+#             market_analysis.get('trade_cur_over_under'),
+#             market_analysis.get('trade_cur_annual_returns_variance')],
+#         [market_analysis.get('home_currency_cagr'),
+#          market_analysis.get('home_cur_fitted_cagr'),
+#          market_analysis.get('home_cur_over_under'),
+#          market_analysis.get('home_cur_annual_returns_variance')]],
+#     columns=[
+#         'Annual Growth Rate',
+#         'Fitted Annual Growth Rate',
+#         'Over/Under valued as at ' +
+#         pd.to_datetime(market_history.tail(
+#             1)['Date'].values[0]).strftime('%d/%m/%y'),
+#         'Annual Returns Variance'],
+#     index=[f'Trade cur ({market_info.get('currency')})',
+#            f'Home cur ({home_currency})']
+# ).T.style.format(formatter=lambda x: f"{x:.1%}"))
 
 
 st.write("### Sectors")
