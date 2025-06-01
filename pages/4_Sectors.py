@@ -1,10 +1,11 @@
-""" Streamlit app to display sector and industry information """
+"""Streamlit app to display sector and industry information"""
+
 # pylint: disable=C0103
 import datetime
 import streamlit as st
 import pandas as pd
 from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf, market_yf, yf_ticket_info
-from utilities.utilities import fully_analyze_symbol, metrics
+from utilities.utilities import fully_analyze_symbol, metrics, retrieve_sector_data
 from utilities.go_charts import display_trend_go_chart_2
 
 
@@ -27,45 +28,20 @@ data_years = 10
 # # print market keys
 # print(f"Market keys: {list(market.keys())}")
 
-
 # Get first market symbol
 # market_symbol = market['summary'][list(market['summary'].keys())[
 #     0]].get('symbol', 'UNDEFINED')
 
 market_symbol = "^GSPC"
-# Fetch market info of the first symbol
+
 market_info = yf_ticket_info(market_symbol)
-# Fetch market history of the first symbol and stats
 trade_df, trade_metrics, home_df, home_metrics = fully_analyze_symbol(
-    market_symbol, home_currency, data_years)
+    market_symbol, home_currency, data_years
+)
+
 
 # Fetch sector data
-sector_data = sorted([sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS],
-                     key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
-
-
-for i, sector in enumerate(sector_data):
-    top_etfs = sector.get('top_etfs')
-    if top_etfs is not None and isinstance(top_etfs, dict) and len(list(top_etfs.keys())) > 0:
-
-       
-        first_etf = list(top_etfs.keys())[0]
-        _, etf_trade_metrics, _, etf_home_metrics = fully_analyze_symbol(
-            first_etf, home_currency, data_years)
-        
-       
-        etf_metrics = {
-            'top_etf': first_etf,
-            'etf_trade_metrics': etf_trade_metrics,
-            'etf_home_metrics': etf_home_metrics
-        }
-
-        sector_data[i]['etf_metrics'] = etf_metrics 
-
-    else:
-        print(f"No ETFs found for sector: {sector.get('name', 'UNDEFINED')}")
-
-
+sector_data, sector_data_df = retrieve_sector_data(home_currency, data_years)
 
 
 # UI
@@ -133,54 +109,11 @@ st.dataframe(metrics_df.style.format(
 ))
 
 
-# print(summary_data)
-# print(f"Summary data: {summary_data}")
-
-
-# st.dataframe(pd.DataFrame(
-#     data={
-#         "Trade Currency": trade_metrics,
-#         "Home Currency": home_metrics
-#     }))
-
-# st.dataframe(pd.DataFrame(
-#     trade_metrics if selected_currency ==
-#              currency_options[0] else home_metrics))
-
-# Market Table
-# st.write(pd.DataFrame(
-#     data=[
-#         [
-#             market_analysis.get('trade_currency_cagr'),
-#             market_analysis.get('trade_cur_fitted_cagr'),
-#             market_analysis.get('trade_cur_over_under'),
-#             market_analysis.get('trade_cur_annual_returns_variance')],
-#         [market_analysis.get('home_currency_cagr'),
-#          market_analysis.get('home_cur_fitted_cagr'),
-#          market_analysis.get('home_cur_over_under'),
-#          market_analysis.get('home_cur_annual_returns_variance')]],
-#     columns=[
-#         'Annual Growth Rate',
-#         'Fitted Annual Growth Rate',
-#         'Over/Under valued as at ' +
-#         pd.to_datetime(market_history.tail(
-#             1)['Date'].values[0]).strftime('%d/%m/%y'),
-#         'Annual Returns Variance'],
-#     index=[f'Trade cur ({market_info.get('currency')})',
-#            f'Home cur ({home_currency})']
-# ).T.style.format(formatter=lambda x: f"{x:.1%}"))
-
-
 st.write("### Sectors")
-st.dataframe(pd.DataFrame(
-    data=[[sector.get('name', 'UNDEFINED'),
-    sector.get('overview', {}).get("market_weight", -9.99),
-    sector.get('etf_metrics', {}).get('top_etf', 'UNDEFINED'),
-    sector.get('etf_metrics', {}).get('etf_trade_metrics', {}).get('over_under', 'UNDEFINED'),
-    sector.get('etf_metrics', {}).get('etf_home_metrics', {}).get('over_under', 'UNDEFINED'),
-    ] for sector in sector_data],
-    columns=['Sector', 'Market Weight','ETF for metrics','Over/Under valued (Trade)','Over/Under valued (Home)']).style.format(
-    {'Market Weight': '{:.1%}' ,'Over/Under valued (Trade)': '{:.1%}' ,'Over/Under valued (Home)': '{:.1%}'}), hide_index=True)
+st.dataframe(sector_data_df.style.format(
+    formatter=lambda x: f"{x:.1%}" if isinstance(x, float) else x
+
+), hide_index=True)
 
 
 for faulty_sector in [

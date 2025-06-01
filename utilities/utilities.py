@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
-from utilities.app_yfinance import search_yf, yf_ticket_info, yf_ticket_history, get_fx_history
+from utilities.app_yfinance import YF_SECTOR_KEYS, search_yf, yf_ticket_info, yf_ticket_history, get_fx_history, sector_yf
 
 from dataclasses import dataclass
 
@@ -483,3 +483,71 @@ def fully_analyze_symbol(symbol: str,  base_currency: str, years: int):
                                                home_value_fitted_col, home_value_return_col)
 
     return trade_df, trade_metrics, home_df, home_metrics
+
+
+def retrieve_sector_data(home_currency: str, data_years: int):
+    """Retrieve the sector data"""
+    sectors_data = sorted(
+        [sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS],
+        key=lambda x: x.get("overview", {}).get("market_weight", -9.99),
+        reverse=True,
+    )
+
+    for i, sector in enumerate(sectors_data):
+        top_etfs = sector.get("top_etfs")
+        if (
+            top_etfs is not None
+            and isinstance(top_etfs, dict)
+            and len(list(top_etfs.keys())) > 0
+        ):
+
+            first_etf = list(top_etfs.keys())[0]
+            info = yf_ticket_info(first_etf)
+            _, etf_trade_metrics, _, etf_home_metrics = fully_analyze_symbol(
+                first_etf, home_currency, data_years
+            )
+
+            etf_metrics = {
+                "top_etf": first_etf,
+                "etf_info": info,
+                "etf_trade_metrics": etf_trade_metrics,
+                "etf_home_metrics": etf_home_metrics,
+            }
+
+            sectors_data[i]["etf_metrics"] = etf_metrics
+
+    columns = [
+        "Sector",
+        "Market Weight",
+        "ETF",
+        # "ETF Summary",
+        "Trade Over/Under",
+        "Trade CAGR",
+        "Trade CAGR Fitted",
+        "Trade Annualized Return",
+        "Trade Annualized Risk",
+        "Trade Return/Risk Ratio",
+        "Reference Date",
+        "Sample Years",
+    ]
+    data = [
+        [
+            sector["name"],
+            sector["overview"]["market_weight"],
+            sector["etf_metrics"]["top_etf"],
+            # sector["etf_metrics"]["etf_info"]["longBusinessSummary"],
+            sector["etf_metrics"]["etf_trade_metrics"]["over_under"],
+            sector["etf_metrics"]["etf_trade_metrics"]["cagr"],
+            sector["etf_metrics"]["etf_trade_metrics"]["cagr_fitted"],
+            sector["etf_metrics"]["etf_trade_metrics"]["annualized_return"],
+            sector["etf_metrics"]["etf_trade_metrics"]["annualized_risk"],
+            sector["etf_metrics"]["etf_trade_metrics"][
+                "annualized_returns_to_risk_ratio"
+            ],
+            sector["etf_metrics"]["etf_home_metrics"]["last_date"],
+            sector["etf_metrics"]["etf_home_metrics"]["actual_years_duration"],
+        ]
+        for sector in sectors_data
+    ]
+
+    return sectors_data, pd.DataFrame(data, columns=columns)
