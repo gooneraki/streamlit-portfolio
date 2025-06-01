@@ -15,21 +15,24 @@ st.set_page_config(page_title="US Market Overview", layout="centered")
 # User contants
 home_currency = "EUR"
 data_years = 10
-country = "US"
+# country = "US"
+
 
 # Fetch market data
-market = market_yf(country)
-if market is None:
-    st.error("Error retrieving US market data.")
-    st.stop()
+# market = market_yf(country)
+# if market is None:
+#     st.error("Error retrieving US market data.")
+#     st.stop()
 
 # # print market keys
 # print(f"Market keys: {list(market.keys())}")
 
 
 # Get first market symbol
-market_symbol = market['summary'][list(market['summary'].keys())[
-    0]].get('symbol', 'UNDEFINED')
+# market_symbol = market['summary'][list(market['summary'].keys())[
+#     0]].get('symbol', 'UNDEFINED')
+
+market_symbol = "^GSPC"
 # Fetch market info of the first symbol
 market_info = yf_ticket_info(market_symbol)
 # Fetch market history of the first symbol and stats
