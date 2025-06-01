@@ -44,10 +44,28 @@ sector_data = sorted([sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS],
                      key=lambda x: x.get('overview', {}).get("market_weight", -9.99), reverse=True)
 
 
-# Adjust for Chart
-# market_history = market_analysis.get('ticker_history').reset_index()
-# market_history['Date'] = pd.to_datetime(
-#     market_history['Date'], errors='coerce')
+for i, sector in enumerate(sector_data):
+    top_etfs = sector.get('top_etfs')
+    if top_etfs is not None and isinstance(top_etfs, dict) and len(list(top_etfs.keys())) > 0:
+
+       
+        first_etf = list(top_etfs.keys())[0]
+        _, etf_trade_metrics, _, etf_home_metrics = fully_analyze_symbol(
+            first_etf, home_currency, data_years)
+        
+       
+        etf_metrics = {
+            'top_etf': first_etf,
+            'etf_trade_metrics': etf_trade_metrics,
+            'etf_home_metrics': etf_home_metrics
+        }
+
+        sector_data[i]['etf_metrics'] = etf_metrics 
+
+    else:
+        print(f"No ETFs found for sector: {sector.get('name', 'UNDEFINED')}")
+
+
 
 
 # UI
@@ -155,10 +173,14 @@ st.dataframe(metrics_df.style.format(
 
 st.write("### Sectors")
 st.dataframe(pd.DataFrame(
-    data=[[sector.get('name', 'UNDEFINED'), sector.get(
-        'overview', {}).get("market_weight", -9.99)] for sector in sector_data],
-    columns=['Sector', 'Market Weight']).style.format(
-    {'Market Weight': '{:.1%}'}), hide_index=True)
+    data=[[sector.get('name', 'UNDEFINED'),
+    sector.get('overview', {}).get("market_weight", -9.99),
+    sector.get('etf_metrics', {}).get('top_etf', 'UNDEFINED'),
+    sector.get('etf_metrics', {}).get('etf_trade_metrics', {}).get('over_under', 'UNDEFINED'),
+    sector.get('etf_metrics', {}).get('etf_home_metrics', {}).get('over_under', 'UNDEFINED'),
+    ] for sector in sector_data],
+    columns=['Sector', 'Market Weight','ETF for metrics','Over/Under valued (Trade)','Over/Under valued (Home)']).style.format(
+    {'Market Weight': '{:.1%}' ,'Over/Under valued (Trade)': '{:.1%}' ,'Over/Under valued (Home)': '{:.1%}'}), hide_index=True)
 
 
 for faulty_sector in [
