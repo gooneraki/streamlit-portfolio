@@ -36,7 +36,11 @@ python -m pip install --upgrade pip
 Write-Host "Installing dependencies from requirements.txt..." -ForegroundColor Cyan
 pip install -r requirements.txt
 
-# Step 5: Deactivate virtual environment
+# Step 5: Freeze dependencies
+Write-Host "Freezing dependencies..." -ForegroundColor Cyan
+pip freeze > requirements.txt
+
+# Step 6: Deactivate virtual environment
 Write-Host "Deactivating virtual environment..." -ForegroundColor Cyan
 deactivate
 
