@@ -516,38 +516,30 @@ def retrieve_sector_data(home_currency: str, data_years: int):
 
             sectors_data[i]["etf_metrics"] = etf_metrics
 
-    columns = [
-        "Sector",
-        "Market Weight",
-        "ETF",
-        # "ETF Summary",
-        "Trade Over/Under",
-        "Trade CAGR",
-        "Trade CAGR Fitted",
-        "Trade Annualized Return",
-        "Trade Annualized Risk",
-        "Trade Return/Risk Ratio",
-        "Reference Date",
-        "Sample Years",
-    ]
     data = [
-        [
-            sector["name"],
-            sector["overview"]["market_weight"],
-            sector["etf_metrics"]["top_etf"],
-            # sector["etf_metrics"]["etf_info"]["longBusinessSummary"],
-            sector["etf_metrics"]["etf_trade_metrics"]["over_under"],
-            sector["etf_metrics"]["etf_trade_metrics"]["cagr"],
-            sector["etf_metrics"]["etf_trade_metrics"]["cagr_fitted"],
-            sector["etf_metrics"]["etf_trade_metrics"]["annualized_return"],
-            sector["etf_metrics"]["etf_trade_metrics"]["annualized_risk"],
-            sector["etf_metrics"]["etf_trade_metrics"][
+        {
+            "Sector":  sector["name"],
+            "Market Weight": sector["overview"]["market_weight"],
+            "ETF": sector["etf_metrics"]["top_etf"],
+            # "ETF Summary":   sector["etf_metrics"]["etf_info"]["longBusinessSummary"],
+            "Trade Over/Under":    sector["etf_metrics"]["etf_trade_metrics"]["over_under"],
+            "Trade CAGR":   sector["etf_metrics"]["etf_trade_metrics"]["cagr"],
+            "Trade CAGR Fitted":  sector["etf_metrics"]["etf_trade_metrics"]["cagr_fitted"],
+            "Trade Annualized Return":   sector["etf_metrics"]["etf_trade_metrics"]["annualized_return"],
+            "Trade Annualized Risk":     sector["etf_metrics"]["etf_trade_metrics"]["annualized_risk"],
+            "Trade Return/Risk Ratio":    sector["etf_metrics"]["etf_trade_metrics"][
                 "annualized_returns_to_risk_ratio"
             ],
-            sector["etf_metrics"]["etf_home_metrics"]["last_date"],
-            sector["etf_metrics"]["etf_home_metrics"]["actual_years_duration"],
-        ]
+            "Reference Date":   sector["etf_metrics"]["etf_home_metrics"]["last_date"],
+            "Sample Years":  sector["etf_metrics"]["etf_home_metrics"]["actual_years_duration"],
+        }
         for sector in sectors_data
     ]
 
-    return sectors_data, pd.DataFrame(data, columns=columns)
+    total_row = {
+        "Sector": "Total",
+        "Market Weight": sum(sector["Market Weight"] for sector in data),
+        "Trade CAGR": sum(sector["Trade CAGR"]*sector["Market Weight"] for sector in data),
+    }
+
+    return sectors_data, pd.DataFrame(data + [total_row])

@@ -16,10 +16,13 @@ st.set_page_config(page_title="US Market Overview", layout="centered")
 # User contants
 home_currency = "EUR"
 data_years = 10
+
+# Dynamic way of taking market symbol
+###
+###
 # country = "US"
 
-
-# Fetch market data
+# # Fetch market data
 # market = market_yf(country)
 # if market is None:
 #     st.error("Error retrieving US market data.")
@@ -28,9 +31,13 @@ data_years = 10
 # # print market keys
 # print(f"Market keys: {list(market.keys())}")
 
-# Get first market symbol
+# # Get first market symbol
 # market_symbol = market['summary'][list(market['summary'].keys())[
 #     0]].get('symbol', 'UNDEFINED')
+
+# print(f"Market symbol: {market_symbol}")
+###
+###
 
 market_symbol = "^GSPC"
 
@@ -110,10 +117,17 @@ st.dataframe(metrics_df.style.format(
 
 
 st.write("### Sectors")
-st.dataframe(sector_data_df.style.format(
-    formatter=lambda x: f"{x:.1%}" if isinstance(x, float) else x
-
-), hide_index=True)
+st.dataframe(sector_data_df.drop(columns=["Reference Date", "Sample Years"]).style.format(
+    {
+        "Market Weight": "{:.1%}",
+        "Trade Over/Under": "{:.1%}",
+        "Trade CAGR": "{:.1%}",
+        "Trade CAGR Fitted": "{:.1%}",
+        "Trade Annualized Return": "{:.1%}",
+        "Trade Annualized Risk": "{:.1%}",
+        "Trade Return/Risk Ratio": "{:.2f}",
+    }
+), hide_index=True, height=sector_data_df.shape[0]*39)
 
 
 for faulty_sector in [
