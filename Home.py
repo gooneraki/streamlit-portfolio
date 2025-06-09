@@ -1,5 +1,6 @@
 # pylint: disable=C0103
 """ Streamlit application for the Home page of the Portfolio Historical Data Analysis app. """
+import sys
 import streamlit as st
 
 # Set the page title and layout
@@ -8,6 +9,9 @@ st.set_page_config(
 
 # Add a title
 st.title("Welcome to Portfolio Historical Data Analysis")
+
+# print python version
+st.write(f"Python version: {sys.version}")
 
 # Add an introduction
 st.write("""
