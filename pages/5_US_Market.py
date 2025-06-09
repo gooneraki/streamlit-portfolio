@@ -44,21 +44,7 @@ symbols = [
     "KOKO"
 ]
 
-# history = yf.download(symbols, period="10y")
 symbol_data = fetch_symbol_data(symbols, "10y")
-# history_close = history.filter(like="Close")
-
-# st.dataframe(history_close.tail())
-
-# for symbol in symbol_data["infos"]:
-#     st.write(symbol["info"])
-
-
-print(len(symbol_data["infos"]))
-print(len(symbols))
-# print(symbol_data["infos"][-2])
-
-# print(symbol_data["history"])
 
 
 def extract_invalid_symbols(p_symbol_data: dict):
@@ -84,3 +70,13 @@ def remove_invalid_symbols(p_symbol_data: dict, p_invalid_symbols: list[str]):
 
 
 valid_symbol_data = remove_invalid_symbols(symbol_data, invalid_symbols)
+
+
+history_close = valid_symbol_data["history"]["Close"].copy()
+
+# remove nan
+history_close.dropna(axis=0, how='any', inplace=True)
+print(history_close)
+
+# history_close.columns = history_close.columns.get_level_values(1)
+st.dataframe(history_close)
