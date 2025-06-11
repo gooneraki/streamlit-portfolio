@@ -5,7 +5,7 @@ This page is used to fetch the data for the US market
 import time
 from typing import Any, Literal
 import numpy as np
-import seaborn as sns
+from utilities.utilities import get_exp_fitted_data
 import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
@@ -24,8 +24,6 @@ def fetch_symbol_data(p_symbols: list[str], period: str):
     ticker_list: list[dict[Literal['symbol', 'info'], Any]] = [{
         "symbol": symbol,
         'info': yf.Ticker(symbol).info} for symbol in p_symbols]
-
-    # print(ticker_list)
 
     return {
         "history": tickers.history(period=period),
@@ -94,10 +92,11 @@ st.dataframe(infos_df, use_container_width=True, hide_index=True)
 
 history_close.dropna(axis=0, how='any', inplace=True)
 
-days_between = (history_close.index[-1] - history_close.index[0]).days + 1
+days_duration = (history_close.index[-1] - history_close.index[0]).days + 1
+years_duration = days_duration / 365.25
 total_points = history_close.shape[0]
-points_per_year = len(history_close.index) / (days_between / 365.25)
-print(f"Days between: {days_between}")
+points_per_year = len(history_close.index) / years_duration
+print(f"Days between: {days_duration}")
 print(f"Total points: {total_points}")
 print(f"Points per year: {points_per_year}")
 
@@ -126,24 +125,24 @@ st.pyplot(fig)
 history_close_pct = history_close.pct_change().dropna()
 
 
-history_close_description = history_close_pct.describe().T
+mean_returns = history_close_pct.describe().T
 
 
-history_close_description['annualized_mean'] = history_close_description['mean'] * points_per_year
-history_close_description['annualized_std'] = history_close_description['std'] * (
+mean_returns['annualized_mean'] = mean_returns['mean'] * points_per_year
+mean_returns['annualized_std'] = mean_returns['std'] * (
     points_per_year ** 0.5)
-history_close_description['annualized_sharpe'] = history_close_description['annualized_mean'] / \
-    history_close_description['annualized_std']
-print(history_close_description)
+mean_returns['annualized_sharpe'] = mean_returns['annualized_mean'] / \
+    mean_returns['annualized_std']
+
 
 # scatter plot of annualized mean vs annualized std
 fig, ax = plt.subplots()
-history_close_description.plot.scatter(
+mean_returns.plot.scatter(
     x='annualized_std', y='annualized_mean', ax=ax, title="Annualized Mean vs Annualized Std")
 ax.set_xlabel("Annualized Std")
 ax.set_ylabel("Annualized Mean")
 
-for i, row in history_close_description.iterrows():
+for i, row in mean_returns.iterrows():
     ax.annotate(row.name,
                 (row['annualized_std'] + 0.002, row['annualized_mean']+0.002))
 
@@ -151,30 +150,28 @@ st.pyplot(fig)
 
 
 # Covariance and correlation matrices
-cov_matrix = history_close_pct.cov()
-print(cov_matrix)
+# cov_matrix = history_close_pct.cov()
 
-corr_matrix = history_close_pct.corr()
-print(corr_matrix)
+# corr_matrix = history_close_pct.corr()
 
-# Heatmap of the correlation matrix
-fig, ax = plt.subplots()
-sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
-ax.set_title("Correlation Matrix of US Market Stocks")
-st.pyplot(fig)
+# # Heatmap of the correlation matrix
+# fig, ax = plt.subplots()
+# sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
+# ax.set_title("Correlation Matrix of US Market Stocks")
+# st.pyplot(fig)
 
 
 # Logarithmic returns
-history_close_log_returns = history_close.apply(
+log_returns = history_close.apply(
     lambda x: np.log(x / x.shift(1))).dropna()
 
-log_returns_description = history_close_log_returns.describe().T
-log_returns_description['first'] = history_close.iloc[0, :]
-log_returns_description['last'] = history_close.iloc[-1, :]
+log_returns_description = log_returns.describe().T
+# log_returns_description['first'] = history_close.iloc[0, :]
+# log_returns_description['last'] = history_close.iloc[-1, :]
 
-log_returns_description['validation'] = log_returns_description['first'] * \
-    np.exp(log_returns_description['mean'] *
-           history_close_log_returns.index.size)
+# log_returns_description['validation'] = log_returns_description['first'] * \
+#     np.exp(log_returns_description['mean'] *
+#            history_close_log_returns.index.size)
 
 log_returns_description['annualized_mean'] = log_returns_description['mean'] * points_per_year
 log_returns_description['annualized_std'] = log_returns_description['std'] * \
@@ -183,18 +180,40 @@ log_returns_description['annualized_sharpe'] = log_returns_description['annualiz
     log_returns_description['annualized_std']
 
 
-print(log_returns_description.loc[:, [
-      'first', 'last', 'mean', 'validation', 'annualized_mean', 'annualized_std', 'annualized_sharpe']])
+print('history_close_description')
+# history_close_description['first'] = history_close.iloc[0, :]
+# history_close_description['last'] = history_close.iloc[-1, :]
+# history_close_description['validation'] = history_close_description['first'] * ((1 +
+#                                                                                  history_close_description['annualized_mean']) ** years_duration)
+print(mean_returns)
+
+print('Log Returns Description:')
+print(log_returns_description)
+
+# cagr_returns = log_returns_description.copy()
+# cagr_returns['cagr'] = (history_close.iloc[-1, :] /
+#                         history_close.iloc[0, :]) ** (1 / years_duration) - 1
+# cagr_returns = cagr_returns[['cagr']].copy()
+# print('CAGR Returns:')
+# print(cagr_returns)
+
+print(history_close)
+history_close_fitted = history_close.apply(get_exp_fitted_data)
+print('Fitted Data:')
+print(history_close_fitted)
+
+squared_errors = ((history_close / history_close_fitted)-1) ** 2
+print('Squared Errors:')
+print(squared_errors)
+
+rmse = np.sqrt(squared_errors.mean())
+rmse = pd.DataFrame(rmse, columns=['RMSE'])
+rmse['cagr'] = (history_close.iloc[-1, :] /
+                history_close.iloc[0, :]) ** (1 / years_duration) - 1
+rmse['years'] = years_duration
+rmse['power'] = rmse['cagr'] / rmse['RMSE']
+print('RMSE:')
+print(rmse)
 
 
 monthly_close = history_close.resample('ME').last()
-# print(monthly_close)
-
-
-# # remove nan
-# history_close.dropna(axis=0, how='any', inplace=True)
-# print(history_close)
-# # print(valid_symbol_data["infos"])
-
-# # history_close.columns = history_close.columns.get_level_values(1)
-# st.dataframe(history_close)

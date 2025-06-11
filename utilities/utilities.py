@@ -107,7 +107,7 @@ def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series
     return asset_history
 
 
-def get_exp_fitted_data(y: List[int]):
+def get_exp_fitted_data(y: List[float]):
     """ Fit the value data to an exponential curve. """
     if len(y) < 2:
         return y
