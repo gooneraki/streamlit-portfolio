@@ -3,10 +3,16 @@
 This page is used to fetch the data for the US market
 """
 import time
+from typing import Any, Literal
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 import streamlit as st
+import pandas as pd
 import yfinance as yf
 
-print(f"\n US Market Page loaded at {time.strftime('%H:%M:%S')}")
+
+print(f"\n--- US Market Page loaded at {time.strftime('%H:%M:%S')} ---\n")
 
 
 @st.cache_data
@@ -15,7 +21,7 @@ def fetch_symbol_data(p_symbols: list[str], period: str):
     Fetch symbol data from yfinance
     """
     tickers = yf.Tickers(p_symbols)
-    ticker_list = [{
+    ticker_list: list[dict[Literal['symbol', 'info'], Any]] = [{
         "symbol": symbol,
         'info': yf.Ticker(symbol).info} for symbol in p_symbols]
 
@@ -27,7 +33,7 @@ def fetch_symbol_data(p_symbols: list[str], period: str):
     }
 
 
-symbols = [
+STOCK_SYMBOLS = [
     "XLC",
     "XLY",
     "XLP",
@@ -40,11 +46,14 @@ symbols = [
     "XLRE",
     "XLU",
     "SPY",
-    "EURUSD=X",
     "KOKO"
 ]
 
-symbol_data = fetch_symbol_data(symbols, "10y")
+CURRENCY_SYMBOLS = [
+    "EURUSD=X",  # Canadian Dollar to US Dollar
+]
+
+symbol_data = fetch_symbol_data(STOCK_SYMBOLS, "10y")
 
 
 def extract_invalid_symbols(p_symbol_data: dict):
@@ -72,11 +81,120 @@ def remove_invalid_symbols(p_symbol_data: dict, p_invalid_symbols: list[str]):
 valid_symbol_data = remove_invalid_symbols(symbol_data, invalid_symbols)
 
 
-history_close = valid_symbol_data["history"]["Close"].copy()
+history_close: pd.DataFrame = valid_symbol_data["history"]["Close"].copy()
+tickers_info = valid_symbol_data["infos"]
 
-# remove nan
+
+infos_df = pd.DataFrame(
+    [(ticker_info['symbol'], ticker_info['info'].get('longName', 'No short name available'))
+        for ticker_info in tickers_info],
+    columns=['Symbol', 'Short Name'])
+st.dataframe(infos_df, use_container_width=True, hide_index=True)
+
+
 history_close.dropna(axis=0, how='any', inplace=True)
-print(history_close)
 
-# history_close.columns = history_close.columns.get_level_values(1)
-st.dataframe(history_close)
+days_between = (history_close.index[-1] - history_close.index[0]).days + 1
+total_points = history_close.shape[0]
+points_per_year = len(history_close.index) / (days_between / 365.25)
+print(f"Days between: {days_between}")
+print(f"Total points: {total_points}")
+print(f"Points per year: {points_per_year}")
+
+
+fig, ax = plt.subplots()
+history_close.plot(ax=ax, title="US Market Historical Close Prices")
+ax.set_ylabel("Price (USD)")
+ax.set_xlabel("Date")
+ax.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0))
+plt.tight_layout()
+st.pyplot(fig)
+
+history_close_normalized = history_close.copy()
+history_close_normalized = history_close_normalized.div(
+    history_close_normalized.iloc[0, :], axis=1).mul(100)
+
+fig, ax = plt.subplots()
+history_close_normalized.plot(ax=ax, title="US Market Normalized Close Prices")
+ax.set_ylabel("Normalized Price")
+ax.set_xlabel("Date")
+ax.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0))
+plt.tight_layout()
+st.pyplot(fig)
+
+
+history_close_pct = history_close.pct_change().dropna()
+
+
+history_close_description = history_close_pct.describe().T
+
+
+history_close_description['annualized_mean'] = history_close_description['mean'] * points_per_year
+history_close_description['annualized_std'] = history_close_description['std'] * (
+    points_per_year ** 0.5)
+history_close_description['annualized_sharpe'] = history_close_description['annualized_mean'] / \
+    history_close_description['annualized_std']
+print(history_close_description)
+
+# scatter plot of annualized mean vs annualized std
+fig, ax = plt.subplots()
+history_close_description.plot.scatter(
+    x='annualized_std', y='annualized_mean', ax=ax, title="Annualized Mean vs Annualized Std")
+ax.set_xlabel("Annualized Std")
+ax.set_ylabel("Annualized Mean")
+
+for i, row in history_close_description.iterrows():
+    ax.annotate(row.name,
+                (row['annualized_std'] + 0.002, row['annualized_mean']+0.002))
+
+st.pyplot(fig)
+
+
+# Covariance and correlation matrices
+cov_matrix = history_close_pct.cov()
+print(cov_matrix)
+
+corr_matrix = history_close_pct.corr()
+print(corr_matrix)
+
+# Heatmap of the correlation matrix
+fig, ax = plt.subplots()
+sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
+ax.set_title("Correlation Matrix of US Market Stocks")
+st.pyplot(fig)
+
+
+# Logarithmic returns
+history_close_log_returns = history_close.apply(
+    lambda x: np.log(x / x.shift(1))).dropna()
+
+log_returns_description = history_close_log_returns.describe().T
+log_returns_description['first'] = history_close.iloc[0, :]
+log_returns_description['last'] = history_close.iloc[-1, :]
+
+log_returns_description['validation'] = log_returns_description['first'] * \
+    np.exp(log_returns_description['mean'] *
+           history_close_log_returns.index.size)
+
+log_returns_description['annualized_mean'] = log_returns_description['mean'] * points_per_year
+log_returns_description['annualized_std'] = log_returns_description['std'] * \
+    (points_per_year ** 0.5)
+log_returns_description['annualized_sharpe'] = log_returns_description['annualized_mean'] / \
+    log_returns_description['annualized_std']
+
+
+print(log_returns_description.loc[:, [
+      'first', 'last', 'mean', 'validation', 'annualized_mean', 'annualized_std', 'annualized_sharpe']])
+
+
+monthly_close = history_close.resample('ME').last()
+# print(monthly_close)
+
+
+# # remove nan
+# history_close.dropna(axis=0, how='any', inplace=True)
+# print(history_close)
+# # print(valid_symbol_data["infos"])
+
+# # history_close.columns = history_close.columns.get_level_values(1)
+# st.dataframe(history_close)
