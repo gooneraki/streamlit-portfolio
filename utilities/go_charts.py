@@ -189,7 +189,12 @@ def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[st
         template='plotly_white',
         height=450,
         margin=dict(t=40, b=0, l=0, r=0),
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        showlegend=True,
+        hovermode='x unified',
+        modebar=dict(remove=['zoom', 'pan', 'select', 'lasso',
+                     'zoomIn', 'zoomOut', 'autoScale', 'resetScale']),
+        dragmode=False
     )
 
     return fig
