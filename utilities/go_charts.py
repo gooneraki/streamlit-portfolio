@@ -146,3 +146,50 @@ def display_daily_annual_returns_chart(df: pd.DataFrame, annual_column='annual_b
     )
 
     return fig
+
+
+def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[str] = None, title: str = None):
+    """
+    Display a line chart for a selected symbol showing multiple metrics.
+
+    Args:
+        df (pd.DataFrame): Multi-index DataFrame with metrics and symbols
+        symbol (str): The symbol to display
+        metrics (list[str]): List of metrics to display. If None, shows all available metrics
+        title (str): Optional title for the chart
+    """
+    if metrics is None:
+        metrics = df.columns.get_level_values('Metric').unique()
+
+    fig = go.Figure()
+
+    colors = ['#14B3EB', '#EB4C14', '#2ECC71', '#F1C40F', '#9B59B6', '#E74C3C']
+
+    for i, metric in enumerate(metrics):
+        if metric in df.columns.get_level_values('Metric'):
+            data = df[metric][symbol]
+            fig.add_trace(go.Scatter(
+                x=data.index,
+                y=data,
+                mode='lines',
+                name=metric,
+                line=dict(color=colors[i % len(colors)])
+            ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"{symbol} - {title}" if title else symbol,
+            x=0.5,
+            y=0.98,
+            xanchor='center',
+            yanchor='top'
+        ),
+        xaxis_title='Date',
+        yaxis_title='Value',
+        template='plotly_white',
+        height=450,
+        margin=dict(t=40, b=0, l=0, r=0),
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+
+    return fig

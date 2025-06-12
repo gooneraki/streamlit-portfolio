@@ -5,11 +5,12 @@ This page is used to fetch the data for the US market
 import time
 from typing import Any, Literal
 import numpy as np
-from utilities.utilities import get_exp_fitted_data
 import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
 import yfinance as yf
+from utilities.utilities import get_exp_fitted_data
+from utilities.go_charts import display_symbol_metrics_chart
 
 
 print(f"\n--- US Market Page loaded at {time.strftime('%H:%M:%S')} ---\n")
@@ -178,12 +179,7 @@ log_returns = history_close.apply(
     lambda x: np.log(x / x.shift(1))).dropna()
 
 log_returns_description = log_returns.describe().T
-# log_returns_description['first'] = history_close.iloc[0, :]
-# log_returns_description['last'] = history_close.iloc[-1, :]
 
-# log_returns_description['validation'] = log_returns_description['first'] * \
-#     np.exp(log_returns_description['mean'] *
-#            history_close_log_returns.index.size)
 
 log_returns_description['annualized_mean'] = log_returns_description['mean'] * points_per_year
 log_returns_description['annualized_std'] = log_returns_description['std'] * \
@@ -192,12 +188,10 @@ log_returns_description['annualized_sharpe'] = log_returns_description['annualiz
     log_returns_description['annualized_std']
 
 
-print('history_close_description')
-# history_close_description['first'] = history_close.iloc[0, :]
-# history_close_description['last'] = history_close.iloc[-1, :]
-# history_close_description['validation'] = history_close_description['first'] * ((1 +
-#                                                                                  history_close_description['annualized_mean']) ** years_duration)
-print(mean_returns)
+# log_returns_description['first'] = history_close.iloc[0, :]
+# log_returns_description['last'] = history_close.iloc[-1, :]
+# log_returns_description['validation'] = log_returns_description['first'] * \
+#     np.exp(log_returns_description['mean'] * (total_points-1))
 
 
 print('Log Returns Description:')
@@ -228,8 +222,8 @@ cagr_metrics['CAGR_Fitted'] = (history_close_fitted.iloc[-1, :] /
 
 cagr_metrics['CAGR-to-RMSE Ratio'] = cagr_metrics['CAGR'] / \
     cagr_metrics['RMSE']
-cagr_metrics['Over/Under Today'] = history_close_fitted.iloc[-1, :] / \
-    history_close.iloc[-1, :] - 1
+cagr_metrics['Over/Under Today'] = history_close.iloc[-1, :] / \
+    history_close_fitted.iloc[-1, :] - 1
 
 cagr_metrics['Log Returns (annualised)'] = log_returns_description['annualized_mean']
 cagr_metrics['Log Returns Std (annualised)'] = log_returns_description['annualized_std']
@@ -251,11 +245,50 @@ st.dataframe(cagr_metrics.style.format({
     "Log Returns Sharpe (annualised)": "{:.2f}",
     "Years Duration": "{:.2f}",
     "First Date": lambda x: x.strftime('%Y-%m-%d'),
-    "Last Date": lambda x: x.strftime('%Y-%m-%d')
-}),
-    use_container_width=True,
-
+    "Last Date": lambda x: x.strftime('%Y-%m-%d')}),
+    use_container_width=True
 )
 
+
+# Create a multi-index DataFrame combining all metrics
+metrics_dict = {
+    'Closing Price': history_close,
+    'Fitted Price': history_close_fitted,
+    'Squared_Errors': squared_errors,
+    'Normalized Price': history_close_normalized,
+    'Pct_Change': history_close_pct,
+    'Log_Returns': log_returns,
+}
+
+# Combine all metrics into a multi-index DataFrame
+combined_metrics = pd.concat(metrics_dict, axis=1).dropna()
+combined_metrics.columns.names = ['Metric', 'Symbol']
+
+
+# Add symbol selector and interactive chart
+st.subheader("Interactive Symbol Analysis")
+
+# Create a mapping of symbol to display name
+symbol_display_map = {
+    row['Symbol']: f"{row['Symbol']} - {row['Short Name']}"
+    for _, row in infos_df.iterrows()
+}
+
+# Create symbol selector with formatted display names
+selected_symbol = st.selectbox(
+    "Select a Symbol",
+    options=list(symbol_display_map.keys()),
+    format_func=lambda x: symbol_display_map[x],
+    index=0  # Default to first symbol
+)
+
+# Create the chart using the new utility function
+fig = display_symbol_metrics_chart(
+    combined_metrics,
+    selected_symbol,
+    metrics=['Closing Price', 'Fitted Price'],
+    title="Price Analysis"
+)
+st.plotly_chart(fig, use_container_width=True)
 
 monthly_close = history_close.resample('ME').last()
