@@ -14,6 +14,11 @@ import yfinance as yf
 
 print(f"\n--- US Market Page loaded at {time.strftime('%H:%M:%S')} ---\n")
 
+st.set_page_config(
+    page_title="US Market",
+    page_icon=":bar_chart:",
+    layout="centered")
+
 
 @st.cache_data
 def fetch_symbol_data(p_symbols: list[str], period: str):
@@ -91,12 +96,19 @@ st.dataframe(infos_df, use_container_width=True, hide_index=True)
 
 
 history_close.dropna(axis=0, how='any', inplace=True)
+# print('History Close Data:')
+# print(history_close)
 
-days_duration = (history_close.index[-1] - history_close.index[0]).days + 1
+first_date = history_close.index[0]
+last_date = history_close.index[-1]
+days_duration = (last_date - first_date).days + 1
 years_duration = days_duration / 365.25
 total_points = history_close.shape[0]
-points_per_year = len(history_close.index) / years_duration
-print(f"Days between: {days_duration}")
+points_per_year = total_points / years_duration
+print(f"First date: {first_date}")
+print(f"Last date: {last_date}")
+print(f"Days duration: {days_duration}")
+print(f"Years duration: {years_duration}")
 print(f"Total points: {total_points}")
 print(f"Points per year: {points_per_year}")
 
@@ -187,6 +199,7 @@ print('history_close_description')
 #                                                                                  history_close_description['annualized_mean']) ** years_duration)
 print(mean_returns)
 
+
 print('Log Returns Description:')
 print(log_returns_description)
 
@@ -197,23 +210,52 @@ print(log_returns_description)
 # print('CAGR Returns:')
 # print(cagr_returns)
 
-print(history_close)
+
 history_close_fitted = history_close.apply(get_exp_fitted_data)
-print('Fitted Data:')
-print(history_close_fitted)
+# print('Fitted Data:')
+# print(history_close_fitted)
 
 squared_errors = ((history_close / history_close_fitted)-1) ** 2
-print('Squared Errors:')
-print(squared_errors)
+# print('Squared Errors:')
+# print(squared_errors)
 
-rmse = np.sqrt(squared_errors.mean())
-rmse = pd.DataFrame(rmse, columns=['RMSE'])
-rmse['cagr'] = (history_close.iloc[-1, :] /
-                history_close.iloc[0, :]) ** (1 / years_duration) - 1
-rmse['years'] = years_duration
-rmse['power'] = rmse['cagr'] / rmse['RMSE']
-print('RMSE:')
-print(rmse)
+cagr_metrics = np.sqrt(squared_errors.mean())
+cagr_metrics = pd.DataFrame(cagr_metrics, columns=['RMSE'])
+cagr_metrics['CAGR'] = (history_close.iloc[-1, :] /
+                        history_close.iloc[0, :]) ** (1 / years_duration) - 1
+cagr_metrics['CAGR_Fitted'] = (history_close_fitted.iloc[-1, :] /
+                               history_close_fitted.iloc[0, :]) ** (1 / years_duration) - 1
+
+cagr_metrics['CAGR-to-RMSE Ratio'] = cagr_metrics['CAGR'] / \
+    cagr_metrics['RMSE']
+cagr_metrics['Over/Under Today'] = history_close_fitted.iloc[-1, :] / \
+    history_close.iloc[-1, :] - 1
+
+cagr_metrics['Log Returns (annualised)'] = log_returns_description['annualized_mean']
+cagr_metrics['Log Returns Std (annualised)'] = log_returns_description['annualized_std']
+cagr_metrics['Log Returns Sharpe (annualised)'] = log_returns_description['annualized_sharpe']
+
+cagr_metrics['First Date'] = history_close.index[0]
+cagr_metrics['Last Date'] = history_close.index[-1]
+cagr_metrics['Years Duration'] = years_duration
+
+print('CAGR Metrics:')
+print(cagr_metrics)
+st.dataframe(cagr_metrics.style.format({
+    "CAGR": "{:.1%}",
+    "CAGR_Fitted": "{:.1%}",
+    "RMSE": "{:.1%}",
+    "Over/Under Today": "{:.1%}",
+    "Log Returns (annualised)": "{:.1%}",
+    "Log Returns Std (annualised)": "{:.1%}",
+    "Log Returns Sharpe (annualised)": "{:.2f}",
+    "Years Duration": "{:.2f}",
+    "First Date": lambda x: x.strftime('%Y-%m-%d'),
+    "Last Date": lambda x: x.strftime('%Y-%m-%d')
+}),
+    use_container_width=True,
+
+)
 
 
 monthly_close = history_close.resample('ME').last()
