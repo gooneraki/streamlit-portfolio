@@ -122,6 +122,31 @@ def get_exp_fitted_data(y: List[float]):
     return y_exp
 
 
+def get_rolling_exp_fit(series: pd.Series):
+    """Calculate exponential fit for each point using all historical data up to that point"""
+    result = pd.Series(index=series.index, dtype=float)
+
+    for i in range(len(series)):
+        if i < 2:  # Need at least 2 points for a fit
+            result.iloc[i] = series.iloc[i]
+            continue
+
+        # Get all data up to current point
+        historical_data = series.iloc[:i+1]
+        x = np.arange(len(historical_data))
+        y = historical_data.values
+
+        # Fit exponential
+        y_log = np.log(y)
+        z_exp = np.polyfit(x, y_log, 1)
+        p_exp = np.poly1d(z_exp)
+
+        # Get the fitted value for the current point
+        result.iloc[i] = np.exp(p_exp(len(historical_data)-1))
+
+    return result
+
+
 def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_fit='base_value'):
     """ Append the fitted data to the history data. """
 

@@ -125,6 +125,29 @@ def market_yf(market: str):
 # yf.Market #
 # ######### #
 
+# ######### #
+# yf.Tickers #
+# ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
+
+@st.cache_data
+def tickers_yf(symbols: list[str]):
+    """ Fetch the tickers info for a given symbols """
+    try:
+        tickers = yf.Tickers(symbols)
+        return {
+            "history": tickers.history(period='max', auto_adjust=True)["Close"],
+            "news": tickers.news()
+            }
+    except Exception as err:
+        error_message = f"Error retrieving tickers details for '{symbols}': {err}"
+        return error_message
+# ^^^^^^^^^ #
+# yf.Tickers #
+# ######### #
+
+
+
+
 
 # valid_periods = ['1d', '5d', '1mo', '3mo',
 #                  '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']

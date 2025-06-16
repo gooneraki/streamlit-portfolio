@@ -49,7 +49,9 @@ def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', fitted_co
     return fig
 
 
-def display_trend_go_chart_2(df: pd.DataFrame, value_column: str, fitted_column: str, title_name: str | None = None):
+def display_trend_go_chart_2(df: pd.DataFrame, value_column: str, fitted_column: str,
+                             secondary_column: str = None,
+                             title_name: str | None = None):
     """Display a clean trend chart using Plotly."""
     df = df.copy()
 
@@ -71,6 +73,26 @@ def display_trend_go_chart_2(df: pd.DataFrame, value_column: str, fitted_column:
         line=dict(color='#EB4C14', dash='dash')
     ))
 
+    if secondary_column:
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df[secondary_column],
+            mode='lines',
+            name=secondary_column,
+            line=dict(color='#2ECC71'),
+            yaxis='y2'
+        ))
+
+    if secondary_column:
+        fig.update_layout(
+            yaxis2=dict(
+                title='Secondary Value',
+                overlaying='y',
+                side='right',
+                showgrid=False
+            )
+        )
+
     fig.update_layout(
         title=dict(
             text=title_name,
@@ -84,7 +106,9 @@ def display_trend_go_chart_2(df: pd.DataFrame, value_column: str, fitted_column:
         template='plotly_white',
         height=450,
         margin=dict(t=0, b=0, l=0, r=0),
-        legend=dict(yanchor="top", y=0.90, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.90, xanchor="left", x=0.01),
+        modebar=dict(remove=['zoom', 'pan', 'select', 'lasso',
+                             'zoomIn', 'zoomOut', 'autoScale', 'resetScale']),
     )
 
     return fig
