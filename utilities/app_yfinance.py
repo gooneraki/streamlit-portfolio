@@ -2,6 +2,7 @@
 import pandas as pd
 import yfinance as yf
 import streamlit as st
+from typing import Union, TypedDict
 
 
 YF_SECTOR_KEYS = list(yf.const.SECTOR_INDUSTY_MAPPING.keys())
@@ -129,24 +130,35 @@ def market_yf(market: str):
 # yf.Tickers #
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
+
+class TickersData(TypedDict):
+    """Type definition for successful tickers data response"""
+    history: pd.DataFrame
+    news: dict[str, list[dict]]
+
+
 @st.cache_data
-def tickers_yf(symbols: list[str]):
-    """ Fetch the tickers info for a given symbols """
+def tickers_yf(symbols: list[str]) -> Union[str, TickersData]:
+    """ 
+    Fetch the tickers info for a given symbols
+
+    Returns:
+        Union[str, TickersData]: Either an error string or a dictionary with:
+            - history: pd.DataFrame - Historical close prices
+            - news: dict[str, list[dict]] - News articles
+    """
     try:
         tickers = yf.Tickers(symbols)
         return {
             "history": tickers.history(period='max', auto_adjust=True)["Close"],
             "news": tickers.news()
-            }
+        }
     except Exception as err:
         error_message = f"Error retrieving tickers details for '{symbols}': {err}"
         return error_message
 # ^^^^^^^^^ #
 # yf.Tickers #
 # ######### #
-
-
-
 
 
 # valid_periods = ['1d', '5d', '1mo', '3mo',
