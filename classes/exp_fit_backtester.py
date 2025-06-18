@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from utilities.app_yfinance import tickers_yf
 from typing import Literal
+from utilities.utilities import get_rolling_exp_fit
 
 
 def print_df(df, title):
@@ -9,6 +10,16 @@ def print_df(df, title):
     print(df.head())
     print(df.tail())
     print(df.shape)
+
+
+def get_central_deviations(close_data):
+
+    tickers_history_fitted = close_data.apply(get_rolling_exp_fit)
+
+    deviations = (tickers_history_fitted/close_data - 1).dropna()
+    central_deviations = deviations.sub(deviations.mean(axis=1), axis=0)
+
+    return central_deviations
 
 
 def get_portfolio_weights(benchmark_weights, central_deviations, tilt, period: Literal['weekly', 'monthly']):
@@ -114,13 +125,7 @@ class ExpFitBacktester():
         # lost end
         #####
 
-        # deviations
-        # (1710, 11)
-        # Lost 49 rows because of the rolling window
-        sma_50 = close_data.rolling(window=20).mean().dropna()
-
-        deviations = (sma_50 / close_data - 1).dropna()
-        central_deviations = deviations.sub(deviations.mean(axis=1), axis=0)
+        central_deviations = get_central_deviations(close_data)
 
         # WEIGHT BALANCING HAPPENS HERE
         portfolio_weights = get_portfolio_weights(
