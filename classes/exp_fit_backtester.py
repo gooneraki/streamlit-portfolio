@@ -14,7 +14,8 @@ def print_df(df, title):
 
 def get_central_deviations(close_data):
 
-    tickers_history_fitted = close_data.apply(get_rolling_exp_fit)
+    tickers_history_fitted = close_data.apply(
+        get_rolling_exp_fit, min_points=round(365.25*3))
 
     deviations = (tickers_history_fitted/close_data - 1).dropna()
     central_deviations = deviations.sub(deviations.mean(axis=1), axis=0)
@@ -61,9 +62,6 @@ class ExpFitBacktester():
 
     def __init__(self, symbols: list[str]):
         self.symbols = symbols
-
-        self.tickers_data = None
-        self.valid_symbols = None
 
         self.fetch_data()
 
@@ -159,6 +157,106 @@ class ExpFitBacktester():
         print(f"Portfolio Performance: {portfolio_exp_cum_returns.iloc[-1]}")
         print(
             f"Outperformance: {portfolio_exp_cum_returns.iloc[-1] - benchmark_exp_cum_returns.iloc[-1]}")
+
+        print_df(close_data, "Close Data")  # (1760, 11)
+        print_df(benchmark_weights, "Benchmark Weights")  # (1760, 11)
+        print_df(central_deviations, "Central Deviations")  # (1760, 11)
+        print_df(portfolio_weights, "Portfolio Weights")  # (1760, 11)
+
+        # Create concatenated dataframe with all four dataframes
+        # Add prefixes to distinguish between different dataframes
+        close_data_prefixed = close_data.add_prefix('close_')
+        benchmark_weights_prefixed = benchmark_weights.add_prefix(
+            'benchmark_weights_')
+        central_deviations_prefixed = central_deviations.add_prefix(
+            'central_deviations_')
+        portfolio_weights_prefixed = portfolio_weights.add_prefix(
+            'portfolio_weights_')
+
+        # Concatenate all dataframes horizontally
+        self.concatenated_main_data = pd.concat([
+            close_data_prefixed,
+            benchmark_weights_prefixed,
+            central_deviations_prefixed,
+            portfolio_weights_prefixed
+        ], axis=1)
+
+        # Create multi-index dataframe with the four main dataframes
+        # Create a list of tuples for the multi-index columns
+        multi_index_columns = []
+
+        # Add close_data columns
+        for ticker in close_data.columns:
+            multi_index_columns.append(('close_data', ticker))
+
+        # Add benchmark_weights columns
+        for ticker in benchmark_weights.columns:
+            multi_index_columns.append(('benchmark_weights', ticker))
+
+        # Add central_deviations columns
+        for ticker in central_deviations.columns:
+            multi_index_columns.append(('central_deviations', ticker))
+
+        # Add portfolio_weights columns
+        for ticker in portfolio_weights.columns:
+            multi_index_columns.append(('portfolio_weights', ticker))
+
+        # Create the multi-index
+        multi_index = pd.MultiIndex.from_tuples(
+            multi_index_columns, names=self.column_titles)
+
+        # Concatenate all dataframes and assign the multi-index
+        self.main_data_multiindex = pd.concat([
+            close_data,
+            benchmark_weights,
+            central_deviations,
+            portfolio_weights
+        ], axis=1)
+        self.main_data_multiindex.columns = multi_index
+
+        print_df(benchmark_close_data, "Benchmark Close Data")  # (1760,)
+        print_df(benchmark_log_returns, "Benchmark Log Returns")  # (1759,)
+        print_df(benchmark_cum_returns, "Benchmark Cum Returns")  # (1759,)
+        print_df(benchmark_exp_cum_returns,
+                 "Benchmark Exp Cum Returns")  # (1759,)
+
+        print_df(portfolio_close_data, "Portfolio Close Data")  # (1760,)
+        print_df(portfolio_log_returns, "Portfolio Log Returns")  # (1759,)
+        print_df(portfolio_cum_returns, "Portfolio Cum Returns")  # (1759,)
+        print_df(portfolio_exp_cum_returns,
+                 "Portfolio Exp Cum Returns")  # (1759,)
+
+        data_dict = {
+            'benchmark_close': benchmark_close_data,
+            'benchmark_log_returns': benchmark_log_returns,
+            'benchmark_cum_returns': benchmark_cum_returns,
+            'benchmark_exp_cum_returns': benchmark_exp_cum_returns,
+            'portfolio_close': portfolio_close_data,
+            'portfolio_log_returns': portfolio_log_returns,
+            'portfolio_cum_returns': portfolio_cum_returns,
+            'portfolio_exp_cum_returns': portfolio_exp_cum_returns
+        }
+
+        # Create consolidated dataframe with all metrics
+        self.consolidated_data = pd.DataFrame(data_dict)
+
+    def get_consolidated_data(self):
+        """
+        Return the consolidated dataframe with all benchmark and portfolio metrics.
+        """
+        return self.consolidated_data
+
+    def get_main_dataframes(self):
+        """
+        Return the multi-index dataframe containing all four main dataframes:
+        - close_data (with 'close_data' as Metric level)
+        - benchmark_weights (with 'benchmark_weights' as Metric level)
+        - central_deviations (with 'central_deviations' as Metric level)  
+        - portfolio_weights (with 'portfolio_weights' as Metric level)
+
+        The dataframe has a MultiIndex with levels: ["Metric", "Ticker"]
+        """
+        return self.main_data_multiindex
 
     def get_tickers_history(self):
         return self.tickers_data["history"]

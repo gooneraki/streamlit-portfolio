@@ -122,12 +122,16 @@ def get_exp_fitted_data(y: List[float]):
     return y_exp
 
 
-def get_rolling_exp_fit(series: pd.Series):
+def get_rolling_exp_fit(series: pd.Series, min_points: int = 2):
     """Calculate exponential fit for each point using all historical data up to that point"""
+    # Need at least 2 points for a fit
+    if min_points < 2:
+        min_points = 2
+
     result = pd.Series(index=series.index, dtype=float)
 
     for i in range(len(series)):
-        if i < 2:  # Need at least 2 points for a fit
+        if i < min_points:
             result.iloc[i] = series.iloc[i]
             continue
 

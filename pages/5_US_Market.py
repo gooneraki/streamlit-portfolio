@@ -41,7 +41,14 @@ STOCK_SYMBOLS = [
 
 exp_fit_backtester = ExpFitBacktester(STOCK_SYMBOLS)
 tickers_history = exp_fit_backtester.get_tickers_history()
-# print(tickers_history)
+
+consolidated_data = exp_fit_backtester.get_consolidated_data()
+
+st.dataframe(consolidated_data, use_container_width=True)
+
+main_dataframes = exp_fit_backtester.get_main_dataframes()
+
+st.dataframe(main_dataframes, use_container_width=True)
 
 
 # CURRENCY_SYMBOLS = [
