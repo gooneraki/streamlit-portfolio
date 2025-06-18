@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from utilities.app_yfinance import tickers_yf
+from typing import Literal
 
 
 def print_df(df, title):
@@ -8,6 +9,39 @@ def print_df(df, title):
     print(df.head())
     print(df.tail())
     print(df.shape)
+
+
+def get_portfolio_weights(benchmark_weights, central_deviations, tilt, period: Literal['weekly', 'monthly']):
+
+    # print_df(benchmark_weights, "Benchmark Weights")
+    # (1759, 11)
+    # print_df(central_deviations, "Central Deviations")
+    # (1740, 11)
+
+    # WEIGHT BALANCING HAPPENS HERE
+    portfolio_weights_pre = (benchmark_weights +
+                             tilt * central_deviations).dropna()
+
+    # print_df(portfolio_weights_pre, "Portfolio Weights Pre")
+    # (1740, 11)
+
+    weights_last_period = portfolio_weights_pre.resample(
+        'W' if period == 'weekly' else 'ME').last()
+
+    # print_df(weights_last_period, "Weights Last Period")
+    # (84, 11)
+
+    weights_reindexed = weights_last_period.reindex(
+        central_deviations.index, method='ffill').dropna()
+    # print_df(weights_reindexed, "Weights Reindexed")
+    # (1730, 11)
+
+    # # Align the data - use portfolio_weights where available, benchmark_weights as fallback
+    portfolio_weights = benchmark_weights.copy()
+    portfolio_weights.loc[weights_reindexed.index,
+                          weights_reindexed.columns] = weights_reindexed
+
+    return portfolio_weights
 
 
 class ExpFitBacktester():
@@ -89,14 +123,9 @@ class ExpFitBacktester():
         central_deviations = deviations.sub(deviations.mean(axis=1), axis=0)
 
         # WEIGHT BALANCING HAPPENS HERE
-        portfolio_weights_pre = (benchmark_weights +
-                                 self.tilt * central_deviations).dropna()
-        # lost end
-
-        # Align the data - use portfolio_weights where available, benchmark_weights as fallback
-        portfolio_weights = benchmark_weights.copy()
-        portfolio_weights.loc[portfolio_weights_pre.index,
-                              portfolio_weights_pre.columns] = portfolio_weights_pre
+        portfolio_weights = get_portfolio_weights(
+            benchmark_weights, central_deviations, self.tilt, 'monthly')
+        # print_df(portfolio_weights, "Portfolio Weights")
 
         portfolio_close_data = (close_data * portfolio_weights).sum(axis=1)
 
