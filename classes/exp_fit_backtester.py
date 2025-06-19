@@ -57,13 +57,14 @@ def get_central_deviations(close_data: pd.DataFrame) -> pd.DataFrame:
         DataFrame with centered deviations from exponential fits
     """
     # Apply rolling exponential fit with minimum 3 years of data
-    min_points = round(365.25 * 3)
-    tickers_history_fitted = close_data.apply(
-        get_rolling_exp_fit, min_points=min_points
-    )
+    # min_points = round(365.25 * 3)
+    # tickers_history_fitted = close_data.apply(
+    #     get_rolling_exp_fit, min_points=min_points
+    # )
+    tickers_history_fitted = close_data.rolling(window=50).mean()
 
     # Calculate deviations from fitted values
-    deviations = (tickers_history_fitted / close_data - 1).dropna()
+    deviations = (close_data/tickers_history_fitted - 1).dropna()
 
     # Center deviations by subtracting mean across tickers for each date
     central_deviations = deviations.sub(deviations.mean(axis=1), axis=0)
@@ -131,20 +132,21 @@ class ExpFitBacktester:
     column_titles = ["Metric", "Ticker"]
     tilt = 0.5
 
-    def __init__(self, symbols: List[str]):
+    def __init__(self, symbols: List[str], initial_capital: float = 1000):
         """
-        Initialize the backtester with a list of symbols.
+        Initialize the backtester with a list of symbols and initial capital.
 
         Args:
             symbols: List of ticker symbols to include in the backtest
+            initial_capital: Starting capital for the backtest (default: 1000)
 
         Raises:
             ValueError: If no valid symbols are found or data fetching fails
         """
         self.symbols = symbols
+        self.initial_capital = initial_capital
         self.tickers_data: Optional[Union[str, TickersData]] = None
         self.valid_symbols: List[str] = []
-        self.consolidated_data: Optional[pd.DataFrame] = None
         self.main_data_multiindex: Optional[pd.DataFrame] = None
 
         self._fetch_data()
@@ -197,222 +199,264 @@ class ExpFitBacktester:
     def _calculate_metrics(self) -> None:
         """
         Calculate all performance metrics and create consolidated data structures.
-
-        This method performs the core backtesting calculations including:
-        - Benchmark and portfolio returns
-        - Central deviations from exponential fits
-        - Portfolio weight optimization
-        - Performance comparison
+        Only keep a single MultiIndex DataFrame with benchmark metrics.
         """
         if not isinstance(self.tickers_data, dict):
             raise ValueError("Invalid tickers data format")
 
         close_data = self.tickers_data["history"]
+        first_date: pd.Timestamp = close_data.index[0]
+        n_symbols = len(self.valid_symbols)
+        initial_weights = pd.Series(1 / n_symbols, index=close_data.columns)
+        initial_prices: pd.Series = close_data.loc[first_date]
+        benchmark_positions = (self.initial_capital *
+                               initial_weights) / initial_prices
 
-        # Create equal-weighted benchmark
-        benchmark_weights = pd.DataFrame(
-            1 / len(self.valid_symbols),
-            index=close_data.index,
-            columns=close_data.columns,
+        # Price (close), B_Position (constant), B_Value, B_Weight, B_log_returns
+        price_df = close_data.copy()
+        b_position_df = pd.DataFrame([benchmark_positions] * len(close_data),
+                                     index=close_data.index,
+                                     columns=close_data.columns)
+        b_value_df = price_df * b_position_df
+        total_b_value = b_value_df.sum(axis=1)
+        b_weight_df = b_value_df.div(total_b_value, axis=0)
+        b_log_returns_df = np.log(price_df / price_df.shift(1))
+        # For TOTAL column: portfolio value and log return
+        total_b_position = b_position_df.sum(axis=1)
+        total_b_weight = pd.Series(1.0, index=close_data.index)
+        total_b_log_returns = np.log(total_b_value / total_b_value.shift(1))
+
+        # Add TOTAL column
+        price_df["TOTAL"] = total_b_value
+        b_position_df["TOTAL"] = total_b_position
+        b_value_df["TOTAL"] = total_b_value
+        b_weight_df["TOTAL"] = total_b_weight
+        b_log_returns_df["TOTAL"] = total_b_log_returns
+
+        # --- Mean Reversion Signal (Z-score, 42-day window) ---
+        mean_reversion_signal = self.get_mean_reversion_signal(
+            price_df, window=42)
+
+        # --- Return Spread Signal (Z-score of short vs long rolling log return) ---
+        return_spread_signal = self.get_return_spread_signal(
+            b_log_returns_df, short_window=21, long_window=126)
+
+        # --- Return Spread Signal (Z-score of short vs long rolling MEAN log return) ---
+        return_spread_signal_mean = self.get_return_spread_signal_mean(
+            b_log_returns_df, short_window=21, long_window=126)
+
+        # --- Volatility Signal (rolling std of log returns, 63-day window) ---
+        volatility_signal = self.get_volatility_signal(
+            b_log_returns_df, window=63)
+
+        # --- Sharpe Ratio Signal (rolling mean/std of log returns, 63-day window) ---
+        sharpe_signal = self.get_sharpe_signal(b_log_returns_df, window=63)
+
+        # --- Relative Strength Signal (63-day rolling return of symbol minus TOTAL) ---
+        relative_strength_signal = self.get_relative_strength_signal(
+            price_df, window=63)
+
+        # Stack into MultiIndex DataFrame
+        metrics = ["Price", "B_Position", "B_Value", "B_Weight",
+                   "B_log_returns", "Mean_Reversion_Signal", "Return_Spread_Signal", "Return_Spread_Signal_Mean",
+                   "Volatility_Signal", "Sharpe_Signal", "Relative_Strength_Signal"]
+        frames = [price_df, b_position_df, b_value_df,
+                  b_weight_df, b_log_returns_df, mean_reversion_signal, return_spread_signal, return_spread_signal_mean,
+                  volatility_signal, sharpe_signal, relative_strength_signal]
+        arrays = []
+        for metric, df in zip(metrics, frames):
+            arrays.append(pd.DataFrame(df, columns=df.columns).T.assign(
+                Metric=metric).set_index("Metric", append=True))
+        stacked = pd.concat(arrays)
+        stacked.index = stacked.index.reorder_levels([1, 0])  # Metric, Symbol
+        stacked = stacked.sort_index()
+        # Dates as rows, (Metric, Symbol) as columns
+        self.main_data_multiindex = stacked.T
+
+        # Remove (B_Position, TOTAL), (Price, TOTAL) and (B_Weight, TOTAL) columns
+        to_drop = [("B_Position", "TOTAL"),
+                   ("Price", "TOTAL"),
+                   ("B_Weight", "TOTAL")]
+        self.main_data_multiindex = self.main_data_multiindex.drop(
+            columns=[col for col in to_drop if col in self.main_data_multiindex.columns])
+
+        # Validate return calculations for benchmark TOTAL and all symbols
+        self._validate_return_calculations(
+            self.main_data_multiindex[("B_Value", "TOTAL")],
+            self.main_data_multiindex[("B_log_returns", "TOTAL")],
+            prefix="Benchmark (TOTAL)"
         )
+        # In case we want to validate for each symbol
+        # for symbol in self.main_data_multiindex["B_Value"].columns:
+        #     self._validate_return_calculations(
+        #         self.main_data_multiindex[("B_Value", symbol)],
+        #         self.main_data_multiindex[("B_log_returns", symbol)],
+        #         prefix=f"Benchmark ({symbol})"
+        #     )
 
-        # Calculate benchmark performance
-        benchmark_close_data = (close_data * benchmark_weights).sum(axis=1)
-        benchmark_metrics = self._calculate_return_metrics(
-            benchmark_close_data, "benchmark")
-
-        # Calculate central deviations and portfolio weights
-        central_deviations = get_central_deviations(close_data)
-        portfolio_weights = get_portfolio_weights(
-            benchmark_weights, central_deviations, self.tilt, 'monthly'
-        )
-
-        # Calculate portfolio performance
-        portfolio_close_data = (close_data * portfolio_weights).sum(axis=1)
-        portfolio_metrics = self._calculate_return_metrics(
-            portfolio_close_data, "portfolio")
-
-        # Print performance summary
-        self._print_performance_summary(benchmark_metrics, portfolio_metrics)
-
-        # Create consolidated data structures
-        self._create_data_structures(
-            close_data, benchmark_weights, central_deviations, portfolio_weights,
-            benchmark_metrics, portfolio_metrics
-        )
-
-    def _calculate_return_metrics(
-        self, close_data: pd.Series, prefix: str
-    ) -> Dict[str, pd.Series]:
+    def get_mean_reversion_signal(self, price_df: pd.DataFrame, window: int = 42) -> pd.DataFrame:
         """
-        Calculate return metrics for a given price series.
-
+        Calculate the mean reversion signal (Z-score) for each symbol using a rolling mean and std.
+        For TOTAL, use the portfolio value column instead of NaN.
         Args:
-            close_data: Series of close prices
-            prefix: Prefix for metric names
-
+            price_df: DataFrame of prices (should include all symbols and TOTAL)
+            window: Rolling window size (default 42)
         Returns:
-            Dictionary containing log returns, cumulative returns, and exponential cumulative returns
+            DataFrame of Z-scores (mean reversion signal) for each symbol, and for TOTAL (portfolio value)
         """
-        # Calculate log returns
-        log_returns = np.log(close_data / close_data.shift(1)).dropna()
-        cum_returns = log_returns.cumsum()
-        exp_cum_returns = np.exp(cum_returns)
+        mean_rolling = price_df[self.valid_symbols].rolling(
+            window=window).mean()
+        std_rolling = price_df[self.valid_symbols].rolling(window=window).std()
+        mean_reversion_signal = (
+            price_df[self.valid_symbols] - mean_rolling) / std_rolling
+        # For TOTAL, use the value column (portfolio value)
+        total_series = price_df["TOTAL"]
+        total_mean = total_series.rolling(window=window).mean()
+        total_std = total_series.rolling(window=window).std()
+        mean_reversion_signal["TOTAL"] = (
+            total_series - total_mean) / total_std
+        return mean_reversion_signal
 
-        # Validate calculations
-        self._validate_return_calculations(close_data, exp_cum_returns, prefix)
-
-        return {
-            'log_returns': log_returns,
-            'cum_returns': cum_returns,
-            'exp_cum_returns': exp_cum_returns
-        }
-
-    def _validate_return_calculations(
-        self, close_data: pd.Series, exp_cum_returns: pd.Series, prefix: str
-    ) -> None:
+    def get_return_spread_signal(self, b_log_returns_df: pd.DataFrame, short_window: int = 21, long_window: int = 126) -> pd.DataFrame:
         """
-        Validate that return calculations are mathematically correct.
-
+        Calculate the Z-score of the difference between short-term and long-term rolling sums of B_log_returns.
         Args:
-            close_data: Original close price series
-            exp_cum_returns: Exponential cumulative returns
-            prefix: Prefix for error messages
-
-        Raises:
-            ValueError: If calculations are incorrect
-        """
-        test_total_close = close_data.iloc[0] * exp_cum_returns.iloc[-1]
-        actual_total_close = close_data.iloc[-1]
-
-        if round(test_total_close - actual_total_close, 4) != 0:
-            raise ValueError(
-                f"{prefix.capitalize()} calculation error: "
-                f"Test Total Close: {test_total_close} != "
-                f"Actual Total Close: {actual_total_close}"
-            )
-
-    def _print_performance_summary(
-        self, benchmark_metrics: Dict[str, pd.Series],
-        portfolio_metrics: Dict[str, pd.Series]
-    ) -> None:
-        """
-        Print a summary of benchmark vs portfolio performance.
-
-        Args:
-            benchmark_metrics: Benchmark return metrics
-            portfolio_metrics: Portfolio return metrics
-        """
-        benchmark_perf = benchmark_metrics['exp_cum_returns'].iloc[-1]
-        portfolio_perf = portfolio_metrics['exp_cum_returns'].iloc[-1]
-        outperformance = portfolio_perf - benchmark_perf
-
-        print(f"Benchmark Performance: {benchmark_perf:.4f}")
-        print(f"Portfolio Performance: {portfolio_perf:.4f}")
-        print(f"Outperformance: {outperformance:.4f}")
-
-    def _create_data_structures(
-        self,
-        close_data: pd.DataFrame,
-        benchmark_weights: pd.DataFrame,
-        central_deviations: pd.DataFrame,
-        portfolio_weights: pd.DataFrame,
-        benchmark_metrics: Dict[str, pd.Series],
-        portfolio_metrics: Dict[str, pd.Series]
-    ) -> None:
-        """
-        Create consolidated data structures for analysis.
-
-        Args:
-            close_data: Historical close prices
-            benchmark_weights: Benchmark portfolio weights
-            central_deviations: Central deviations from exponential fits
-            portfolio_weights: Optimized portfolio weights
-            benchmark_metrics: Benchmark return metrics
-            portfolio_metrics: Portfolio return metrics
-        """
-        # Create multi-index DataFrame
-        self._create_multiindex_dataframe(
-            close_data, benchmark_weights, central_deviations, portfolio_weights
-        )
-
-        # Create consolidated DataFrame with all metrics
-        self._create_consolidated_dataframe(
-            benchmark_metrics, portfolio_metrics)
-
-    def _create_multiindex_dataframe(
-        self,
-        close_data: pd.DataFrame,
-        benchmark_weights: pd.DataFrame,
-        central_deviations: pd.DataFrame,
-        portfolio_weights: pd.DataFrame
-    ) -> None:
-        """
-        Create a multi-index DataFrame with all main data components.
-
-        Args:
-            close_data: Historical close prices
-            benchmark_weights: Benchmark portfolio weights
-            central_deviations: Central deviations from exponential fits
-            portfolio_weights: Optimized portfolio weights
-        """
-        # Create multi-index columns
-        multi_index_columns = []
-
-        for ticker in close_data.columns:
-            multi_index_columns.extend([
-                ('close_data', ticker),
-                ('benchmark_weights', ticker),
-                ('central_deviations', ticker),
-                ('portfolio_weights', ticker)
-            ])
-
-        multi_index = pd.MultiIndex.from_tuples(
-            multi_index_columns, names=self.column_titles
-        )
-
-        # Concatenate all dataframes
-        self.main_data_multiindex = pd.concat([
-            close_data, benchmark_weights, central_deviations, portfolio_weights
-        ], axis=1)
-        self.main_data_multiindex.columns = multi_index
-
-    def _create_consolidated_dataframe(
-        self,
-        benchmark_metrics: Dict[str, pd.Series],
-        portfolio_metrics: Dict[str, pd.Series]
-    ) -> None:
-        """
-        Create a consolidated DataFrame with all performance metrics.
-
-        Args:
-            benchmark_metrics: Benchmark return metrics
-            portfolio_metrics: Portfolio return metrics
-        """
-        data_dict = {
-            'benchmark_close': benchmark_metrics.get('close_data', pd.Series()),
-            'benchmark_log_returns': benchmark_metrics['log_returns'],
-            'benchmark_cum_returns': benchmark_metrics['cum_returns'],
-            'benchmark_exp_cum_returns': benchmark_metrics['exp_cum_returns'],
-            'portfolio_close': portfolio_metrics.get('close_data', pd.Series()),
-            'portfolio_log_returns': portfolio_metrics['log_returns'],
-            'portfolio_cum_returns': portfolio_metrics['cum_returns'],
-            'portfolio_exp_cum_returns': portfolio_metrics['exp_cum_returns']
-        }
-
-        self.consolidated_data = pd.DataFrame(data_dict)
-
-    def get_consolidated_data(self) -> pd.DataFrame:
-        """
-        Get the consolidated DataFrame with all benchmark and portfolio metrics.
-
+            b_log_returns_df: DataFrame of log returns (should include all symbols and TOTAL)
+            short_window: Short rolling window (default 21)
+            long_window: Long rolling window (default 126)
         Returns:
-            DataFrame containing all performance metrics
+            DataFrame of Z-scores (return spread signal) for each symbol and TOTAL
         """
-        if self.consolidated_data is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
-        return self.consolidated_data
+        short_sum = b_log_returns_df[self.valid_symbols].rolling(
+            window=short_window).sum()
+        long_sum = b_log_returns_df[self.valid_symbols].rolling(
+            window=long_window).sum()
+        spread = short_sum - long_sum
+        spread_mean = spread.rolling(window=long_window).mean()
+        spread_std = spread.rolling(window=long_window).std()
+        spread_zscore = (spread - spread_mean) / spread_std
+        # For TOTAL
+        short_sum_total = b_log_returns_df["TOTAL"].rolling(
+            window=short_window).sum()
+        long_sum_total = b_log_returns_df["TOTAL"].rolling(
+            window=long_window).sum()
+        spread_total = short_sum_total - long_sum_total
+        spread_mean_total = spread_total.rolling(window=long_window).mean()
+        spread_std_total = spread_total.rolling(window=long_window).std()
+        spread_zscore["TOTAL"] = (
+            spread_total - spread_mean_total) / spread_std_total
+        return spread_zscore
+
+    def get_return_spread_signal_mean(self, log_returns_df: pd.DataFrame, short_window: int = 21, long_window: int = 126) -> pd.DataFrame:
+        """
+        Calculate the Z-score of the difference between short-term and long-term rolling MEANS of B_log_returns.
+        Args:
+            log_returns_df: DataFrame of log returns (should include all symbols and TOTAL)
+            short_window: Short rolling window (default 21)
+            long_window: Long rolling window (default 126)
+        Returns:
+            DataFrame of Z-scores (return spread signal using means) for each symbol and TOTAL
+        """
+        short_mean = log_returns_df[self.valid_symbols].rolling(
+            window=short_window).mean()
+        long_mean = log_returns_df[self.valid_symbols].rolling(
+            window=long_window).mean()
+        spread = short_mean - long_mean
+        spread_mean = spread.rolling(window=long_window).mean()
+        spread_std = spread.rolling(window=long_window).std()
+        spread_zscore = (spread - spread_mean) / spread_std
+        # For TOTAL
+        short_mean_total = log_returns_df["TOTAL"].rolling(
+            window=short_window).mean()
+        long_mean_total = log_returns_df["TOTAL"].rolling(
+            window=long_window).mean()
+        spread_total = short_mean_total - long_mean_total
+        spread_mean_total = spread_total.rolling(window=long_window).mean()
+        spread_std_total = spread_total.rolling(window=long_window).std()
+        spread_zscore["TOTAL"] = (
+            spread_total - spread_mean_total) / spread_std_total
+        return spread_zscore
+
+    def get_volatility_signal(self, log_returns_df: pd.DataFrame, window: int = 63) -> pd.DataFrame:
+        """
+        Calculate rolling volatility (std dev) of log returns for each symbol and TOTAL.
+        Args:
+            log_returns_df: DataFrame of log returns (should include all symbols and TOTAL)
+            window: Rolling window size (default 63)
+        Returns:
+            DataFrame of rolling std dev for each symbol and TOTAL
+        """
+        vol = log_returns_df[self.valid_symbols].rolling(window=window).std()
+        vol["TOTAL"] = log_returns_df["TOTAL"].rolling(window=window).std()
+        return vol
+
+    def get_sharpe_signal(self, log_returns_df: pd.DataFrame, window: int = 63) -> pd.DataFrame:
+        """
+        Calculate rolling Sharpe ratio (mean/std) of log returns for each symbol and TOTAL.
+        Args:
+            log_returns_df: DataFrame of log returns (should include all symbols and TOTAL)
+            window: Rolling window size (default 63)
+        Returns:
+            DataFrame of rolling Sharpe ratio for each symbol and TOTAL
+        """
+        mean = log_returns_df[self.valid_symbols].rolling(window=window).mean()
+        std = log_returns_df[self.valid_symbols].rolling(window=window).std()
+        sharpe = mean / std
+        mean_total = log_returns_df["TOTAL"].rolling(window=window).mean()
+        std_total = log_returns_df["TOTAL"].rolling(window=window).std()
+        sharpe["TOTAL"] = mean_total / std_total
+        return sharpe
+
+    def get_relative_strength_signal(self, price_df: pd.DataFrame, window: int = 63) -> pd.DataFrame:
+        """
+        Calculate relative strength: rolling window return of each symbol minus TOTAL.
+        Args:
+            price_df: DataFrame of prices (should include all symbols and TOTAL)
+            window: Rolling window size (default 63)
+        Returns:
+            DataFrame of relative strength for each symbol and TOTAL (TOTAL is NaN)
+        """
+        returns = price_df[self.valid_symbols].pct_change(periods=window)
+        total_return = price_df["TOTAL"].pct_change(periods=window)
+        rel_strength = returns.subtract(total_return, axis=0)
+        rel_strength["TOTAL"] = np.nan
+        return rel_strength
+
+    def _validate_return_calculations(self, value_series: pd.Series, log_return_series: pd.Series, prefix: str) -> None:
+        """
+        Validate that return calculations are mathematically correct and print the result.
+        Also print CAGR, annualized log return mean, and stddev.
+
+        Args:
+            value_series: Series of portfolio values (for a symbol or TOTAL)
+            log_return_series: Series of log returns (for a symbol or TOTAL)
+            prefix: Prefix for print messages
+        """
+        first_value = value_series.iloc[0]
+        last_value = value_series.iloc[-1]
+        exp_sum_log_returns = np.exp(
+            log_return_series[1:].sum())  # skip first NaN
+        test_last_value = first_value * exp_sum_log_returns
+        n_years = (value_series.index[-1] -
+                   value_series.index[0]).days / 365.25
+        cagr = (last_value / first_value) ** (1 / n_years) - \
+            1 if n_years > 0 else float('nan')
+        ann_log_return_mean = log_return_series[1:].mean() * 252
+        ann_log_return_std = log_return_series[1:].std() * (252 ** 0.5)
+        print(f"{prefix} validation:")
+        print(f"  Sample years: {n_years:.2f}")
+        print(f"  First Value: {first_value:.4f}")
+        print(f"  exp(sum(log_returns)): {exp_sum_log_returns:.6f}")
+        print(f"  Test Last Value: {test_last_value:.4f}")
+        print(f"  Actual Last Value: {last_value:.4f}")
+        print(f"  CAGR: {cagr:.4%}")
+        print(f"  Annualized log return mean: {ann_log_return_mean:.4%}")
+        print(f"  Annualized log return stddev: {ann_log_return_std:.4%}")
+        if not np.isclose(test_last_value, last_value, atol=1e-4):
+            print("  WARNING: Validation failed! Values do not match.")
+            raise ValueError("Validation failed! Values do not match.")
+        else:
+            print("  Validation successful: Values match.\n")
 
     def get_main_dataframes(self) -> pd.DataFrame:
         """
@@ -420,7 +464,7 @@ class ExpFitBacktester:
 
         Returns:
             Multi-index DataFrame with levels: ["Metric", "Ticker"]
-            Contains: close_data, benchmark_weights, central_deviations, portfolio_weights
+            Contains: Price, B_Position, B_Value, B_Weight, B_log_returns (plus TOTAL column)
         """
         if self.main_data_multiindex is None:
             raise ValueError(
@@ -467,22 +511,19 @@ class ExpFitBacktester:
         Returns:
             BacktestResults object containing all performance metrics and data
         """
-        if self.consolidated_data is None:
+        if self.main_data_multiindex is None:
             raise ValueError(
                 "Data not yet processed. Call _preprocess_data() first.")
 
-        if self.main_data_multiindex is None:
-            raise ValueError("Multi-index data not yet created.")
-
-        benchmark_perf = self.consolidated_data['benchmark_exp_cum_returns'].iloc[-1]
-        portfolio_perf = self.consolidated_data['portfolio_exp_cum_returns'].iloc[-1]
+        benchmark_perf = self.main_data_multiindex['B_log_returns'].iloc[-1]
+        portfolio_perf = self.main_data_multiindex['B_log_returns'].iloc[-1]
         outperformance = portfolio_perf - benchmark_perf
 
         return BacktestResults(
             benchmark_performance=benchmark_perf,
             portfolio_performance=portfolio_perf,
             outperformance=outperformance,
-            consolidated_data=self.consolidated_data,
+            consolidated_data=pd.DataFrame(),
             main_data_multiindex=self.main_data_multiindex,
             tickers_history=self.get_tickers_history(),
             tickers_news=self.get_tickers_news()

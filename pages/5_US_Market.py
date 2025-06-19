@@ -19,7 +19,7 @@ print(f"\n--- US Market Page loaded at {time.strftime('%H:%M:%S')} ---\n")
 st.set_page_config(
     page_title="US Market",
     page_icon=":bar_chart:",
-    layout="centered")
+    layout="wide")
 
 
 BENCHMARK_SYMBOL = "SPY"
@@ -41,10 +41,6 @@ STOCK_SYMBOLS = [
 
 exp_fit_backtester = ExpFitBacktester(STOCK_SYMBOLS)
 tickers_history = exp_fit_backtester.get_tickers_history()
-
-consolidated_data = exp_fit_backtester.get_consolidated_data()
-
-st.dataframe(consolidated_data, use_container_width=True)
 
 main_dataframes = exp_fit_backtester.get_main_dataframes()
 
@@ -93,7 +89,7 @@ st.dataframe(main_dataframes, use_container_width=True)
 #     [tickers_history, log_returns], axis=1, )
 
 
-# print(tickers_history.columns)
+# # print(tickers_history.columns)
 
 
 # # do over/under each day
