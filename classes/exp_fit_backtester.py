@@ -9,10 +9,10 @@ Classes:
     ExpFitBacktester: Main backtesting class for portfolio optimization
 """
 
-import pandas as pd
-import numpy as np
 from typing import Literal, Union, Optional, Dict, Any, List
 from dataclasses import dataclass
+import pandas as pd
+import numpy as np
 from utilities.app_yfinance import tickers_yf, TickersData
 from utilities.utilities import get_rolling_exp_fit
 
