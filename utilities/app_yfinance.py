@@ -138,7 +138,7 @@ class TickersData(TypedDict):
 
 
 @st.cache_data
-def tickers_yf(symbols: list[str]) -> Union[str, TickersData]:
+def tickers_yf(symbols: list[str], period='max') -> Union[str, TickersData]:
     """ 
     Fetch the tickers info for a given symbols
 
@@ -150,7 +150,7 @@ def tickers_yf(symbols: list[str]) -> Union[str, TickersData]:
     try:
         tickers = yf.Tickers(symbols)
         return {
-            "history": tickers.history(period='max', auto_adjust=True)["Close"],
+            "history": tickers.history(period=period, auto_adjust=True)["Close"],
             "news": tickers.news()
         }
     except Exception as err:

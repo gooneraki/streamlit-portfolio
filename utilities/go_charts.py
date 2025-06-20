@@ -222,3 +222,99 @@ def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[st
     )
 
     return fig
+
+
+def display_scatter_chart(df: pd.DataFrame, x_column: str, y_column: str, title_name: str | None = None):
+    """Display a clean scatter chart using Plotly."""
+    df = df.copy()
+    df = df.dropna(subset=[x_column, y_column])
+
+    if df.empty:
+        return None
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df[x_column],
+        y=df[y_column],
+        mode='markers',
+        name='Data Points',
+        marker=dict(
+            color='#14B3EB',
+            size=6,
+            opacity=0.7
+        )
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=title_name,
+            x=0.5,
+            y=0.98,
+            xanchor='center',
+            yanchor='top'
+        ) if title_name else None,
+        xaxis_title=x_column,
+        yaxis_title=y_column,
+        template='plotly_white',
+        height=450,
+        margin=dict(t=40, b=0, l=0, r=0),
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        showlegend=False,
+        modebar=dict(remove=['zoom', 'pan', 'select', 'lasso',
+                     'zoomIn', 'zoomOut', 'autoScale', 'resetScale']),
+        dragmode=False
+    )
+
+    return fig
+
+
+def display_efficient_frontier_chart(efficient_frontier_df: pd.DataFrame, random_df: pd.DataFrame = None, title_name: str | None = None):
+    """Display an efficient frontier chart with optional random portfolios for comparison."""
+    fig = go.Figure()
+
+    # Add efficient frontier line
+    fig.add_trace(go.Scatter(
+        x=efficient_frontier_df['Volatility'],
+        y=efficient_frontier_df['Returns'],
+        mode='lines+markers',
+        name='Efficient Frontier',
+        line=dict(color='#14B3EB', width=3),
+        marker=dict(size=6)
+    ))
+
+    # Add random portfolios if provided
+    if random_df is not None and not random_df.empty:
+        fig.add_trace(go.Scatter(
+            x=random_df['Volatility'],
+            y=random_df['Returns'],
+            mode='markers',
+            name='Random Portfolios',
+            marker=dict(
+                color='#E74C3C',
+                size=4,
+                opacity=0.6
+            )
+        ))
+
+    fig.update_layout(
+        title=dict(
+            text=title_name,
+            x=0.5,
+            y=0.98,
+            xanchor='center',
+            yanchor='top'
+        ) if title_name else None,
+        xaxis_title='Volatility (Risk)',
+        yaxis_title='Expected Return',
+        template='plotly_white',
+        height=450,
+        margin=dict(t=40, b=0, l=0, r=0),
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        showlegend=True,
+        modebar=dict(remove=['zoom', 'pan', 'select', 'lasso',
+                     'zoomIn', 'zoomOut', 'autoScale', 'resetScale']),
+        dragmode=False
+    )
+
+    return fig
