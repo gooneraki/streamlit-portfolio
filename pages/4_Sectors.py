@@ -172,3 +172,11 @@ for sector in sector_data:
                 top_etfs, orient='index', columns=['ETF']).reset_index(names='Symbol')
             st.write("**Top ETFs**")
             st.dataframe(top_etfs_df, hide_index=True)
+
+st.subheader("Efficient Frontier")
+with st.expander("Manual creation", expanded=False):
+
+    symbols = [(list(sector_data[sector_id]['top_etfs'].keys()))[0] for sector_id in range(len(sector_data))] \
+        if DYNAMIC_MARKET else ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+    if DEBUG:
+        print(f"Symbols: {symbols}")
