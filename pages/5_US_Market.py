@@ -43,8 +43,44 @@ exp_fit_backtester = ExpFitBacktester(STOCK_SYMBOLS)
 tickers_history = exp_fit_backtester.get_tickers_history()
 
 main_dataframes = exp_fit_backtester.get_main_dataframes()
+first_level_columns = [*set(main_dataframes.columns.get_level_values(0))]
+
+
+second_level_columns = sorted(
+    [*set(main_dataframes.columns.get_level_values(1))])
+
+
+st.multiselect(
+    "Select columns",
+    options=first_level_columns,
+    default=first_level_columns,
+    key="first_level_columns"
+)
+
+st.multiselect(
+    "Select columns",
+    options=second_level_columns,
+    default=['TOTAL', 'XLB', 'XLC'],
+    key="second_level_columns"
+)
+
+selected_columns = []
+for first_level in st.session_state.first_level_columns:
+    for second_level in st.session_state.second_level_columns:
+        if (first_level, second_level) in main_dataframes.columns:
+            selected_columns.append((first_level, second_level))
+
+
+filtered_main_dataframes = main_dataframes.loc[:, selected_columns]
+
+st.dataframe(filtered_main_dataframes, use_container_width=True)
+# st.dataframe(filtered_main_dataframes.tail().T, use_container_width=True)
 
 st.dataframe(main_dataframes, use_container_width=True)
+
+
+# st.dataframe(filtered_main_dataframes.head(), use_container_width=True)
+# st.dataframe(filtered_main_dataframes.tail(), use_container_width=True)
 
 
 # CURRENCY_SYMBOLS = [

@@ -14,7 +14,6 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 from utilities.app_yfinance import tickers_yf, TickersData
-from utilities.utilities import get_rolling_exp_fit
 
 
 @dataclass
@@ -205,37 +204,36 @@ class ExpFitBacktester:
             raise ValueError("Invalid tickers data format")
 
         close_data = self.tickers_data["history"]
-        first_date: pd.Timestamp = close_data.index[0]
-        n_symbols = len(self.valid_symbols)
-        initial_weights = pd.Series(1 / n_symbols, index=close_data.columns)
-        initial_prices: pd.Series = close_data.loc[first_date]
-        benchmark_positions = (self.initial_capital *
-                               initial_weights) / initial_prices
 
-        # Price (close), B_Position (constant), B_Value, B_Weight, B_log_returns
+        # The below are SERIES with the symbols as index (e.g. [11 symbols, 1 column])
+        initial_weights = pd.Series(
+            1 / len(self.valid_symbols), index=close_data.columns)
+        initial_prices: pd.Series = close_data.loc[close_data.index[0]]
+        initial_benchmark_positions = (self.initial_capital *
+                                       initial_weights) / initial_prices
+
+        # The below are DATAFRAMES with the symbols as columns (e.g. [1000 dates, 11 symbols])
         price_df = close_data.copy()
-        b_position_df = pd.DataFrame([benchmark_positions] * len(close_data),
+        b_position_df = pd.DataFrame([initial_benchmark_positions] * len(close_data),
                                      index=close_data.index,
                                      columns=close_data.columns)
+
         b_value_df = price_df * b_position_df
         total_b_value = b_value_df.sum(axis=1)
         b_weight_df = b_value_df.div(total_b_value, axis=0)
         b_log_returns_df = np.log(price_df / price_df.shift(1))
-        # For TOTAL column: portfolio value and log return
-        total_b_position = b_position_df.sum(axis=1)
-        total_b_weight = pd.Series(1.0, index=close_data.index)
-        total_b_log_returns = np.log(total_b_value / total_b_value.shift(1))
 
         # Add TOTAL column
-        price_df["TOTAL"] = total_b_value
-        b_position_df["TOTAL"] = total_b_position
+        # price_df["TOTAL"] = total_b_value
+        # b_position_df["TOTAL"] = b_position_df.sum(axis=1)
         b_value_df["TOTAL"] = total_b_value
-        b_weight_df["TOTAL"] = total_b_weight
-        b_log_returns_df["TOTAL"] = total_b_log_returns
+        b_weight_df["TOTAL"] = b_weight_df.sum(axis=1)
+        b_log_returns_df["TOTAL"] = np.log(
+            total_b_value / total_b_value.shift(1))
 
         # --- Mean Reversion Signal (Z-score, 42-day window) ---
         mean_reversion_signal = self.get_mean_reversion_signal(
-            price_df, window=42)
+            price_df, total_b_value, window=42)
 
         # --- Return Spread Signal (Z-score of short vs long rolling log return) ---
         return_spread_signal = self.get_return_spread_signal(
@@ -254,7 +252,7 @@ class ExpFitBacktester:
 
         # --- Relative Strength Signal (63-day rolling return of symbol minus TOTAL) ---
         relative_strength_signal = self.get_relative_strength_signal(
-            price_df, window=63)
+            price_df, total_b_value, window=63)
 
         # Stack into MultiIndex DataFrame
         metrics = ["Price", "B_Position", "B_Value", "B_Weight",
@@ -273,13 +271,6 @@ class ExpFitBacktester:
         # Dates as rows, (Metric, Symbol) as columns
         self.main_data_multiindex = stacked.T
 
-        # Remove (B_Position, TOTAL), (Price, TOTAL) and (B_Weight, TOTAL) columns
-        to_drop = [("B_Position", "TOTAL"),
-                   ("Price", "TOTAL"),
-                   ("B_Weight", "TOTAL")]
-        self.main_data_multiindex = self.main_data_multiindex.drop(
-            columns=[col for col in to_drop if col in self.main_data_multiindex.columns])
-
         # Validate return calculations for benchmark TOTAL and all symbols
         self._validate_return_calculations(
             self.main_data_multiindex[("B_Value", "TOTAL")],
@@ -294,7 +285,7 @@ class ExpFitBacktester:
         #         prefix=f"Benchmark ({symbol})"
         #     )
 
-    def get_mean_reversion_signal(self, price_df: pd.DataFrame, window: int = 42) -> pd.DataFrame:
+    def get_mean_reversion_signal(self, price_df: pd.DataFrame, total_b_value: pd.Series, window: int = 42) -> pd.DataFrame:
         """
         Calculate the mean reversion signal (Z-score) for each symbol using a rolling mean and std.
         For TOTAL, use the portfolio value column instead of NaN.
@@ -309,8 +300,8 @@ class ExpFitBacktester:
         std_rolling = price_df[self.valid_symbols].rolling(window=window).std()
         mean_reversion_signal = (
             price_df[self.valid_symbols] - mean_rolling) / std_rolling
-        # For TOTAL, use the value column (portfolio value)
-        total_series = price_df["TOTAL"]
+
+        total_series = total_b_value
         total_mean = total_series.rolling(window=window).mean()
         total_std = total_series.rolling(window=window).std()
         mean_reversion_signal["TOTAL"] = (
@@ -407,7 +398,7 @@ class ExpFitBacktester:
         sharpe["TOTAL"] = mean_total / std_total
         return sharpe
 
-    def get_relative_strength_signal(self, price_df: pd.DataFrame, window: int = 63) -> pd.DataFrame:
+    def get_relative_strength_signal(self, price_df: pd.DataFrame, total_b_value: pd.Series, window: int = 63) -> pd.DataFrame:
         """
         Calculate relative strength: rolling window return of each symbol minus TOTAL.
         Args:
@@ -417,7 +408,7 @@ class ExpFitBacktester:
             DataFrame of relative strength for each symbol and TOTAL (TOTAL is NaN)
         """
         returns = price_df[self.valid_symbols].pct_change(periods=window)
-        total_return = price_df["TOTAL"].pct_change(periods=window)
+        total_return = total_b_value.pct_change(periods=window)
         rel_strength = returns.subtract(total_return, axis=0)
         rel_strength["TOTAL"] = np.nan
         return rel_strength
