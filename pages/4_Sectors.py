@@ -27,7 +27,7 @@ country = "US"
 
 # Fetch market data
 market = market_yf(country)
-if market is None:
+if market is None and DYNAMIC_MARKET:
     st.error("Error retrieving US market data.")
     st.stop()
 
