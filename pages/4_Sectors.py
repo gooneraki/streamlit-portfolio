@@ -13,6 +13,9 @@ print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 
 st.set_page_config(page_title="US Market Overview", layout="centered")
 
+DEBUG = False
+DYNAMIC_MARKET = True
+
 # User contants
 home_currency = "EUR"
 data_years = 10
@@ -20,26 +23,27 @@ data_years = 10
 # Dynamic way of taking market symbol
 ###
 ###
-# country = "US"
+country = "US"
 
-# # Fetch market data
-# market = market_yf(country)
-# if market is None:
-#     st.error("Error retrieving US market data.")
-#     st.stop()
+# Fetch market data
+market = market_yf(country)
+if market is None:
+    st.error("Error retrieving US market data.")
+    st.stop()
 
-# # print market keys
-# print(f"Market keys: {list(market.keys())}")
 
-# # Get first market symbol
-# market_symbol = market['summary'][list(market['summary'].keys())[
-#     0]].get('symbol', 'UNDEFINED')
+# Get first market symbol
+market_symbol = market['summary'][list(market['summary'].keys())[
+    0]].get('symbol', 'UNDEFINED') if DYNAMIC_MARKET else "^GSPC"
 
-# print(f"Market symbol: {market_symbol}")
-###
-###
+# print market keys
+if DEBUG:
+    print(f"Market keys: {list(market.keys())}")
+    print(f"Market summary keys: {list(market['summary'].keys())}")
+    print(f"First market summary: {market['summary'][list(market['summary'].keys())[
+        0]]}")
+    print(f"Market symbol: {market_symbol}")
 
-market_symbol = "^GSPC"
 
 market_info = yf_ticket_info(market_symbol)
 trade_df, trade_metrics, home_df, home_metrics = fully_analyze_symbol(
