@@ -5,6 +5,7 @@ import datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from utilities.app_yfinance import YF_SECTOR_KEYS, market_yf, yf_ticket_info, tickers_yf
 from utilities.utilities import fully_analyze_symbol, metrics, retrieve_sector_data
 from utilities.go_charts import display_trend_go_chart_2, display_efficient_frontier_chart
@@ -551,5 +552,4 @@ with st.expander("Manual creation", expanded=False):
     </table>
     """
 
-    import streamlit.components.v1 as components
-    components.html(html_table, height=300)
+    components.html(html_table, height=500)
