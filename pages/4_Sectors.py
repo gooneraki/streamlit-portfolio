@@ -177,7 +177,8 @@ for sector in sector_data:
 st.divider()
 
 st.subheader("Efficient Frontier")
-risk_free_rate = 0
+risk_free_rate = 0.02
+iterations = 10000
 
 with st.expander("Manual creation", expanded=False):
 
@@ -219,7 +220,7 @@ with st.expander("Manual creation", expanded=False):
     portfolio_sharpes = []
 
     # Generate many random portfolios
-    for x in range(5000):  # More iterations for better frontier
+    for x in range(iterations):  # More iterations for better frontier
         weights = np.random.random(len(symbols))
         weights /= np.sum(weights)
 
