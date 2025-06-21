@@ -5,9 +5,9 @@ import datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
-from utilities.app_yfinance import YF_SECTOR_KEYS, sector_yf, market_yf, yf_ticket_info, tickers_yf
+from utilities.app_yfinance import YF_SECTOR_KEYS, market_yf, yf_ticket_info, tickers_yf
 from utilities.utilities import fully_analyze_symbol, metrics, retrieve_sector_data
-from utilities.go_charts import display_trend_go_chart_2, display_scatter_chart, display_efficient_frontier_chart
+from utilities.go_charts import display_trend_go_chart_2, display_efficient_frontier_chart
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 
@@ -90,8 +90,9 @@ with col2:
         index=1
     )
 
-filtered_first_date = trade_metrics['last_date'] - pd.DateOffset(
-    years=years_to_show) if selected_currency == currency_options[0] else home_metrics['last_date'] - pd.DateOffset(years=years_to_show)
+filtered_first_date = trade_metrics['last_date'] - pd.DateOffset(years=years_to_show) \
+    if selected_currency == currency_options[0] \
+    else home_metrics['last_date'] - pd.DateOffset(years=years_to_show)
 
 value_fig = display_trend_go_chart_2(
     trade_df[trade_df.index >= filtered_first_date] if selected_currency == currency_options[0] else home_df[home_df.index >= filtered_first_date],
@@ -184,6 +185,10 @@ with st.expander("Manual creation", expanded=False):
         if DYNAMIC_MARKET else ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
     if DEBUG:
         print(f"Symbols: {symbols}")
+
+    # get list of  market weights from sector data
+    sector_market_weights = [sector_data[sector_id]['overview']['market_weight']
+                             for sector_id in range(len(sector_data))]
 
     tickers_data = tickers_yf(symbols, period='10y')
 
@@ -308,7 +313,7 @@ with st.expander("Manual creation", expanded=False):
 
     if DEBUG:
         print(f"\n{'='*50}")
-        print(f"PORTFOLIO ANALYSIS")
+        print("PORTFOLIO ANALYSIS")
         print(f"{'='*50}")
         print(f"Risk-free rate: {risk_free_rate:.2%}")
         print(
@@ -334,10 +339,24 @@ with st.expander("Manual creation", expanded=False):
             f"Improvement in Sharpe: {max_sharpe_portfolio['sharpe'] - benchmark_sharpe:.4f}")
         print(f"{'='*50}")
 
-        print(f"MAX SHARPE PORTFOLIO WEIGHTS:")
+        print("MAX SHARPE PORTFOLIO WEIGHTS:")
         print(f"{'-'*30}")
         for symbol, weight in zip(symbols, max_sharpe_portfolio['weights']):
             print(f"{symbol:<10} {weight:>8.1%}")
+        print(f"{'='*50}")
+
+        print("SECTOR MARKET WEIGHTS:")
+        print(f"{'-'*30}")
+        for symbol, market_weight in zip(symbols, sector_market_weights):
+            print(f"{symbol:<10} {market_weight:>8.1%}")
+        print(f"{'='*50}")
+
+        print("WEIGHT COMPARISON (Optimal vs Market):")
+        print(f"{'-'*50}")
+        for symbol, optimal_weight, market_weight in zip(symbols, max_sharpe_portfolio['weights'], sector_market_weights):
+            diff = optimal_weight - market_weight
+            print(
+                f"{symbol:<10} Optimal: {optimal_weight:>6.1%} | Market: {market_weight:>6.1%} | Diff: {diff:+6.1%}")
         print(f"{'='*50}")
 
     # plot efficient frontier
