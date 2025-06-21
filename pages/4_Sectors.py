@@ -312,6 +312,80 @@ with st.expander("Manual creation", expanded=False):
         'weights': weights_list[max_sharpe_idx]
     }
 
+    # Find portfolio with similar risk to benchmark but higher return
+    # Look for portfolios on efficient frontier with volatility close to benchmark
+    benchmark_risk_tolerance = 0.01  # 1% tolerance for "same risk"
+    similar_risk_portfolios = []
+
+    for i in efficient_indices:
+        vol_diff = abs(portfolio_volatilities[i] - benchmark_volatility)
+        if vol_diff <= benchmark_risk_tolerance and portfolio_returns[i] > benchmark_return:
+            similar_risk_portfolios.append({
+                'index': i,
+                'return': portfolio_returns[i],
+                'volatility': portfolio_volatilities[i],
+                'sharpe': portfolio_sharpes[i],
+                'weights': weights_list[i],
+                'vol_diff': vol_diff
+            })
+
+    # Sort by return (highest first) and take the best one
+    if similar_risk_portfolios:
+        similar_risk_portfolios.sort(key=lambda x: x['return'], reverse=True)
+        same_risk_portfolio = similar_risk_portfolios[0]
+    else:
+        # If no portfolio with similar risk and higher return, find closest volatility
+        closest_vol_idx = min(efficient_indices,
+                              key=lambda i: abs(portfolio_volatilities[i] - benchmark_volatility))
+        same_risk_portfolio = {
+            'index': closest_vol_idx,
+            'return': portfolio_returns[closest_vol_idx],
+            'volatility': portfolio_volatilities[closest_vol_idx],
+            'sharpe': portfolio_sharpes[closest_vol_idx],
+            'weights': weights_list[closest_vol_idx],
+            'vol_diff': abs(portfolio_volatilities[closest_vol_idx] - benchmark_volatility)
+        }
+
+    # Find portfolio on efficient frontier closest to benchmark volatility
+    # Look for portfolios with volatility lower than benchmark
+    lower_vol_portfolios = efficient_frontier_df[efficient_frontier_df['Volatility']
+                                                 < benchmark_volatility]
+    # Look for portfolios with volatility higher than benchmark
+    higher_vol_portfolios = efficient_frontier_df[efficient_frontier_df['Volatility']
+                                                  > benchmark_volatility]
+
+    if not lower_vol_portfolios.empty and not higher_vol_portfolios.empty:
+        # Take the highest volatility portfolio below benchmark
+        lower_vol_portfolio = lower_vol_portfolios.iloc[-1]
+        # Take the lowest volatility portfolio above benchmark
+        higher_vol_portfolio = higher_vol_portfolios.iloc[0]
+        # Use the middle value
+        target_volatility = (
+            lower_vol_portfolio['Volatility'] + higher_vol_portfolio['Volatility']) / 2
+    elif not lower_vol_portfolios.empty:
+        # Only lower volatility portfolios available
+        target_volatility = lower_vol_portfolios.iloc[-1]['Volatility']
+    elif not higher_vol_portfolios.empty:
+        # Only higher volatility portfolios available
+        target_volatility = higher_vol_portfolios.iloc[0]['Volatility']
+    else:
+        # Fallback to closest volatility
+        target_volatility = benchmark_volatility
+
+    # Find the portfolio on efficient frontier closest to target volatility
+    closest_idx = efficient_frontier_df['Volatility'].sub(
+        target_volatility).abs().idxmin()
+    same_risk_portfolio = {
+        'return': efficient_frontier_df.loc[closest_idx, 'Returns'],
+        'volatility': efficient_frontier_df.loc[closest_idx, 'Volatility'],
+        'weights': weights_list[efficient_indices[closest_idx]],
+        'vol_diff': abs(efficient_frontier_df.loc[closest_idx, 'Volatility'] - benchmark_volatility)
+    }
+
+    # Calculate Sharpe ratio for same risk portfolio
+    same_risk_portfolio['sharpe'] = (same_risk_portfolio['return'] - risk_free_rate) / \
+        same_risk_portfolio['volatility'] if same_risk_portfolio['volatility'] > 0 else 0
+
     if DEBUG:
         print(f"\n{'='*50}")
         print("PORTFOLIO ANALYSIS")
@@ -348,6 +422,31 @@ with st.expander("Manual creation", expanded=False):
                 f"{symbol:<10} Optimal: {optimal_weight:>6.1%} | Market: {market_weight:>6.1%} | Diff: {diff:+6.1%}")
         print(f"{'='*50}")
 
+    # plot efficient frontier first
+    frontier_fig = display_efficient_frontier_chart(
+        efficient_frontier_df,
+        random_df=random_df,
+        benchmark_return=benchmark_return,
+        benchmark_volatility=benchmark_volatility,
+        benchmark_name=market_symbol,
+        max_sharpe_return=max_sharpe_portfolio['return'],
+        max_sharpe_volatility=max_sharpe_portfolio['volatility'],
+        max_sharpe_name="Max Sharpe Portfolio",
+        same_risk_return=same_risk_portfolio['return'],
+        same_risk_volatility=same_risk_portfolio['volatility'],
+        same_risk_name="Same Risk Portfolio",
+        title_name='Efficient Frontier'
+    )
+
+    if frontier_fig is not None:
+        st.plotly_chart(
+            frontier_fig,
+            config={'staticPlot': True},
+            use_container_width=True
+        )
+    else:
+        st.warning("No valid data to plot for Efficient Frontier.")
+
     # Display portfolio analysis results in Streamlit
     st.write("### Portfolio Analysis Results")
 
@@ -376,6 +475,33 @@ with st.expander("Manual creation", expanded=False):
         st.dataframe(pd.DataFrame([optimal_metrics]).set_index(
             "Portfolio"), use_container_width=True)
 
+    # Same risk portfolio comparison
+    col3, col4 = st.columns(2)
+
+    with col3:
+        st.write("**Same Risk Portfolio Performance**")
+        same_risk_metrics = {
+            "Portfolio": "Same Risk",
+            "Return": f"{same_risk_portfolio['return']:.2%}",
+            "Volatility": f"{same_risk_portfolio['volatility']:.2%}",
+            "Sharpe Ratio": f"{same_risk_portfolio['sharpe']:.3f}",
+            "Risk Diff": f"{same_risk_portfolio['vol_diff']:.3f}"
+        }
+        st.dataframe(pd.DataFrame([same_risk_metrics]).set_index(
+            "Portfolio"), use_container_width=True)
+
+    with col4:
+        st.write("**Return Improvement**")
+        return_improvement = {
+            "Metric": ["Return Improvement", "Risk Difference"],
+            "Value": [
+                f"{same_risk_portfolio['return'] - benchmark_return:.2%}",
+                f"{same_risk_portfolio['vol_diff']:.3f}"
+            ]
+        }
+        st.dataframe(pd.DataFrame(return_improvement),
+                     use_container_width=True, hide_index=True)
+
     # Improvement metrics
     st.write("**Performance Improvement**")
     improvement_metrics = {
@@ -395,37 +521,35 @@ with st.expander("Manual creation", expanded=False):
 
     # Portfolio weights comparison
     st.write("**Portfolio Weights Comparison**")
-    weights_comparison = []
-    for symbol, optimal_weight, market_weight in zip(symbols, max_sharpe_portfolio['weights'], sector_market_weights):
-        diff = optimal_weight - market_weight
-        weights_comparison.append({
-            "Symbol": symbol,
-            "Optimal Weight": f"{optimal_weight:.1%}",
-            "Market Weight": f"{market_weight:.1%}",
-            "Difference": f"{diff:+.1%}"
-        })
 
-    weights_df = pd.DataFrame(weights_comparison)
-    st.dataframe(weights_df, use_container_width=True, hide_index=True)
+    # Create HTML table
+    html_table = """
+    <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+        <thead>
+            <tr style="border-bottom: 2px solid #ddd;">
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Sector</th>
+                <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Market</th>
+                <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Optimal</th>
+                <th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Same Risk</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
 
-    # plot efficient frontier
-    frontier_fig = display_efficient_frontier_chart(
-        efficient_frontier_df,
-        random_df=random_df,
-        benchmark_return=benchmark_return,
-        benchmark_volatility=benchmark_volatility,
-        benchmark_name=market_symbol,
-        max_sharpe_return=max_sharpe_portfolio['return'],
-        max_sharpe_volatility=max_sharpe_portfolio['volatility'],
-        max_sharpe_name="Max Sharpe Portfolio",
-        title_name='Efficient Frontier'
-    )
+    for symbol, optimal_weight, market_weight, same_risk_weight in zip(symbols, max_sharpe_portfolio['weights'], sector_market_weights, same_risk_portfolio['weights']):
+        html_table += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 6px 8px;">{symbol}</td>
+                <td style="text-align: right; padding: 6px 8px;">{market_weight:.1%}</td>
+                <td style="text-align: right; padding: 6px 8px;">{optimal_weight:.1%}</td>
+                <td style="text-align: right; padding: 6px 8px;">{same_risk_weight:.1%}</td>
+            </tr>
+        """
 
-    if frontier_fig is not None:
-        st.plotly_chart(
-            frontier_fig,
-            config={'staticPlot': True},
-            use_container_width=True
-        )
-    else:
-        st.warning("No valid data to plot for Efficient Frontier.")
+    html_table += """
+        </tbody>
+    </table>
+    """
+
+    import streamlit.components.v1 as components
+    components.html(html_table, height=300)
