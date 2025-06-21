@@ -363,6 +363,9 @@ with st.expander("Manual creation", expanded=False):
     frontier_fig = display_efficient_frontier_chart(
         efficient_frontier_df,
         random_df=random_df,
+        benchmark_return=benchmark_return,
+        benchmark_volatility=benchmark_volatility,
+        benchmark_name=market_symbol,
         title_name='Efficient Frontier'
     )
 

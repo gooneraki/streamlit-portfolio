@@ -269,8 +269,10 @@ def display_scatter_chart(df: pd.DataFrame, x_column: str, y_column: str, title_
     return fig
 
 
-def display_efficient_frontier_chart(efficient_frontier_df: pd.DataFrame, random_df: pd.DataFrame = None, title_name: str | None = None):
-    """Display an efficient frontier chart with optional random portfolios for comparison."""
+def display_efficient_frontier_chart(efficient_frontier_df: pd.DataFrame, random_df: pd.DataFrame = None,
+                                     benchmark_return: float = None, benchmark_volatility: float = None,
+                                     benchmark_name: str = "Benchmark", title_name: str | None = None):
+    """Display an efficient frontier chart with optional random portfolios and benchmark point for comparison."""
     fig = go.Figure()
 
     # Add efficient frontier line
@@ -294,6 +296,21 @@ def display_efficient_frontier_chart(efficient_frontier_df: pd.DataFrame, random
                 color='#E74C3C',
                 size=4,
                 opacity=0.6
+            )
+        ))
+
+    # Add benchmark point if provided
+    if benchmark_return is not None and benchmark_volatility is not None:
+        fig.add_trace(go.Scatter(
+            x=[benchmark_volatility],
+            y=[benchmark_return],
+            mode='markers',
+            name=benchmark_name,
+            marker=dict(
+                symbol='star',
+                size=15,
+                color='#00FF00',
+                line=dict(color='#008000', width=2)
             )
         ))
 
