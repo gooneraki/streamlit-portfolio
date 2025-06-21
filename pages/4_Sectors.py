@@ -340,18 +340,6 @@ with st.expander("Manual creation", expanded=False):
             f"Improvement in Sharpe: {max_sharpe_portfolio['sharpe'] - benchmark_sharpe:.4f}")
         print(f"{'='*50}")
 
-        print("MAX SHARPE PORTFOLIO WEIGHTS:")
-        print(f"{'-'*30}")
-        for symbol, weight in zip(symbols, max_sharpe_portfolio['weights']):
-            print(f"{symbol:<10} {weight:>8.1%}")
-        print(f"{'='*50}")
-
-        print("SECTOR MARKET WEIGHTS:")
-        print(f"{'-'*30}")
-        for symbol, market_weight in zip(symbols, sector_market_weights):
-            print(f"{symbol:<10} {market_weight:>8.1%}")
-        print(f"{'='*50}")
-
         print("WEIGHT COMPARISON (Optimal vs Market):")
         print(f"{'-'*50}")
         for symbol, optimal_weight, market_weight in zip(symbols, max_sharpe_portfolio['weights'], sector_market_weights):
@@ -359,6 +347,66 @@ with st.expander("Manual creation", expanded=False):
             print(
                 f"{symbol:<10} Optimal: {optimal_weight:>6.1%} | Market: {market_weight:>6.1%} | Diff: {diff:+6.1%}")
         print(f"{'='*50}")
+
+    # Display portfolio analysis results in Streamlit
+    st.write("### Portfolio Analysis Results")
+
+    # Benchmark vs Optimal Portfolio comparison
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("**Benchmark Performance**")
+        benchmark_metrics = {
+            "Symbol": market_symbol,
+            "Return": f"{benchmark_return:.2%}",
+            "Volatility": f"{benchmark_volatility:.2%}",
+            "Sharpe Ratio": f"{benchmark_sharpe:.3f}"
+        }
+        st.dataframe(pd.DataFrame([benchmark_metrics]).set_index(
+            "Symbol"), use_container_width=True)
+
+    with col2:
+        st.write("**Optimal Portfolio Performance**")
+        optimal_metrics = {
+            "Portfolio": "Optimal",
+            "Return": f"{max_sharpe_portfolio['return']:.2%}",
+            "Volatility": f"{max_sharpe_portfolio['volatility']:.2%}",
+            "Sharpe Ratio": f"{max_sharpe_portfolio['sharpe']:.3f}"
+        }
+        st.dataframe(pd.DataFrame([optimal_metrics]).set_index(
+            "Portfolio"), use_container_width=True)
+
+    # Improvement metrics
+    st.write("**Performance Improvement**")
+    improvement_metrics = {
+        "Metric": [
+            "Portfolios with higher Sharpe than benchmark",
+            "Improvement in Sharpe ratio",
+            "Data period"
+        ],
+        "Value": [
+            f"{len(better_sharpe_indices)}",
+            f"{max_sharpe_portfolio['sharpe'] - benchmark_sharpe:.4f}",
+            f"{close_prices.index[0].strftime('%Y-%m-%d')} to {close_prices.index[-1].strftime('%Y-%m-%d')}"
+        ]
+    }
+    st.dataframe(pd.DataFrame(improvement_metrics),
+                 use_container_width=True, hide_index=True)
+
+    # Portfolio weights comparison
+    st.write("**Portfolio Weights Comparison**")
+    weights_comparison = []
+    for symbol, optimal_weight, market_weight in zip(symbols, max_sharpe_portfolio['weights'], sector_market_weights):
+        diff = optimal_weight - market_weight
+        weights_comparison.append({
+            "Symbol": symbol,
+            "Optimal Weight": f"{optimal_weight:.1%}",
+            "Market Weight": f"{market_weight:.1%}",
+            "Difference": f"{diff:+.1%}"
+        })
+
+    weights_df = pd.DataFrame(weights_comparison)
+    st.dataframe(weights_df, use_container_width=True, hide_index=True)
 
     # plot efficient frontier
     frontier_fig = display_efficient_frontier_chart(
