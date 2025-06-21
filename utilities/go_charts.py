@@ -271,8 +271,10 @@ def display_scatter_chart(df: pd.DataFrame, x_column: str, y_column: str, title_
 
 def display_efficient_frontier_chart(efficient_frontier_df: pd.DataFrame, random_df: pd.DataFrame = None,
                                      benchmark_return: float = None, benchmark_volatility: float = None,
-                                     benchmark_name: str = "Benchmark", title_name: str | None = None):
-    """Display an efficient frontier chart with optional random portfolios and benchmark point for comparison."""
+                                     benchmark_name: str = "Benchmark",
+                                     max_sharpe_return: float = None, max_sharpe_volatility: float = None,
+                                     max_sharpe_name: str = "Max Sharpe Portfolio", title_name: str | None = None):
+    """Display an efficient frontier chart with optional random portfolios, benchmark point, and max Sharpe portfolio point for comparison."""
     fig = go.Figure()
 
     # Add efficient frontier line
@@ -309,8 +311,23 @@ def display_efficient_frontier_chart(efficient_frontier_df: pd.DataFrame, random
             marker=dict(
                 symbol='star',
                 size=15,
-                color='#00FF00',
-                line=dict(color='#008000', width=2)
+                color='#2ECC71',
+                line=dict(color='#27AE60', width=2)
+            )
+        ))
+
+    # Add max Sharpe portfolio point if provided
+    if max_sharpe_return is not None and max_sharpe_volatility is not None:
+        fig.add_trace(go.Scatter(
+            x=[max_sharpe_volatility],
+            y=[max_sharpe_return],
+            mode='markers',
+            name=max_sharpe_name,
+            marker=dict(
+                symbol='diamond',
+                size=12,
+                color='#9B59B6',
+                line=dict(color='#8E44AD', width=2)
             )
         ))
 

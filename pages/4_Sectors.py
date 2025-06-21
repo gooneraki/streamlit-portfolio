@@ -415,6 +415,9 @@ with st.expander("Manual creation", expanded=False):
         benchmark_return=benchmark_return,
         benchmark_volatility=benchmark_volatility,
         benchmark_name=market_symbol,
+        max_sharpe_return=max_sharpe_portfolio['return'],
+        max_sharpe_volatility=max_sharpe_portfolio['volatility'],
+        max_sharpe_name="Max Sharpe Portfolio",
         title_name='Efficient Frontier'
     )
 
