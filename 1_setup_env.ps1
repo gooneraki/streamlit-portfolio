@@ -34,7 +34,7 @@ python -m pip install --upgrade pip
 
 # Step 4: Install dependencies
 Write-Host "Installing dependencies from requirements.txt..." -ForegroundColor Cyan
-pip install -r requirements.txt
+pip install -r custom_requirements.txt
 
 # Step 5: Freeze dependencies
 Write-Host "Freezing dependencies..." -ForegroundColor Cyan
