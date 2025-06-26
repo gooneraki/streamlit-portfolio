@@ -273,19 +273,20 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='b
     return pd.DataFrame(
         columns=['Label', 'Value'],
         data=[
-            ['Sample Years', f"{days / 365.25:.1f}"]] +
-        ([['CAGR Base-fx', f"{(cagr-cagr_value):.1%}"],
-          ['CAGR Base-inv', f"{(cagr_value):.1%}"]] if cagr_value is not None else []) +
-        [['CAGR Base', f"{cagr:.1%}"],
-         ['CAGR Fitted', f"{cagr_fitted:.1%}"],
-         ['', ''],
-         ['Date',
-             periodic_asset_history_with_fit['Date'].iloc[-1].strftime('%Y-%m-%d')],
-         ['Base Value',
-             f"{periodic_asset_history_with_fit[base_column].iloc[-1]:,.2f}"],
-         ['Fitted Value',
-             f"{periodic_asset_history_with_fit['fitted'].iloc[-1]:,.2f}"],
-         ['Base Over/Under', f"{base_over_under:.1%}"]]
+            ['Sample Years', f"{days / 365.25:.1f}"],
+            ['CAGR Base-fx', f"{(cagr-cagr_value):.1%}"],
+            ['CAGR Base-inv',
+                f"{(cagr_value):.1%}"] if cagr_value is not None else [],
+            ['CAGR Base', f"{cagr:.1%}"],
+            ['CAGR Fitted', f"{cagr_fitted:.1%}"],
+            ['', ''],
+            ['Date',
+                periodic_asset_history_with_fit['Date'].iloc[-1].strftime('%Y-%m-%d')],
+            ['Base Value',
+                f"{periodic_asset_history_with_fit[base_column].iloc[-1]:,.2f}"],
+            ['Fitted Value',
+                f"{periodic_asset_history_with_fit['fitted'].iloc[-1]:,.2f}"],
+            ['Base Over/Under', f"{base_over_under:.1%}"]]
     )
 # def display_trend_line_chart(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value'):
 #     """ Display the trend line chart """
@@ -678,14 +679,11 @@ def get_first_last_values(p_history: pd.DataFrame, p_fitted_history: pd.DataFram
     return first_value, last_value, first_fitted_value, last_fitted_value
 
 
-def get_history_exp_fit(p_tickers_data: TickersData):
+def get_history_exp_fit(history: pd.DataFrame):
     """ Get the tickers data extended """
-    history = p_tickers_data['history']
+
     fitted_history = history.apply(get_exp_fitted_data)
     cagr_error = history/fitted_history - 1
-
-    if not isinstance(history, pd.DataFrame):
-        raise ValueError("History is not a DataFrame")
 
     if not isinstance(fitted_history, pd.DataFrame):
         raise ValueError("Fitted history is not a DataFrame")
@@ -722,7 +720,7 @@ def get_history_exp_fit(p_tickers_data: TickersData):
     if not isinstance(cagr_error_std, pd.Series):
         raise ValueError("Error: CAGR error std is not a Series")
 
-    return history, fitted_history, cagr_error, cagr, cagr_fitted, over_under, \
+    return fitted_history, cagr_error, cagr, cagr_fitted, over_under, \
         cagr_error_rmse, cagr_error_std
 
 
@@ -781,18 +779,33 @@ def get_log_returns(p_history: pd.DataFrame):
         std_log_monthly_returns, mean_log_yearly_returns, std_log_yearly_returns
 
 
-def get_tickers_data(symbols: list[str], period: str = 'max'):
+def get_tickers_data(symbols: list[str], period: str = 'max', sector_weights: Union[list[float], None] = None):
     """ Get the tickers data """
-    debug = False
+    debug = True
 
     tickers_data = tickers_yf(symbols, period)
     if isinstance(tickers_data, str):
         return tickers_data
 
-    history, fitted_history, cagr_error, \
+    history = tickers_data['history']
+
+    if not isinstance(history, pd.DataFrame):
+        raise ValueError("History is not a DataFrame")
+
+    if sector_weights is None:
+        sector_weights = [1/len(history.columns)]*len(history.columns)
+
+    if len(sector_weights) != len(history.columns):
+        raise ValueError(
+            "Error: Sector weights length does not match symbols length")
+
+    # multiply the history by the sector weights
+    history['TOTAL'] = history.mul(sector_weights, axis=1).sum(axis=1)
+
+    fitted_history, cagr_error, \
         cagr, cagr_fitted, over_under, \
         cagr_error_rmse, cagr_error_std = get_history_exp_fit(
-            tickers_data)
+            history)
 
     # fitted_close_prices = close_prices.apply(get_exp_fitted_data)
     cumulative_log_returns, daily_log_returns, monthly_log_returns, yearly_log_returns, \
@@ -827,9 +840,13 @@ def get_tickers_data(symbols: list[str], period: str = 'max'):
         print(f"Std log yearly returns: {std_log_yearly_returns.head()}")
 
     # concatenate series into a dataframe
+
+    sector_weights_series = pd.Series(
+        sector_weights+[1], index=history.columns)
     extended_data = pd.concat(
-        [cagr, cagr_fitted, over_under, cagr_error_rmse, cagr_error_std],
+        [cagr, cagr_fitted, over_under, cagr_error_rmse,
+            cagr_error_std, sector_weights_series],
         axis=1,
-        keys=['cagr', 'cagr_fitted', 'over_under', 'cagr_error_rmse', 'cagr_error_std'])
+        keys=['cagr', 'cagr_fitted', 'over_under', 'cagr_error_rmse', 'cagr_error_std', 'weight'])
 
     return extended_data

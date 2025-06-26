@@ -69,7 +69,8 @@ print(f"\nSector symbols: {sector_symbols}")
 print(f"\nSector weights: {sector_weights}")
 
 
-tickers_data = get_tickers_data(sector_symbols, period='10y')
+tickers_data = get_tickers_data(
+    sector_symbols, period='10y', sector_weights=sector_weights)
 if isinstance(tickers_data, str):
     st.error(f"Error retrieving tickers data: {tickers_data}")
     st.stop()
