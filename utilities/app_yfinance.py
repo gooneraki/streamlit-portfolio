@@ -1,29 +1,95 @@
 """ Yfinance utilities for Streamlit app """
+from dataclasses import dataclass
+from typing import Union, TypedDict,  Any
 import pandas as pd
 import yfinance as yf
 import streamlit as st
-from typing import Union, TypedDict
 
 
-YF_SECTOR_KEYS = list(yf.const.SECTOR_INDUSTY_MAPPING.keys())
+def get_sector_keys():
+    """ Get the sector keys """
+    try:
+        return list(
+            yf.const.SECTOR_INDUSTY_MAPPING.keys())  # type: ignore
+
+    except Exception as err:
+        print(f"Error retrieving sector keys: {err}")
+        return [
+            'basic-materials',
+            'communication-services',
+            'consumer-cyclical',
+            'consumer-defensive',
+            'energy',
+            'financial-services',
+            'healthcare',
+            'industrials',
+            'real-estate',
+            'technology',
+            'utilities']
+
+
+YF_SECTOR_KEYS = get_sector_keys()
 
 # ######### #
 # yf.Sector #
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
 
+@dataclass
+class SectorOverview:
+    """Type definition for sector overview"""
+    companies_count: int
+    market_cap: int
+    message_board_id: str
+    description: str
+    industries_count: int
+    market_weight: float
+    employee_count: int
+
+
+class SectorData(TypedDict):
+    """
+    Type definition for successful sector data response.
+
+    top_companies: pd.DataFrame
+        - Columns: "name", "rating", "market weight"
+        - Index: "symbol"
+
+    top_etfs: dict[str, str]
+        - Key: "symbol"
+        - Value: "short name"
+    """
+    key: str
+    name: str
+    overview: dict  # is SectorOverview
+    top_companies: pd.DataFrame
+    top_etfs: dict[str, str]
+
+
 @st.cache_data
-def sector_yf(sector_key: str):
+def sector_yf(sector_key: str) -> Union[str, SectorData]:
     """ Fetch the sector data """
     try:
         sector = yf.Sector(sector_key)
 
-        return {
-            'name': sector.name,
-            'overview': sector.overview,
-            'top_companies': sector.top_companies,
-            'top_etfs': sector.top_etfs
-        }
+        name = sector.name
+        overview: dict = sector.overview
+        top_companies = sector.top_companies
+        top_etfs = sector.top_etfs
+
+        if not isinstance(top_companies, pd.DataFrame):
+            return f"Error: Top companies is not a DataFrame: {top_companies}"
+
+        if not isinstance(top_etfs, dict):
+            return f"Error: Top etfs is not a dictionary: {top_etfs}"
+
+        return SectorData(
+            key=sector_key,
+            name=name,
+            overview=overview,
+            top_companies=top_companies,
+            top_etfs=top_etfs,
+        )
 
     except Exception as err:
         error_message = f"Error retrieving sector details for '{sector_key}': {err}"
@@ -108,16 +174,42 @@ def get_fx_history(base_currency, target_currency):
 # yf.Market #
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
+class MarketData(TypedDict):
+    """Type definition for successful market data response"""
+    summary: dict[str, Any]
+    first_summary_symbol: str
+
 
 @st.cache_data
-def market_yf(market: str):
+def market_yf(market: str) -> Union[str, MarketData]:
     """ Fetch the market info for a given market """
     try:
         market_data = yf.Market(market)
 
+        data_summary = market_data.summary
+
+        # To get first market symbol
+        if not isinstance(data_summary, dict):
+            return "Error: Market summary is not a dictionary"
+
+        summary_keys = list(data_summary.keys())
+
+        first_summary = data_summary[summary_keys[0]]
+
+        if not isinstance(first_summary, dict):
+            return "Error: Market symbol is not a dictionary"
+
+        if not 'symbol' in first_summary:
+            return "Error: Symbol is not in the first summary"
+
+        first_summary_symbol = first_summary['symbol']
+
+        if not isinstance(first_summary_symbol, str):
+            return "Error: Market symbol is not a string"
+
         return {
-            'summary': market_data.summary,
-            'status': market_data.status
+            'summary': data_summary,
+            'first_summary_symbol': first_summary_symbol
         }
     except Exception as err:
         error_message = f"Error retrieving market details for '{market}': {err}"
@@ -134,24 +226,37 @@ def market_yf(market: str):
 class TickersData(TypedDict):
     """Type definition for successful tickers data response"""
     history: pd.DataFrame
-    news: dict[str, list[dict]]
 
 
 @st.cache_data
 def tickers_yf(symbols: list[str], period='max') -> Union[str, TickersData]:
-    """ 
-    Fetch the tickers info for a given symbols
-
-    Returns:
-        Union[str, TickersData]: Either an error string or a dictionary with:
-            - history: pd.DataFrame - Historical close prices
-            - news: dict[str, list[dict]] - News articles
-    """
+    """ Fetch the tickers data """
     try:
         tickers = yf.Tickers(symbols)
+        history_data = tickers.history(period=period, auto_adjust=True)
+        if history_data is None:
+            return "Error: No history data returned"
+
+        close_prices = history_data["Close"]
+
+        if not isinstance(close_prices, pd.DataFrame):
+            return "Error: Close prices is not a DataFrame"
+
+        # drop all columns with all NaNs for erroneous symbols
+        close_prices = close_prices.dropna(axis=1, how='all')
+
+        # drop all rows with any NaNs to have consistent data
+        close_prices = close_prices.dropna(axis=0, how='any')
+
+        if close_prices.empty:
+            return "Error: No close prices returned"
+
+        if len(close_prices.columns) != len(symbols):
+            print(
+                f"\nError: Not all symbols have data: {[el for el in symbols if el not in close_prices.columns]}\n")
+
         return {
-            "history": tickers.history(period=period, auto_adjust=True)["Close"],
-            "news": tickers.news()
+            "history": close_prices
         }
     except Exception as err:
         error_message = f"Error retrieving tickers details for '{symbols}': {err}"
