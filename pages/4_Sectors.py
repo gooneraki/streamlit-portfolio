@@ -18,8 +18,8 @@ from utilities.go_charts import display_trend_go_chart_2, display_efficient_fron
 
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
-if st.button("Refresh cache"):
-    st.cache_data.clear()
+# if st.button("Refresh cache"):
+#     st.cache_data.clear()
 
 st.set_page_config(page_title="US Market Overview", layout="centered")
 
@@ -69,17 +69,14 @@ print(f"\nSector symbols: {sector_symbols}")
 print(f"\nSector weights: {sector_weights}")
 
 
-tickers_data, timeseries_data = get_tickers_data(
+symbol_metrics, timeseries_data = get_tickers_data(
     sector_symbols, period='10y', sector_weights=sector_weights)
-if isinstance(tickers_data, str):
-    st.error(f"Error retrieving tickers data: {tickers_data}")
-    st.stop()
 
-
-st.dataframe(tickers_data)
-
-st.dataframe(timeseries_data.head())
-st.dataframe(timeseries_data.tail())
+with st.expander("Raw data", expanded=False):
+    st.write("Symbol metrics")
+    st.dataframe(symbol_metrics)
+    st.write("Timeseries data")
+    st.dataframe(timeseries_data)
 
 
 # market_info = yf_ticket_info(market_symbol)
