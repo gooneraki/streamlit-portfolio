@@ -23,7 +23,7 @@ print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 # if st.button("Refresh cache"):
 #     st.cache_data.clear()
 
-st.set_page_config(page_title="US Market Overview", layout="centered")
+st.set_page_config(page_title="US Market Overview", layout="wide")
 
 DEBUG = True
 DYNAMIC_MARKET = True
@@ -81,6 +81,31 @@ with st.expander("Raw data", expanded=False):
     st.write("Timeseries data")
     st.dataframe(timeseries_data)
 
+# Sample Period Information
+st.subheader("Data Sample Overview")
+
+# Extract period information from timeseries data
+first_date = timeseries_data.index.min()
+last_date = timeseries_data.index.max()
+total_days = (last_date - first_date).days
+sample_years = total_days / 365.25
+data_points = len(timeseries_data)
+frequency = data_points / sample_years
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Start Date", first_date.strftime('%Y-%m-%d'))
+with col2:
+    st.metric("End Date", last_date.strftime('%Y-%m-%d'))
+with col3:
+    st.metric("Sample Period", f"{sample_years:.1f} years")
+with col4:
+    st.metric("Data Points", f"{data_points:,}")
+
+st.info(
+    f"📊 **Analysis Coverage:** {total_days:,} days ({sample_years:.1f} years) with {data_points:,} data points (avg {frequency:.0f} points/year)")
+
+st.divider()
 
 # Asset Selection and Chart Visualization
 st.subheader("Asset Analysis")
