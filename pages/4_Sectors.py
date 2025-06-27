@@ -14,7 +14,7 @@ from typing import Dict, Any
 
 from utilities.app_yfinance import market_yf
 
-from utilities.utilities import fetch_multiple_sectors_data, get_tickers_data, \
+from utilities.utilities import MultiAsset, fetch_multiple_sectors_data, \
     fully_analyze_symbol, metrics, retrieve_sector_data
 from utilities.go_charts import display_trend_go_chart_2, display_efficient_frontier_chart
 
@@ -66,13 +66,14 @@ else:
                       "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
     sector_weights = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 
-print(f"\nMarket symbol: {market_symbol}")
-print(f"\nSector symbols: {sector_symbols}")
-print(f"\nSector weights: {sector_weights}")
+# print(f"\nMarket symbol: {market_symbol}")
+# print(f"\nSector symbols: {sector_symbols}")
+# print(f"\nSector weights: {sector_weights}")
 
 
-symbol_metrics, timeseries_data = get_tickers_data(
-    sector_symbols, period='10y', sector_weights=sector_weights)
+multi_asset = MultiAsset(sector_symbols, period='10y',
+                         sector_weights=sector_weights)
+symbol_metrics, timeseries_data = multi_asset.get_data()
 
 # # UI
 with st.expander("Raw data", expanded=False):
@@ -84,26 +85,21 @@ with st.expander("Raw data", expanded=False):
 # Sample Period Information
 st.subheader("Data Sample Overview")
 
-# Extract period information from timeseries data
-first_date = pd.Timestamp(timeseries_data.index.min())
-last_date = pd.Timestamp(timeseries_data.index.max())
-total_days = (last_date - first_date).days
-sample_years = total_days / 365.25
-data_points = len(timeseries_data)
-frequency = data_points / sample_years
+# Extract period information using MultiAsset method
+period_info = multi_asset.get_period_info()
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Start Date", first_date.strftime('%Y-%m-%d'))
+    st.metric("Start Date", period_info['first_date'].strftime('%Y-%m-%d'))
 with col2:
-    st.metric("End Date", last_date.strftime('%Y-%m-%d'))
+    st.metric("End Date", period_info['last_date'].strftime('%Y-%m-%d'))
 with col3:
-    st.metric("Sample Period", f"{sample_years:.1f} years")
+    st.metric("Sample Period", f"{period_info['sample_years']:.1f} years")
 with col4:
-    st.metric("Data Points", f"{data_points:,}")
+    st.metric("Data Points", f"{period_info['data_points']:,}")
 
 st.info(
-    f"📊 **Analysis Coverage:** {total_days:,} days ({sample_years:.1f} years) with {data_points:,} data points (avg {frequency:.0f} points/year)")
+    f"📊 **Analysis Coverage:** {period_info['total_days']:,} days ({period_info['sample_years']:.1f} years) with {period_info['data_points']:,} data points (avg {period_info['frequency']:.0f} points/year)")
 
 # Assets Overview
 st.subheader("Assets Overview")

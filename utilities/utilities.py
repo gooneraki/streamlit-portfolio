@@ -778,94 +778,138 @@ def get_log_returns(p_history: pd.DataFrame):
         std_log_monthly_returns, mean_log_yearly_returns, std_log_yearly_returns
 
 
-def get_tickers_data(symbols: list[str], period: str = 'max', sector_weights: Union[list[float], None] = None):
-    """ Get the tickers data """
-    debug = False
+class MultiAsset:
+    """ Multi-asset analysis class """
 
-    tickers_data = tickers_yf(symbols, period)
-    if isinstance(tickers_data, str):
-        raise ValueError(tickers_data)
+    def __init__(
+            self,
+            symbols: list[str],
+            period: str = 'max',
+            debug: bool = False,
+            sector_weights: Union[list[float], None] = None):
+        """ Initialize MultiAsset with symbols and calculate metrics """
+        self.symbols = symbols
+        self.period = period
+        self.debug = debug
 
-    history = tickers_data['history']
+        # Fetch data from Yahoo Finance
+        tickers_data = tickers_yf(symbols, period)
+        if isinstance(tickers_data, str):
+            raise ValueError(tickers_data)
 
-    if not isinstance(history, pd.DataFrame):
-        raise ValueError("History is not a DataFrame")
+        history = tickers_data['history']
+        if not isinstance(history, pd.DataFrame):
+            raise ValueError("History is not a DataFrame")
 
-    if sector_weights is None:
-        sector_weights = [1/len(history.columns)]*len(history.columns)
+        # Set default weights if not provided
+        if sector_weights is None:
+            sector_weights = [1/len(history.columns)] * len(history.columns)
 
-    if len(sector_weights) != len(history.columns):
-        raise ValueError(
-            "Error: Sector weights length does not match symbols length")
+        if len(sector_weights) != len(history.columns):
+            raise ValueError(
+                "Error: Sector weights length does not match symbols length")
 
-    # multiply the history by the sector weights
-    history['TOTAL'] = history.mul(sector_weights, axis=1).sum(axis=1)
+        self.sector_weights = sector_weights
 
-    fitted_history, trend_deviation, \
-        cagr, cagr_fitted, over_under, \
-        cagr_error_rmse,  cagr_z_score = get_history_exp_fit(
-            history)
+        # Create weighted total
+        history['TOTAL'] = history.mul(sector_weights, axis=1).sum(axis=1)
 
-    # fitted_close_prices = close_prices.apply(get_exp_fitted_data)
-    cumulative_log_returns, daily_log_returns, monthly_log_returns, yearly_log_returns, \
-        mean_log_daily_returns, std_log_daily_returns, mean_log_monthly_returns, \
-        std_log_monthly_returns, mean_log_yearly_returns, std_log_yearly_returns = get_log_returns(
-            history)
+        # Calculate fitted data and metrics
+        fitted_history, trend_deviation, \
+            cagr, cagr_fitted, over_under, \
+            cagr_error_rmse, cagr_z_score = get_history_exp_fit(history)
 
-    if debug:
-        # These are dataframes with index as dates
+        # Calculate log returns
+        cumulative_log_returns, daily_log_returns, monthly_log_returns, yearly_log_returns, \
+            mean_log_daily_returns, std_log_daily_returns, mean_log_monthly_returns, \
+            std_log_monthly_returns, mean_log_yearly_returns, std_log_yearly_returns = get_log_returns(
+                history)
+
+        # Debug output
+        if self.debug:
+            self._print_debug_info(history, fitted_history, trend_deviation, daily_log_returns,
+                                   cumulative_log_returns, monthly_log_returns, yearly_log_returns,
+                                   cagr, cagr_fitted, over_under, cagr_error_rmse,
+                                   mean_log_daily_returns, std_log_daily_returns,
+                                   mean_log_monthly_returns, std_log_monthly_returns,
+                                   mean_log_yearly_returns, std_log_yearly_returns)
+
+        # Create symbol metrics DataFrame
+        sector_weights_series = pd.Series(
+            sector_weights + [1], index=history.columns)
+        self.symbol_metrics = pd.concat(
+            [cagr, cagr_fitted, over_under, cagr_error_rmse, sector_weights_series,
+             mean_log_daily_returns, std_log_daily_returns,
+             mean_log_monthly_returns, std_log_monthly_returns,
+             mean_log_yearly_returns, std_log_yearly_returns],
+            axis=1,
+            keys=['cagr', 'cagr_fitted', 'over_under', 'cagr_error_rmse', 'sector_weights',
+                  'mean_log_daily_returns', 'std_log_daily_returns',
+                  'mean_log_monthly_returns', 'std_log_monthly_returns',
+                  'mean_log_yearly_returns', 'std_log_yearly_returns'])
+
+        # Create timeseries data DataFrame
+        self.timeseries_data = pd.concat(
+            objs=[history, fitted_history, trend_deviation, cagr_z_score,
+                  daily_log_returns, cumulative_log_returns,
+                  monthly_log_returns, yearly_log_returns],
+            axis=1,
+            keys=['history', 'fitted_history', 'trend_deviation', 'cagr_z_score',
+                  'daily_log_returns', 'cumulative_log_returns',
+                  'monthly_log_returns', 'yearly_log_returns'])
+
+    def get_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """ Return symbol metrics and timeseries data """
+        return self.symbol_metrics, self.timeseries_data
+
+    def get_period_info(self) -> dict[str, Any]:
+        """ Extract and return period information from timeseries data with type checking """
+
+        # Extract dates with type checking
+        first_date = self.timeseries_data.index.min()
+        last_date = self.timeseries_data.index.max()
+
+        if not isinstance(first_date, pd.Timestamp):
+            raise ValueError("First date is not a Timestamp")
+        if not isinstance(last_date, pd.Timestamp):
+            raise ValueError("Last date is not a Timestamp")
+
+        # Calculate period metrics
+        total_days = (last_date - first_date).days + 1
+        sample_years = total_days / 365.25
+        data_points = len(self.timeseries_data)
+        frequency = data_points / sample_years if sample_years > 0 else 0
+
+        return {
+            'first_date': first_date,
+            'last_date': last_date,
+            'total_days': total_days,
+            'sample_years': sample_years,
+            'data_points': data_points,
+            'frequency': frequency
+        }
+
+    def _print_debug_info(self, history, fitted_history, trend_deviation, daily_log_returns,
+                          cumulative_log_returns, monthly_log_returns, yearly_log_returns,
+                          cagr, cagr_fitted, over_under, cagr_error_rmse,
+                          mean_log_daily_returns, std_log_daily_returns,
+                          mean_log_monthly_returns, std_log_monthly_returns,
+                          mean_log_yearly_returns, std_log_yearly_returns):
+        """ Print debug information """
         print(f"History: {history.head()}")
         print(f"Fitted history: {fitted_history.head()}")
         print(f"CAGR error: {trend_deviation.head()}")
-
         print(f"Daily log returns: {daily_log_returns.head()}")
         print(f"Cumulative log returns: {cumulative_log_returns.head()}")
         print(f"Monthly log returns: {monthly_log_returns.head()}")
         print(f"Yearly log returns: {yearly_log_returns.head()}")
-
-        # These are series with index as symbols
-
         print(f"CAGR: {cagr.head()}")
         print(f"CAGR fitted: {cagr_fitted.head()}")
         print(f"Over/Under: {over_under.head()}")
         print(f"CAGR error RMSE: {cagr_error_rmse.head()}")
-
         print(f"Mean log daily returns: {mean_log_daily_returns.head()}")
         print(f"Std log daily returns: {std_log_daily_returns.head()}")
         print(f"Mean log monthly returns: {mean_log_monthly_returns.head()}")
         print(f"Std log monthly returns: {std_log_monthly_returns.head()}")
         print(f"Mean log yearly returns: {mean_log_yearly_returns.head()}")
         print(f"Std log yearly returns: {std_log_yearly_returns.head()}")
-
-    # concatenate series into a dataframe
-
-    sector_weights_series = pd.Series(
-        sector_weights+[1], index=history.columns)
-    symbol_metrics = pd.concat(
-        [cagr, cagr_fitted, over_under, cagr_error_rmse, sector_weights_series,
-         mean_log_daily_returns, std_log_daily_returns,
-         mean_log_monthly_returns, std_log_monthly_returns,
-         mean_log_yearly_returns, std_log_yearly_returns
-         ],
-        axis=1,
-        keys=['cagr', 'cagr_fitted', 'over_under', 'cagr_error_rmse', 'sector_weights',
-              'mean_log_daily_returns', 'std_log_daily_returns',
-              'mean_log_monthly_returns',
-              'std_log_monthly_returns',
-              'mean_log_yearly_returns',
-              'std_log_yearly_returns'])
-
-    timeseries_data = pd.concat(
-        objs=[history, fitted_history,
-              trend_deviation, cagr_z_score,
-              daily_log_returns, cumulative_log_returns,
-              monthly_log_returns,
-              yearly_log_returns],
-        axis=1,
-        keys=['history', 'fitted_history',
-              'trend_deviation', 'cagr_z_score',
-              'daily_log_returns', 'cumulative_log_returns',
-              'monthly_log_returns',
-              'yearly_log_returns'])
-
-    return symbol_metrics, timeseries_data
