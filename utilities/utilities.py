@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from utilities.app_yfinance import YF_SECTOR_KEYS, \
     search_yf, tickers_yf, yf_ticket_info, yf_ticket_history, get_fx_history, sector_yf
 
@@ -888,6 +890,82 @@ class MultiAsset:
             'data_points': data_points,
             'frequency': frequency
         }
+
+    def create_asset_analysis_chart(self, selected_asset: str) -> go.Figure:
+        """ Create dual-axis chart for selected asset with history, fitted history, and z-score """
+        # Validate asset exists
+        available_assets = self.timeseries_data.columns.get_level_values(
+            1).unique().tolist()
+        if selected_asset not in available_assets:
+            raise ValueError(
+                f"Asset '{selected_asset}' not found. Available assets: {available_assets}")
+
+        # Prepare data for selected asset
+        history_data = self.timeseries_data[(
+            'history', selected_asset)].dropna()
+        fitted_data = self.timeseries_data[(
+            'fitted_history', selected_asset)].dropna()
+        z_score_data = self.timeseries_data[(
+            'cagr_z_score', selected_asset)].dropna()
+
+        # Create subplot with secondary y-axis
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        # Add history line (primary axis)
+        fig.add_trace(
+            go.Scatter(
+                x=history_data.index,
+                y=history_data.values,
+                mode='lines',
+                name='History',
+                line=dict(color='#1f77b4', width=2)
+            ),
+            secondary_y=False,
+        )
+
+        # Add fitted history line (primary axis)
+        fig.add_trace(
+            go.Scatter(
+                x=fitted_data.index,
+                y=fitted_data.values,
+                mode='lines',
+                name='Fitted History',
+                line=dict(color='#ff7f0e', width=2, dash='dash')
+            ),
+            secondary_y=False,
+        )
+
+        # Add z-score line (secondary axis)
+        fig.add_trace(
+            go.Scatter(
+                x=z_score_data.index,
+                y=z_score_data.values,
+                mode='lines',
+                name='CAGR Z-Score',
+                line=dict(color='#d62728', width=1.5),
+                opacity=0.7
+            ),
+            secondary_y=True,
+        )
+
+        # Update layout
+        fig.update_layout(
+            title=f"Asset Analysis: {selected_asset}",
+            xaxis_title="Date",
+            hovermode='x unified',
+            legend=dict(orientation="h", yanchor="bottom",
+                        y=1.02, xanchor="right", x=1)
+        )
+
+        # Set y-axes titles
+        fig.update_yaxes(title_text="Value", secondary_y=False)
+        fig.update_yaxes(title_text="Z-Score", secondary_y=True)
+
+        # Add horizontal line at z-score = 0
+        fig.add_hline(y=0, line_dash="dot", line_color="gray",
+                      opacity=0.5, secondary_y=True)
+
+        return fig
 
     def _print_debug_info(self, history, fitted_history, trend_deviation, daily_log_returns,
                           cumulative_log_returns, monthly_log_returns, yearly_log_returns,

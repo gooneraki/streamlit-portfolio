@@ -169,71 +169,12 @@ selected_asset = st.selectbox(
         default_asset) if default_asset in available_assets else 0
 )
 
-# Create dual-axis chart
-
-# Prepare data for selected asset
-history_data = timeseries_data[('history', selected_asset)].dropna()
-fitted_data = timeseries_data[('fitted_history', selected_asset)].dropna()
-z_score_data = timeseries_data[('cagr_z_score', selected_asset)].dropna()
-
-# Create subplot with secondary y-axis
-fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-# Add history line (primary axis)
-fig.add_trace(
-    go.Scatter(
-        x=history_data.index,
-        y=history_data.values,
-        mode='lines',
-        name='History',
-        line=dict(color='#1f77b4', width=2)
-    ),
-    secondary_y=False,
-)
-
-# Add fitted history line (primary axis)
-fig.add_trace(
-    go.Scatter(
-        x=fitted_data.index,
-        y=fitted_data.values,
-        mode='lines',
-        name='Fitted History',
-        line=dict(color='#ff7f0e', width=2, dash='dash')
-    ),
-    secondary_y=False,
-)
-
-# Add z-score line (secondary axis)
-fig.add_trace(
-    go.Scatter(
-        x=z_score_data.index,
-        y=z_score_data.values,
-        mode='lines',
-        name='CAGR Z-Score',
-        line=dict(color='#d62728', width=1.5),
-        opacity=0.7
-    ),
-    secondary_y=True,
-)
-
-# Update layout
-fig.update_layout(
-    title=f"Asset Analysis: {selected_asset}",
-    xaxis_title="Date",
-    hovermode='x unified',
-    legend=dict(orientation="h", yanchor="bottom",
-                y=1.02, xanchor="right", x=1)
-)
-
-# Set y-axes titles
-fig.update_yaxes(title_text="Value", secondary_y=False)
-fig.update_yaxes(title_text="Z-Score", secondary_y=True)
-
-# Add horizontal line at z-score = 0
-fig.add_hline(y=0, line_dash="dot", line_color="gray",
-              opacity=0.5, secondary_y=True)
-
-st.plotly_chart(fig, use_container_width=True)
+# Create dual-axis chart using MultiAsset method
+if selected_asset:
+    fig = multi_asset.create_asset_analysis_chart(selected_asset)
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.error("No asset selected")
 
 # Display key metrics for selected asset
 st.subheader(f"Key Metrics: {selected_asset}")
