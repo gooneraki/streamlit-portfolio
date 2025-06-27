@@ -85,8 +85,8 @@ with st.expander("Raw data", expanded=False):
 st.subheader("Data Sample Overview")
 
 # Extract period information from timeseries data
-first_date = timeseries_data.index.min()
-last_date = timeseries_data.index.max()
+first_date = pd.Timestamp(timeseries_data.index.min())
+last_date = pd.Timestamp(timeseries_data.index.max())
 total_days = (last_date - first_date).days
 sample_years = total_days / 365.25
 data_points = len(timeseries_data)
@@ -105,14 +105,64 @@ with col4:
 st.info(
     f"📊 **Analysis Coverage:** {total_days:,} days ({sample_years:.1f} years) with {data_points:,} data points (avg {frequency:.0f} points/year)")
 
+# Assets Overview
+st.subheader("Assets Overview")
+
+# Get available assets from timeseries data
+available_assets = timeseries_data.columns.get_level_values(
+    1).unique().tolist()
+
+# Create assets summary table
+assets_info = []
+total_weight = 0
+
+for symbol in available_assets:
+    if symbol == 'TOTAL':
+        continue  # Skip TOTAL as it's a calculated aggregate
+
+    if symbol in symbol_metrics.index:
+        metrics = symbol_metrics.loc[symbol]
+        weight = metrics.get('sector_weights', 0)
+        cagr = metrics.get('cagr', 0)
+        total_weight += weight
+
+        assets_info.append({
+            'Asset': symbol,
+            'Sector Weight': f"{weight:.1%}",
+            'CAGR': f"{cagr:.1%}",
+            'Annualized Return': f"{metrics.get('mean_log_yearly_returns', 0):.1%}",
+            'Annualized Risk': f"{metrics.get('std_log_yearly_returns', 0):.1%}"
+        })
+
+if assets_info:
+    assets_df = pd.DataFrame(assets_info)
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.dataframe(
+            assets_df,
+            use_container_width=True,
+            hide_index=True,
+            height=min(400, len(assets_df) * 35 + 40)
+        )
+
+    with col2:
+        st.metric("Total Assets", len(assets_df))
+        st.metric("Total Weight", f"{total_weight:.1%}")
+        st.metric("TOTAL Asset", "Weighted Aggregate")
+
+        if total_weight < 0.99 or total_weight > 1.01:
+            st.warning(f"⚠️ Weights sum to {total_weight:.1%}")
+        else:
+            st.success("✅ Weights properly normalized")
+
+st.info("💡 **TOTAL** represents the weighted aggregate of all individual assets based on their sector weights")
+
 st.divider()
 
 # Asset Selection and Chart Visualization
 st.subheader("Asset Analysis")
 
-# Get available assets from timeseries data
-available_assets = timeseries_data.columns.get_level_values(
-    1).unique().tolist()
 default_asset = 'TOTAL' if 'TOTAL' in available_assets else available_assets[0]
 
 # Asset selector
