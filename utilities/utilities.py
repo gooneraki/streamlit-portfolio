@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 # import streamlit as st
 # import altair as alt
-from utilities.app_yfinance import YF_SECTOR_KEYS,  TickersData, \
+from utilities.app_yfinance import YF_SECTOR_KEYS, \
     search_yf, tickers_yf, yf_ticket_info, yf_ticket_history, get_fx_history, sector_yf
 
 
@@ -271,7 +271,6 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='b
         cagr_value = None
 
     return pd.DataFrame(
-        columns=['Label', 'Value'],
         data=[
             ['Sample Years', f"{days / 365.25:.1f}"],
             ['CAGR Base-fx', f"{(cagr-cagr_value):.1%}"],
@@ -286,7 +285,8 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='b
                 f"{periodic_asset_history_with_fit[base_column].iloc[-1]:,.2f}"],
             ['Fitted Value',
                 f"{periodic_asset_history_with_fit['fitted'].iloc[-1]:,.2f}"],
-            ['Base Over/Under', f"{base_over_under:.1%}"]]
+            ['Base Over/Under', f"{base_over_under:.1%}"]],
+        columns=pd.Index(['Label', 'Value'])
     )
 # def display_trend_line_chart(periodic_asset_history_with_fit: pd.DataFrame, base_column='base_value'):
 #     """ Display the trend line chart """
@@ -781,7 +781,7 @@ def get_log_returns(p_history: pd.DataFrame):
 
 def get_tickers_data(symbols: list[str], period: str = 'max', sector_weights: Union[list[float], None] = None):
     """ Get the tickers data """
-    debug = True
+    debug = False
 
     tickers_data = tickers_yf(symbols, period)
     if isinstance(tickers_data, str):
@@ -843,10 +843,29 @@ def get_tickers_data(symbols: list[str], period: str = 'max', sector_weights: Un
 
     sector_weights_series = pd.Series(
         sector_weights+[1], index=history.columns)
-    extended_data = pd.concat(
-        [cagr, cagr_fitted, over_under, cagr_error_rmse,
-            cagr_error_std, sector_weights_series],
+    symbol_metrics = pd.concat(
+        [cagr, cagr_fitted, over_under, cagr_error_rmse, cagr_error_std, sector_weights_series,
+         mean_log_daily_returns, std_log_daily_returns,
+         mean_log_monthly_returns, std_log_monthly_returns,
+         mean_log_yearly_returns, std_log_yearly_returns
+         ],
         axis=1,
-        keys=['cagr', 'cagr_fitted', 'over_under', 'cagr_error_rmse', 'cagr_error_std', 'weight'])
+        keys=['cagr', 'cagr_fitted', 'over_under', 'cagr_error_rmse', 'cagr_error_std', 'sector_weights',
+              'mean_log_daily_returns', 'std_log_daily_returns',
+              'mean_log_monthly_returns',
+              'std_log_monthly_returns',
+              'mean_log_yearly_returns',
+              'std_log_yearly_returns'])
 
-    return extended_data
+    timeseries_data = pd.concat(
+        objs=[history, fitted_history, cagr_error,
+              daily_log_returns, cumulative_log_returns,
+              monthly_log_returns,
+              yearly_log_returns],
+        axis=1,
+        keys=['history', 'fitted_history', 'cagr_error',
+              'daily_log_returns', 'cumulative_log_returns',
+              'monthly_log_returns',
+              'yearly_log_returns'])
+
+    return symbol_metrics, timeseries_data

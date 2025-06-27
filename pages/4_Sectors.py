@@ -69,7 +69,7 @@ print(f"\nSector symbols: {sector_symbols}")
 print(f"\nSector weights: {sector_weights}")
 
 
-tickers_data = get_tickers_data(
+tickers_data, timeseries_data = get_tickers_data(
     sector_symbols, period='10y', sector_weights=sector_weights)
 if isinstance(tickers_data, str):
     st.error(f"Error retrieving tickers data: {tickers_data}")
@@ -77,6 +77,9 @@ if isinstance(tickers_data, str):
 
 
 st.dataframe(tickers_data)
+
+st.dataframe(timeseries_data.head())
+st.dataframe(timeseries_data.tail())
 
 
 # market_info = yf_ticket_info(market_symbol)
