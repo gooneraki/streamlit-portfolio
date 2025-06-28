@@ -61,10 +61,6 @@ else:
                       "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
     sector_weights = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 
-# print(f"\nMarket symbol: {market_symbol}")
-# print(f"\nSector symbols: {sector_symbols}")
-# print(f"\nSector weights: {sector_weights}")
-
 
 multi_asset = MultiAsset(
     sector_symbols,
@@ -73,9 +69,12 @@ multi_asset = MultiAsset(
 symbol_metrics, timeseries_data = multi_asset.get_data()
 
 # # UI
+selected_currency = st.selectbox("Select currency", options=["EUR", "USD"])
+
+
 with st.expander("Raw data", expanded=False):
     st.write("Symbol metrics")
-    st.dataframe(symbol_metrics)
+    st.dataframe(symbol_metrics.drop(columns=['long_business_summaries']))
     st.write("Timeseries data")
     st.dataframe(timeseries_data)
 

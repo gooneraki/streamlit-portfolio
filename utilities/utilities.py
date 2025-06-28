@@ -829,8 +829,6 @@ class MultiAsset:
                   for info in clean_info_list],
             index=[info.get("symbol", "") for info in clean_info_list])
 
-        print(currencies)
-
         # Set default weights if not provided
         if weights is None:
             weights = [1/len(history.columns)] * len(history.columns)
@@ -873,12 +871,13 @@ class MultiAsset:
             self.weights + [1], index=history.columns)  # add 1 for TOTAL
 
         self.symbol_metrics = pd.concat(
-            [cagr, cagr_fitted, over_under, trend_deviation_rmse, weights_series,
+            [currencies, long_names, types, long_business_summaries,
+                cagr, cagr_fitted, over_under, trend_deviation_rmse, weights_series,
              mean_log_daily_returns, std_log_daily_returns,
              mean_log_monthly_returns, std_log_monthly_returns,
              mean_log_yearly_returns, std_log_yearly_returns],
             axis=1,
-            keys=['cagr', 'cagr_fitted', 'over_under', 'trend_deviation_rmse', 'weights',
+            keys=['currencies', 'long_names', 'types', 'long_business_summaries', 'cagr', 'cagr_fitted', 'over_under', 'trend_deviation_rmse', 'weights',
                   'mean_log_daily_returns', 'std_log_daily_returns',
                   'mean_log_monthly_returns', 'std_log_monthly_returns',
                   'mean_log_yearly_returns', 'std_log_yearly_returns'])
