@@ -713,16 +713,16 @@ def get_history_exp_fit(history: pd.DataFrame):
     if not isinstance(over_under, pd.Series):
         raise ValueError("Error: Over/Under is not a Series")
 
-    cagr_error_rmse = np.sqrt((trend_deviation ** 2).mean())
+    trend_deviation_rmse = np.sqrt((trend_deviation ** 2).mean())
 
-    if not isinstance(cagr_error_rmse, pd.Series):
+    if not isinstance(trend_deviation_rmse, pd.Series):
         raise ValueError("Error: CAGR error RMSE is not a Series")
 
-    cagr_z_score = (trend_deviation - trend_deviation.mean()) / \
+    trend_deviation_z_score = (trend_deviation - trend_deviation.mean()) / \
         trend_deviation.std()
 
     return fitted_history, trend_deviation, cagr, cagr_fitted, over_under, \
-        cagr_error_rmse, cagr_z_score
+        trend_deviation_rmse, trend_deviation_z_score
 
 
 def get_log_returns(p_history: pd.DataFrame):
@@ -819,7 +819,8 @@ class MultiAsset:
         # Calculate fitted data and metrics
         fitted_history, trend_deviation, \
             cagr, cagr_fitted, over_under, \
-            cagr_error_rmse, cagr_z_score = get_history_exp_fit(history)
+            trend_deviation_rmse, trend_deviation_z_score = get_history_exp_fit(
+                history)
 
         # Calculate log returns
         cumulative_log_returns, daily_log_returns, monthly_log_returns, yearly_log_returns, \
@@ -831,7 +832,7 @@ class MultiAsset:
         if self.debug:
             self._print_debug_info(history, fitted_history, trend_deviation, daily_log_returns,
                                    cumulative_log_returns, monthly_log_returns, yearly_log_returns,
-                                   cagr, cagr_fitted, over_under, cagr_error_rmse,
+                                   cagr, cagr_fitted, over_under, trend_deviation_rmse,
                                    mean_log_daily_returns, std_log_daily_returns,
                                    mean_log_monthly_returns, std_log_monthly_returns,
                                    mean_log_yearly_returns, std_log_yearly_returns)
@@ -840,23 +841,23 @@ class MultiAsset:
         sector_weights_series = pd.Series(
             sector_weights + [1], index=history.columns)
         self.symbol_metrics = pd.concat(
-            [cagr, cagr_fitted, over_under, cagr_error_rmse, sector_weights_series,
+            [cagr, cagr_fitted, over_under, trend_deviation_rmse, sector_weights_series,
              mean_log_daily_returns, std_log_daily_returns,
              mean_log_monthly_returns, std_log_monthly_returns,
              mean_log_yearly_returns, std_log_yearly_returns],
             axis=1,
-            keys=['cagr', 'cagr_fitted', 'over_under', 'cagr_error_rmse', 'sector_weights',
+            keys=['cagr', 'cagr_fitted', 'over_under', 'trend_deviation_rmse', 'sector_weights',
                   'mean_log_daily_returns', 'std_log_daily_returns',
                   'mean_log_monthly_returns', 'std_log_monthly_returns',
                   'mean_log_yearly_returns', 'std_log_yearly_returns'])
 
         # Create timeseries data DataFrame
         self.timeseries_data = pd.concat(
-            objs=[history, fitted_history, trend_deviation, cagr_z_score,
+            objs=[history, fitted_history, trend_deviation, trend_deviation_z_score,
                   daily_log_returns, cumulative_log_returns,
                   monthly_log_returns, yearly_log_returns],
             axis=1,
-            keys=['history', 'fitted_history', 'trend_deviation', 'cagr_z_score',
+            keys=['history', 'fitted_history', 'trend_deviation', 'trend_deviation_z_score',
                   'daily_log_returns', 'cumulative_log_returns',
                   'monthly_log_returns', 'yearly_log_returns'])
 
@@ -906,7 +907,7 @@ class MultiAsset:
         fitted_data = self.timeseries_data[(
             'fitted_history', selected_asset)].dropna()
         z_score_data = self.timeseries_data[(
-            'cagr_z_score', selected_asset)].dropna()
+            'trend_deviation_z_score', selected_asset)].dropna()
 
         # Create subplot with secondary y-axis
         fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -941,7 +942,7 @@ class MultiAsset:
                 x=z_score_data.index,
                 y=z_score_data.values,
                 mode='lines',
-                name='CAGR Z-Score',
+                name='Trend Deviation Z-Score',
                 line=dict(color='#d62728', width=1.5),
                 opacity=0.7
             ),
@@ -969,7 +970,7 @@ class MultiAsset:
 
     def _print_debug_info(self, history, fitted_history, trend_deviation, daily_log_returns,
                           cumulative_log_returns, monthly_log_returns, yearly_log_returns,
-                          cagr, cagr_fitted, over_under, cagr_error_rmse,
+                          cagr, cagr_fitted, over_under, trend_deviation_rmse,
                           mean_log_daily_returns, std_log_daily_returns,
                           mean_log_monthly_returns, std_log_monthly_returns,
                           mean_log_yearly_returns, std_log_yearly_returns):
@@ -984,7 +985,7 @@ class MultiAsset:
         print(f"CAGR: {cagr.head()}")
         print(f"CAGR fitted: {cagr_fitted.head()}")
         print(f"Over/Under: {over_under.head()}")
-        print(f"CAGR error RMSE: {cagr_error_rmse.head()}")
+        print(f"CAGR error RMSE: {trend_deviation_rmse.head()}")
         print(f"Mean log daily returns: {mean_log_daily_returns.head()}")
         print(f"Std log daily returns: {std_log_daily_returns.head()}")
         print(f"Mean log monthly returns: {mean_log_monthly_returns.head()}")
