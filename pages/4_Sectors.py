@@ -66,8 +66,10 @@ else:
 # print(f"\nSector weights: {sector_weights}")
 
 
-multi_asset = MultiAsset(sector_symbols, period='10y',
-                         sector_weights=sector_weights)
+multi_asset = MultiAsset(
+    sector_symbols,
+    period='10y',
+    weights=sector_weights)
 symbol_metrics, timeseries_data = multi_asset.get_data()
 
 # # UI
@@ -113,7 +115,7 @@ for symbol in available_assets:
 
     if symbol in symbol_metrics.index:
         metrics = symbol_metrics.loc[symbol]
-        weight = metrics.get('sector_weights', 0)
+        weight = metrics.get('weights', 0)
         cagr = metrics.get('cagr', 0)
         total_weight += weight
 
@@ -184,7 +186,7 @@ if selected_asset in symbol_metrics.index:
     with col3:
         st.metric("Over/Under", f"{asset_metrics['over_under']:.1%}")
     with col4:
-        st.metric("Sector Weight", f"{asset_metrics['sector_weights']:.1%}")
+        st.metric("Sector Weight", f"{asset_metrics['weights']:.1%}")
 else:
     st.warning(f"Metrics not available for {selected_asset}")
 

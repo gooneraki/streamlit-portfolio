@@ -788,7 +788,7 @@ class MultiAsset:
             symbols: list[str],
             period: str = 'max',
             debug: bool = False,
-            sector_weights: Union[list[float], None] = None):
+            weights: Union[list[float], None] = None):
         """ Initialize MultiAsset with symbols and calculate metrics """
         self.symbols = symbols
         self.period = period
@@ -804,17 +804,20 @@ class MultiAsset:
             raise ValueError("History is not a DataFrame")
 
         # Set default weights if not provided
-        if sector_weights is None:
-            sector_weights = [1/len(history.columns)] * len(history.columns)
+        if weights is None:
+            weights = [1/len(history.columns)] * len(history.columns)
 
-        if len(sector_weights) != len(history.columns):
+        if len(weights) != len(history.columns):
             raise ValueError(
                 "Error: Sector weights length does not match symbols length")
 
-        self.sector_weights = sector_weights
+        # Make sure the weights sum to 1
+        weights_sum = sum(weights)
+        self.weights = [
+            w / weights_sum for w in weights] if weights_sum > 0 else weights
 
         # Create weighted total
-        history['TOTAL'] = history.mul(sector_weights, axis=1).sum(axis=1)
+        history['TOTAL'] = history.mul(self.weights, axis=1).sum(axis=1)
 
         # Calculate fitted data and metrics
         fitted_history, trend_deviation, \
@@ -838,15 +841,15 @@ class MultiAsset:
                                    mean_log_yearly_returns, std_log_yearly_returns)
 
         # Create symbol metrics DataFrame
-        sector_weights_series = pd.Series(
-            sector_weights + [1], index=history.columns)
+        weights_series = pd.Series(
+            self.weights + [1], index=history.columns)
         self.symbol_metrics = pd.concat(
-            [cagr, cagr_fitted, over_under, trend_deviation_rmse, sector_weights_series,
+            [cagr, cagr_fitted, over_under, trend_deviation_rmse, weights_series,
              mean_log_daily_returns, std_log_daily_returns,
              mean_log_monthly_returns, std_log_monthly_returns,
              mean_log_yearly_returns, std_log_yearly_returns],
             axis=1,
-            keys=['cagr', 'cagr_fitted', 'over_under', 'trend_deviation_rmse', 'sector_weights',
+            keys=['cagr', 'cagr_fitted', 'over_under', 'trend_deviation_rmse', 'weights',
                   'mean_log_daily_returns', 'std_log_daily_returns',
                   'mean_log_monthly_returns', 'std_log_monthly_returns',
                   'mean_log_yearly_returns', 'std_log_yearly_returns'])
