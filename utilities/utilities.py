@@ -803,6 +803,34 @@ class MultiAsset:
         if not isinstance(history, pd.DataFrame):
             raise ValueError("History is not a DataFrame")
 
+        # Fetch info for each symbol
+        info_list = [yf_ticket_info(symbol) for symbol in history.columns]
+        error_list = [info for info in info_list if isinstance(info, str)]
+        if error_list:
+            raise ValueError(
+                f"Error: Failed to retrieve ticker info for some symbols: {error_list}")
+        clean_info_list = [
+            info for info in info_list if isinstance(info, dict)]
+
+        currencies = pd.Series(
+            data=[info.get("currency", "")for info in clean_info_list],
+            index=[info.get("symbol", "") for info in clean_info_list])
+
+        long_names = pd.Series(
+            data=[info.get("longName", "")for info in clean_info_list],
+            index=[info.get("symbol", "") for info in clean_info_list])
+
+        types = pd.Series(
+            data=[info.get("typeDisp", "") for info in clean_info_list],
+            index=[info.get("symbol", "") for info in clean_info_list])
+
+        long_business_summaries = pd.Series(
+            data=[info.get("longBusinessSummary", "")
+                  for info in clean_info_list],
+            index=[info.get("symbol", "") for info in clean_info_list])
+
+        print(currencies)
+
         # Set default weights if not provided
         if weights is None:
             weights = [1/len(history.columns)] * len(history.columns)
@@ -842,7 +870,8 @@ class MultiAsset:
 
         # Create symbol metrics DataFrame
         weights_series = pd.Series(
-            self.weights + [1], index=history.columns)
+            self.weights + [1], index=history.columns)  # add 1 for TOTAL
+
         self.symbol_metrics = pd.concat(
             [cagr, cagr_fitted, over_under, trend_deviation_rmse, weights_series,
              mean_log_daily_returns, std_log_daily_returns,
