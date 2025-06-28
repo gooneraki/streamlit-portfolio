@@ -265,9 +265,9 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column='b
     base_over_under = latest_base_value / \
         latest_fitted_value - 1
 
-    if 'value' in periodic_asset_history_with_fit.columns:
-        latest_value = periodic_asset_history_with_fit['value'].iloc[-1]
-        oldest_value = periodic_asset_history_with_fit['value'].iloc[0]
+    if 'base_value' in periodic_asset_history_with_fit.columns:
+        latest_value = periodic_asset_history_with_fit['base_value'].iloc[-1]
+        oldest_value = periodic_asset_history_with_fit['base_value'].iloc[0]
         cagr_value = (latest_value / oldest_value) ** (1 / (days / 365.25)) - 1
     else:
         cagr_value = None
