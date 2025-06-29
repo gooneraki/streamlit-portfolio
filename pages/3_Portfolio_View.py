@@ -9,14 +9,17 @@ from utilities.utilities import generate_asset_base_value, append_fitted_data, g
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart
 from utilities.app_yfinance import yf_ticket_info
+from classes.asset_positions import Portfolio
 
 
 print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
 
-st.set_page_config(page_title="Portfolio View", layout="centered")
+st.set_page_config(page_title="Portfolio View", layout="wide")
 
-username = st.text_input(label="Enter username",
-                         key="username_input", type="password")
+col1, col2 = st.columns([1, 2])
+with col1:
+    username = st.text_input(label="Enter username",
+                             key="username_input", type="password")
 
 
 assets_positions = json.loads(st.secrets["ASSETS_POSITIONS_STR"]) if username == st.secrets["DB_USERNAME"] else [
@@ -38,14 +41,16 @@ assets_positions = json.loads(st.secrets["ASSETS_POSITIONS_STR"]) if username ==
     }
 ]
 
+portfolio = Portfolio(assets_positions, "EUR")
 
 st.title("Portfolio Information")
 
 st.markdown("#### Portfolio Composition")
 
-assets_positions_df = pd.DataFrame(assets_positions)
+col1, col2 = st.columns([1, 2])
+with col1:
 
-st.dataframe(assets_positions_df, hide_index=True)
+    st.dataframe(pd.DataFrame(portfolio.get_positions()), hide_index=True)
 
 col1, col2 = st.columns([1, 2])
 with col1:

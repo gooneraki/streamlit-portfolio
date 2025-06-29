@@ -130,7 +130,8 @@ def yf_ticket_info(symbol: str):
         ticker = yf.Ticker(symbol)
         return ticker.info
     except Exception as err:
-        return f"Error retrieving ticker details for '{symbol}': {err}"
+        raise ValueError(
+            f"Error retrieving ticker details for '{symbol}': {err}")
 
 
 @st.cache_data
@@ -163,7 +164,8 @@ def get_fx_history(base_currency, target_currency):
     if not isinstance(crypto_history, str):
         return crypto_history
 
-    return f"Error retrieving historical data for either '{fx_symbol}' or '{crypto_symbol}'"
+    raise ValueError(
+        f"Error retrieving historical data for either '{fx_symbol}' or '{crypto_symbol}'")
 
 # ^^^^^^^^^ #
 # yf.Ticker #
@@ -229,18 +231,18 @@ class TickersData(TypedDict):
 
 
 @st.cache_data
-def tickers_yf(symbols: list[str], period='max') -> Union[str, TickersData]:
+def tickers_yf(symbols: list[str], period='max') -> TickersData:
     """ Fetch the tickers data """
     try:
         tickers = yf.Tickers(symbols)
         history_data = tickers.history(period=period, auto_adjust=True)
         if history_data is None:
-            return "Error: No history data returned"
+            raise ValueError("Error: No history data returned")
 
         close_prices = history_data["Close"]
 
         if not isinstance(close_prices, pd.DataFrame):
-            return "Error: Close prices is not a DataFrame"
+            raise ValueError("Error: Close prices is not a DataFrame")
 
         # drop all columns with all NaNs for erroneous symbols
         close_prices = close_prices.dropna(axis=1, how='all')
@@ -249,10 +251,10 @@ def tickers_yf(symbols: list[str], period='max') -> Union[str, TickersData]:
         close_prices = close_prices.dropna(axis=0, how='any')
 
         if close_prices.empty:
-            return "Error: No close prices returned"
+            raise ValueError("Error: No close prices returned")
 
         if len(close_prices.columns) != len(symbols):
-            print(
+            raise ValueError(
                 f"\nError: Not all symbols have data: {[el for el in symbols if el not in close_prices.columns]}\n")
 
         return {
@@ -260,7 +262,8 @@ def tickers_yf(symbols: list[str], period='max') -> Union[str, TickersData]:
         }
     except Exception as err:
         error_message = f"Error retrieving tickers details for '{symbols}': {err}"
-        return error_message
+        raise ValueError(error_message) from err
+
 # ^^^^^^^^^ #
 # yf.Tickers #
 # ######### #
