@@ -73,16 +73,31 @@ st.markdown("#### Portfolio Composition")
 
 st.dataframe(
     pd.DataFrame(portfolio.get_assets_metrics().drop(
-        columns=['cagr', 'cagr_fitted'])),
+        columns=['cagr', 'cagr_fitted', 'latest_weights'])),
     column_config={
+        "position": st.column_config.NumberColumn(label="Position", format="localized"),
         "cagr_pct": st.column_config.NumberColumn(
-            format="%.2f%%",
+            label="CAGR",
+            format="%.1f%%",
             help="Compound Annual Growth Rate",
         ),
         "cagr_fitted_pct": st.column_config.NumberColumn(
-            format="%.2f%%",
+            label="CAGR Fitted",
+            format="%.1f%%",
             help="Compound Annual Growth Rate Fitted",
-        )
+        ),
+        "latest_value": st.column_config.NumberColumn(
+            label="Latest Value",
+            format="localized"
+        ),
+        "latest_fitted_value": st.column_config.NumberColumn(
+            label="Latest Fitted Value",
+            format="localized"
+        ),
+        "latest_weights_pct": st.column_config.NumberColumn(
+            label="Latest Weights",
+            format="%.1f%%"
+        ),
     })
 
 
