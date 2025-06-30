@@ -38,10 +38,13 @@ class Portfolio:
 
         translated_fitted_values = self._get_fitted_values(translated_values)
 
-        translated_total = translated_values.sum(axis=1)
+        translated_values['TOTAL'] = translated_values.sum(axis=1)
 
-        translated_fitted_total = self._get_fitted_total_values(
-            translated_total)
+        translated_fitted_values['TOTAL'] = self._get_fitted_total_values(
+            translated_values['TOTAL'])
+
+        print(f"translated_values: {translated_values}")
+        print(f"translated_fitted_values: {translated_fitted_values}")
 
     def get_positions(self) -> list[AssetPosition]:
         """ Get the positions """
