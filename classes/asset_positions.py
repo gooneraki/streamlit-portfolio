@@ -28,6 +28,8 @@ class Portfolio:
 
         translated_values = self._get_translated_history()
 
+        weights = translated_values.div(translated_values.sum(axis=1), axis=0)
+
         translated_values['TOTAL'] = translated_values.sum(axis=1)
 
         translated_fitted_values = self._get_fitted_values(translated_values)
@@ -54,13 +56,12 @@ class Portfolio:
         cagr_fitted: pd.Series = (last_fitted_value /
                                   first_fitted_value) ** (1 / number_of_years) - 1
 
-        latest_over_under: pd.Series = last_value / last_fitted_value - 1
-
         self.asset_metrics = pd.concat(
-            objs=[cagr, cagr_fitted, last_value,
-                  last_fitted_value, latest_over_under],
+            objs=[cagr, cagr_fitted,
+                  last_value, last_fitted_value],
             axis=1,
-            keys=['cagr', 'cagr_fitted', 'last_value', 'last_fitted_value', 'latest_over_under'])
+            keys=['cagr', 'cagr_fitted',
+                  'last_value', 'last_fitted_value'])
 
         print(self.asset_metrics)
 
