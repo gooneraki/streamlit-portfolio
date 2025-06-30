@@ -48,12 +48,42 @@ portfolio = Portfolio(assets_positions, base_currency)
 
 st.title("Portfolio Information")
 
+first_date, last_date, number_of_points, number_of_days, number_of_years, points_per_year, points_per_month = portfolio.get_period_info()
+
+# Display sampling period information
+st.markdown("#### 📊 Data Sampling Period")
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Start Date", first_date.strftime('%Y-%m-%d'))
+with col2:
+    st.metric("End Date", last_date.strftime('%Y-%m-%d'))
+with col3:
+    st.metric("Sample Period", f"{number_of_years:.1f} years")
+with col4:
+    st.metric("Data Points", f"{number_of_points:,}")
+
+st.info(
+    f"📈 **Analysis Coverage:** {number_of_days:,} days ({number_of_years:.1f} years) with {number_of_points:,} data points (avg {points_per_year:.0f} points/year)")
+
+st.markdown("---")
+
 st.markdown("#### Portfolio Composition")
 
-col1, col2 = st.columns([1, 2])
-with col1:
 
-    st.dataframe(pd.DataFrame(portfolio.get_positions()), hide_index=True)
+st.dataframe(
+    pd.DataFrame(portfolio.get_assets_metrics().drop(
+        columns=['cagr', 'cagr_fitted'])),
+    column_config={
+        "cagr_pct": st.column_config.NumberColumn(
+            format="%.2f%%",
+            help="Compound Annual Growth Rate",
+        ),
+        "cagr_fitted_pct": st.column_config.NumberColumn(
+            format="%.2f%%",
+            help="Compound Annual Growth Rate Fitted",
+        )
+    })
 
 
 st.markdown("#### Portfolio Performance")

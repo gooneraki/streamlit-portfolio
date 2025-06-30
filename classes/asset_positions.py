@@ -26,6 +26,20 @@ class Portfolio:
         self.positions = positions
         self.reference_currency = reference_currency.upper()
 
+        asset_symbols = [position.get_symbol() for position in self.positions]
+        self.symbols_info_list = [yf_ticket_info(
+            symbol) for symbol in asset_symbols]
+        unique_currencies = set([info['currency']
+                                 for info in self.symbols_info_list])
+
+        self.currency_symbols = [(target_currency + self.reference_currency + "=X")
+                                 for target_currency in unique_currencies if target_currency != self.reference_currency]
+
+        self.history_combo = tickers_yf(
+            asset_symbols+self.currency_symbols, period='max')
+
+        print(f"self.history_combo: \n{self.history_combo}")
+
         translated_values = self._get_translated_history()
 
         weights = translated_values.div(translated_values.sum(axis=1), axis=0)
@@ -38,15 +52,26 @@ class Portfolio:
         trend_deviation_z_score = (trend_deviation - trend_deviation.mean()) / \
             trend_deviation.std()
 
-        number_of_points, number_of_days, number_of_years, points_per_year, points_per_month = self.get_period_info(
-            translated_values)
+        first_date, last_date, number_of_points, number_of_days, number_of_years, points_per_year, points_per_month = self.get_period_info()
 
-        daily_log_returns = np.log(
+        daily_log_returns: pd.DataFrame = np.log(
             translated_values / translated_values.shift(1))
-        monthly_log_returns = np.log(
+        monthly_log_returns: pd.DataFrame = np.log(
             translated_values / translated_values.shift(round(points_per_month)))
-        yearly_log_returns = np.log(
+        yearly_log_returns: pd.DataFrame = np.log(
             translated_values / translated_values.shift(round(points_per_year)))
+
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        self.timeseries_data = pd.concat(
+            objs=[
+                translated_values, translated_fitted_values, trend_deviation, trend_deviation_z_score,
+                daily_log_returns, monthly_log_returns, yearly_log_returns],
+            axis=1,
+            keys=['translated_values', 'translated_fitted_values', 'trend_deviation', 'trend_deviation_z_score',
+                  'daily_log_returns', 'monthly_log_returns', 'yearly_log_returns'])
+
+        self.timeseries_data.columns.names = ['Metric', 'Ticker']
+        # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         first_value, last_value, first_fitted_value, last_fitted_value = self.get_first_last_values(
             translated_values, translated_fitted_values)
@@ -56,18 +81,33 @@ class Portfolio:
         cagr_fitted: pd.Series = (last_fitted_value /
                                   first_fitted_value) ** (1 / number_of_years) - 1
 
-        self.asset_metrics = pd.concat(
-            objs=[cagr, cagr_fitted,
-                  last_value, last_fitted_value],
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        self.assets_metrics = pd.concat(
+            objs=[
+                cagr, cagr_fitted,
+                cagr.mul(100), cagr_fitted.mul(100),
+                pd.Series(index=cagr.index, data=first_date), pd.Series(
+                    index=cagr.index, data=last_date),
+                last_value, last_fitted_value],
             axis=1,
-            keys=['cagr', 'cagr_fitted',
-                  'last_value', 'last_fitted_value'])
+            keys=[
+                'cagr', 'cagr_fitted',
+                'cagr_pct', 'cagr_fitted_pct',
+                'first_date', 'last_date',
+                'last_value', 'last_fitted_value'])
+        # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        print(self.asset_metrics)
+    def get_assets_metrics(self):
+        """ Get the assets metrics """
+        return self.assets_metrics
 
-    def get_positions(self) -> list[AssetPosition]:
-        """ Get the positions """
-        return self.positions
+    def get_asset_series(self, p_asset: str):
+        """ Get the series for the given asset """
+
+        if not p_asset in self.timeseries_data.columns.get_level_values('Ticker').unique():
+            raise ValueError(f"Asset {p_asset} not found in timeseries data")
+
+        return self.timeseries_data.xs(p_asset, level='Ticker', axis=1)
 
     def get_first_last_values(self, p_history: pd.DataFrame, p_fitted_history: pd.DataFrame):
         """ Get the first and last values """
@@ -91,23 +131,23 @@ class Portfolio:
 
         return first_value, last_value, first_fitted_value, last_fitted_value
 
-    def get_period_info(self, p_history: pd.DataFrame):
+    def get_period_info(self):
         """ Get the period info for the given history """
-        first_date = p_history.index[0]
-        last_date = p_history.index[-1]
+        first_date = self.history_combo['history'].index[0]
+        last_date = self.history_combo['history'].index[-1]
 
         if not isinstance(first_date, pd.Timestamp):
             raise ValueError("First date is not a Timestamp")
         if not isinstance(last_date, pd.Timestamp):
             raise ValueError("Last date is not a Timestamp")
 
-        number_of_points = p_history.shape[0]
+        number_of_points = self.history_combo['history'].shape[0]
         number_of_days = (last_date - first_date).days + 1
         number_of_years = number_of_days / 365.25
         points_per_year = number_of_points / number_of_years
         points_per_month = points_per_year / 12
 
-        return number_of_points, number_of_days, number_of_years, points_per_year, points_per_month
+        return first_date, last_date, number_of_points, number_of_days, number_of_years, points_per_year, points_per_month
 
     def _get_fitted_values(self, translated_values: pd.DataFrame):
         """ Get fitted values for each symbol individually """
@@ -139,30 +179,21 @@ class Portfolio:
         return fitted_total
 
     def _get_translated_history(self):
-        symbols = [position.get_symbol() for position in self.positions]
-        symbols_info_list = [yf_ticket_info(symbol) for symbol in symbols]
-        unique_currencies = set([info['currency']
-                                for info in symbols_info_list])
 
-        currency_symbols = [(target_currency + self.reference_currency + "=X")
-                            for target_currency in unique_currencies if target_currency != self.reference_currency]
-
-        history_combo = tickers_yf(symbols+currency_symbols, period='max')
-
-        assets_history = history_combo['history'].drop(
-            columns=currency_symbols)
-        currency_history = history_combo['history'][currency_symbols]
+        assets_history = self.history_combo['history'].drop(
+            columns=self.currency_symbols)
+        currency_history = self.history_combo['history'][self.currency_symbols]
 
         if not isinstance(currency_history, pd.DataFrame):
             raise ValueError("Currency history is not a DataFrame")
 
         translated_values = assets_history.copy()
 
-        # Create a dictionary to map symbols to positions for quick lookup
+        # Create a dictionary to map asset_symbols to positions for quick lookup
         positions_dict = {pos.get_symbol(): pos.get_position()
                           for pos in self.positions}
 
-        for symbol, info in zip(assets_history.columns, symbols_info_list):
+        for symbol, info in zip(assets_history.columns, self.symbols_info_list):
             position_value = positions_dict[symbol]
 
             translated_values[symbol] = translated_values[symbol] * \

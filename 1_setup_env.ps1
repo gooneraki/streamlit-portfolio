@@ -29,8 +29,8 @@ if (-Not (Get-Command "deactivate" -ErrorAction SilentlyContinue)) {
 }
 
 # Step 3: Upgrade pip
-# Write-Host "Upgrading pip..." -ForegroundColor Cyan
-# python -m pip install --upgrade pip
+Write-Host "Upgrading pip..." -ForegroundColor Cyan
+python -m pip install --upgrade pip
 
 # Step 4: Install dependencies
 Write-Host "Installing dependencies from custom_requirements.txt..." -ForegroundColor Cyan
