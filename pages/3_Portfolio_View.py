@@ -9,7 +9,7 @@ from utilities.utilities import generate_asset_base_value, append_fitted_data, g
 from utilities.constants import ASSETS_POSITIONS_DEFAULT, BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart
 from utilities.app_yfinance import yf_ticket_info
-from classes.asset_positions import Portfolio
+from classes.asset_positions import AssetPosition, Portfolio
 
 
 print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
@@ -22,8 +22,22 @@ with col1:
                              key="username_input", type="password")
 
 
-assets_positions = json.loads(
-    st.secrets["ASSETS_POSITIONS_STR"]) if username == st.secrets["DB_USERNAME"] else ASSETS_POSITIONS_DEFAULT
+def get_assets_positions():
+    """ Get the assets positions """
+    try:
+        if username == st.secrets["DB_USERNAME"]:
+            positions_dict = json.loads(st.secrets["ASSETS_POSITIONS_STR"])
+            result = [AssetPosition(**position) for position in positions_dict]
+            return result
+        else:
+            return ASSETS_POSITIONS_DEFAULT
+    except Exception as err:
+        print(f"Error: {err}")
+        return ASSETS_POSITIONS_DEFAULT
+
+
+assets_positions = get_assets_positions()
+
 
 col1, col2 = st.columns([1, 2])
 with col1:
@@ -48,8 +62,8 @@ aggregate_df = pd.DataFrame()
 
 for asset in assets_positions:
 
-    asset_info = yf_ticket_info(asset['symbol'])
-    full_asset_history = ticker_yf_history(asset['symbol'])
+    asset_info = yf_ticket_info(asset.get_symbol())
+    full_asset_history = ticker_yf_history(asset.get_symbol())
 
     # Fetch the fx rate history for the asset currency
     full_fx_rate_history = fetch_fx_rate_history(
@@ -60,10 +74,10 @@ for asset in assets_positions:
         full_asset_history, full_fx_rate_history)
 
     # Add the base value to the aggregate dataframe
-    full_asset_base_history['base_value'] *= asset['position']
+    full_asset_base_history['base_value'] *= asset.get_position()
 
     aggregate_df = pd.concat([aggregate_df, full_asset_base_history[['base_value']].rename(
-        columns={'base_value': asset['symbol']})], axis=1)
+        columns={'base_value': asset.get_symbol()})], axis=1)
 
 # Drop any rows with NaN values
 aggregate_df.dropna(inplace=True)
