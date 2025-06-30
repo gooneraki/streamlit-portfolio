@@ -4,11 +4,9 @@ import datetime
 import json
 import pandas as pd
 import streamlit as st
-from utilities.utilities import generate_asset_base_value, append_fitted_data, get_trend_info, get_history_options, \
-    fetch_fx_rate_history, ticker_yf_history
+
 from utilities.constants import ASSETS_POSITIONS_DEFAULT, BASE_CURRENCY_OPTIONS
-from utilities.go_charts import display_trend_go_chart
-from utilities.app_yfinance import yf_ticket_info
+from utilities.go_charts import display_trend_go_chart_2
 from classes.asset_positions import AssetPosition, Portfolio
 
 
@@ -48,7 +46,9 @@ portfolio = Portfolio(assets_positions, base_currency)
 
 st.title("Portfolio Information")
 
-first_date, last_date, number_of_points, number_of_days, number_of_years, points_per_year, points_per_month = portfolio.get_period_info()
+first_date, last_date, \
+    number_of_points, number_of_days, number_of_years, \
+    points_per_year, points_per_month = portfolio.get_period_info()
 
 # Display sampling period information
 st.markdown("#### 📊 Data Sampling Period")
@@ -64,7 +64,9 @@ with col4:
     st.metric("Data Points", f"{number_of_points:,}")
 
 st.info(
-    f"📈 **Analysis Coverage:** {number_of_days:,} days ({number_of_years:.1f} years) with {number_of_points:,} data points (avg {points_per_year:.0f} points/year)")
+    f"📈 **Analysis Coverage:** {number_of_days:,} days ({number_of_years:.1f} years) "
+    f"with {number_of_points:,} data points (avg {points_per_year:.0f} points/year)"
+)
 
 st.markdown("---")
 
@@ -103,63 +105,71 @@ st.dataframe(
 
 st.markdown("#### Portfolio Performance")
 
-aggregate_df = pd.DataFrame()
+# Get available assets from timeseries data
+available_assets = portfolio.timeseries_data.columns.get_level_values(
+    'Ticker').unique().tolist()
 
-for asset in assets_positions:
-
-    asset_info = yf_ticket_info(asset.get_symbol())
-    full_asset_history = ticker_yf_history(asset.get_symbol())
-
-    # Fetch the fx rate history for the asset currency
-    full_fx_rate_history = fetch_fx_rate_history(
-        asset_info['currency'], base_currency)
-
-    # Add the fx rate history to the asset history
-    full_asset_base_history = generate_asset_base_value(
-        full_asset_history, full_fx_rate_history)
-
-    # Add the base value to the aggregate dataframe
-    full_asset_base_history['base_value'] *= asset.get_position()
-
-    aggregate_df = pd.concat([aggregate_df, full_asset_base_history[['base_value']].rename(
-        columns={'base_value': asset.get_symbol()})], axis=1)
-
-# Drop any rows with NaN values
-aggregate_df.dropna(inplace=True)
-
-# TODO : Backwards fill
-
-# Calculate the portfolio value
-aggregate_df['base_value'] = aggregate_df.sum(axis=1)
-
-
-history_options = get_history_options(aggregate_df['base_value'].shape[0])
-
-history_options_keys = list(history_options.keys())
-
-col3, col4 = st.columns([1, 2])
-with col3:
-    selected_period_key = st.selectbox(
-        "Select period",
-        history_options_keys,
-        index=history_options_keys.index("10 Years") if "10 Years" in history_options_keys else 0)
-    selected_period_value = history_options[selected_period_key]
-
-periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
-    aggregate_df, selected_period_value)
-
-col1, col2 = st.columns([1, 2])
+# Create columns for asset selection and time period filter
+col1, col2 = st.columns([1, 1])
 
 with col1:
-    trend_info_df = get_trend_info(periodic_asset_history_with_fit)
-    st.dataframe(trend_info_df, hide_index=True)
-    st.write("*CAGR: Compound Annual Growth Rate*")
+    # Asset selection
+    selected_asset = st.selectbox(
+        "Select Asset",
+        available_assets,
+        index=available_assets.index(
+            "TOTAL") if "TOTAL" in available_assets else 0
+    )
 
-# Create the line chart
 with col2:
-    value_fig = display_trend_go_chart(periodic_asset_history_with_fit)
+    # Time period filter - check available data range
+    total_years = number_of_years
+    year_options = []
 
-    if value_fig is None:
-        st.warning("No valid data to plot.")
-    else:
-        st.plotly_chart(value_fig, use_container_width=True)
+    if total_years >= 1:
+        year_options.append("1 Year")
+    if total_years >= 3:
+        year_options.append("3 Years")
+    if total_years >= 5:
+        year_options.append("5 Years")
+    if total_years >= 10:
+        year_options.append("10 Years")
+    if total_years > 10:
+        year_options.append("10+ Years (All)")
+
+    # Default to the longest available period
+    default_period = year_options[-1] if year_options else "1 Year"
+
+    selected_period = st.selectbox(
+        "Display Period",
+        year_options
+    )
+
+# Get data for selected asset
+asset_data = portfolio.timeseries_data.xs(
+    selected_asset, level='Ticker', axis=1)
+
+# Filter data based on selected period
+if selected_period == "1 Year":
+    asset_data = asset_data.tail(round(points_per_year))
+elif selected_period == "3 Years":
+    asset_data = asset_data.tail(round(points_per_year * 3))
+elif selected_period == "5 Years":
+    asset_data = asset_data.tail(round(points_per_year * 5))
+elif selected_period == "10 Years":
+    asset_data = asset_data.tail(round(points_per_year * 10))
+# For "10+ Years (All)", use all data (no filtering)
+
+# Create the chart
+asset_fig = display_trend_go_chart_2(
+    df=asset_data,
+    value_column='translated_values',
+    fitted_column='translated_fitted_values',
+    secondary_column='trend_deviation_z_score',
+    title_name=f"{selected_asset} - Performance Analysis"
+)
+
+if asset_fig is None:
+    st.warning("No valid data to plot.")
+else:
+    st.plotly_chart(asset_fig, use_container_width=True)

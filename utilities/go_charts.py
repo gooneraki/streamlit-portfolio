@@ -79,7 +79,8 @@ def display_trend_go_chart_2(df: pd.DataFrame, value_column: str, fitted_column:
             y=df[secondary_column],
             mode='lines',
             name=secondary_column,
-            line=dict(color='#2ECC71'),
+            line=dict(color='#2ECC71', width=1),
+            opacity=0.6,
             yaxis='y2'
         ))
 

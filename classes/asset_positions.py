@@ -38,11 +38,13 @@ class Portfolio:
             symbol) for symbol in asset_symbols]
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        unique_currencies = set([info['currency']
-                                 for info in self.symbols_info_list])
+        currencies_series = pd.Series(
+            data=[info['currency'] for info in self.symbols_info_list],
+            index=[position.get_symbol() for position in asset_positions],
+        )
 
         currency_symbols = [(target_currency + reference_currency + "=X")
-                            for target_currency in unique_currencies if target_currency != reference_currency]
+                            for target_currency in currencies_series.unique() if target_currency != reference_currency]
 
         # >>>
         self.tickers_data = tickers_yf(
@@ -53,7 +55,6 @@ class Portfolio:
             asset_positions, reference_currency, currency_symbols)
 
         weights = translated_values.div(translated_values.sum(axis=1), axis=0)
-        latest_weights: pd.Series = weights.iloc[-1]
 
         translated_values['TOTAL'] = translated_values.sum(axis=1)
 
@@ -65,9 +66,14 @@ class Portfolio:
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
             objs=[
-                translated_values, translated_fitted_values, trend_deviation, trend_deviation_z_score],
+                weights,
+                translated_values, translated_fitted_values,
+                trend_deviation, trend_deviation_z_score],
             axis=1,
-            keys=['translated_values', 'translated_fitted_values', 'trend_deviation', 'trend_deviation_z_score'])
+            keys=[
+                'weights',
+                'translated_values', 'translated_fitted_values',
+                'trend_deviation', 'trend_deviation_z_score'])
 
         self.timeseries_data.columns.names = ['Metric', 'Ticker']
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -86,15 +92,19 @@ class Portfolio:
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.assets_metrics = pd.concat(
-            objs=[positions_series, latest_weights, latest_weights.mul(100),
-                  cagr, cagr_fitted,
-                  cagr.mul(100), cagr_fitted.mul(100),
-                  last_value, last_fitted_value,
-                  latest_timeseries_df['trend_deviation'],
-                  latest_timeseries_df['trend_deviation_z_score']],
+            objs=[
+                currencies_series, positions_series,
+                latest_timeseries_df['weights'], latest_timeseries_df['weights'].mul(
+                    100),
+                cagr, cagr_fitted,
+                cagr.mul(100), cagr_fitted.mul(100),
+                last_value, last_fitted_value,
+                latest_timeseries_df['trend_deviation'],
+                latest_timeseries_df['trend_deviation_z_score']],
             axis=1,
             keys=[
-                'position', 'latest_weights', 'latest_weights_pct',
+                'currency', 'position',
+                'latest_weights', 'latest_weights_pct',
                 'cagr', 'cagr_fitted',
                 'cagr_pct', 'cagr_fitted_pct',
                 'latest_value', 'latest_fitted_value',
