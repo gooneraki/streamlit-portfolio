@@ -36,15 +36,19 @@ class Portfolio:
             currency_history,
             symbols_info_list)
 
-        translated_fitted_values = self._get_fitted_values(translated_values)
-
         translated_values['TOTAL'] = translated_values.sum(axis=1)
 
-        translated_fitted_values['TOTAL'] = self._get_fitted_total_values(
-            translated_values['TOTAL'])
+        translated_fitted_values = self._get_fitted_values(translated_values)
 
         print(f"translated_values: {translated_values}")
         print(f"translated_fitted_values: {translated_fitted_values}")
+
+        trend_deviation = (translated_values / translated_fitted_values) - 1
+        trend_deviation_z_score = (trend_deviation - trend_deviation.mean()) / \
+            trend_deviation.std()
+
+        print(f"trend_deviation: {trend_deviation}")
+        print(f"trend_deviation_z_score: {trend_deviation_z_score}")
 
     def get_positions(self) -> list[AssetPosition]:
         """ Get the positions """
