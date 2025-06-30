@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 from utilities.utilities import generate_asset_base_value, append_fitted_data, get_trend_info, get_history_options, \
     fetch_fx_rate_history, ticker_yf_history
-from utilities.constants import BASE_CURRENCY_OPTIONS
+from utilities.constants import ASSETS_POSITIONS_DEFAULT, BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart
 from utilities.app_yfinance import yf_ticket_info
 from classes.asset_positions import Portfolio
@@ -22,26 +22,15 @@ with col1:
                              key="username_input", type="password")
 
 
-assets_positions = json.loads(st.secrets["ASSETS_POSITIONS_STR"]) if username == st.secrets["DB_USERNAME"] else [
-    {
-        "symbol": "CSPX.L",
-        "position": 1
-    },
-    {
-        "symbol": "IUSE.L",
-        "position": 1
-    },
-    {
-        "symbol": "IWDE.L",
-        "position": 1
-    },
-    {
-        "symbol": "IWDA.L",
-        "position": 1
-    }
-]
+assets_positions = json.loads(
+    st.secrets["ASSETS_POSITIONS_STR"]) if username == st.secrets["DB_USERNAME"] else ASSETS_POSITIONS_DEFAULT
 
-portfolio = Portfolio(assets_positions, "EUR")
+col1, col2 = st.columns([1, 2])
+with col1:
+    base_currency = st.selectbox(
+        "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
+
+portfolio = Portfolio(assets_positions, base_currency)
 
 st.title("Portfolio Information")
 
@@ -52,10 +41,6 @@ with col1:
 
     st.dataframe(pd.DataFrame(portfolio.get_positions()), hide_index=True)
 
-col1, col2 = st.columns([1, 2])
-with col1:
-    base_currency = st.selectbox(
-        "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
 
 st.markdown("#### Portfolio Performance")
 

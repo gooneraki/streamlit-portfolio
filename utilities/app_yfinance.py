@@ -131,7 +131,7 @@ def yf_ticket_info(symbol: str):
         return ticker.info
     except Exception as err:
         raise ValueError(
-            f"Error retrieving ticker details for '{symbol}': {err}")
+            f"Error retrieving ticker details for '{symbol}': {err}") from err
 
 
 @st.cache_data
