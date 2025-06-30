@@ -29,15 +29,15 @@ if (-Not (Get-Command "deactivate" -ErrorAction SilentlyContinue)) {
 }
 
 # Step 3: Upgrade pip
-Write-Host "Upgrading pip..." -ForegroundColor Cyan
-python -m pip install --upgrade pip
+# Write-Host "Upgrading pip..." -ForegroundColor Cyan
+# python -m pip install --upgrade pip
 
 # Step 4: Install dependencies
-Write-Host "Installing dependencies from requirements.txt..." -ForegroundColor Cyan
+Write-Host "Installing dependencies from custom_requirements.txt..." -ForegroundColor Cyan
 pip install -r custom_requirements.txt
 
 # Step 5: Freeze dependencies
-Write-Host "Freezing dependencies..." -ForegroundColor Cyan
+Write-Host "Freezing dependencies in requirements.txt..." -ForegroundColor Cyan
 pip freeze > requirements.txt
 
 # Step 6: Deactivate virtual environment
