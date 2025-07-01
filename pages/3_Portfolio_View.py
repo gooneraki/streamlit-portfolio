@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from utilities.constants import ASSETS_POSITIONS_DEFAULT, BASE_CURRENCY_OPTIONS
-from utilities.go_charts import display_trend_go_chart_2
+from utilities.go_charts import display_trend_go_chart_2, display_multi_asset_metric_trend
 from classes.asset_positions import AssetPosition, Portfolio
 
 
@@ -68,11 +68,33 @@ st.info(
     f"with {number_of_points:,} data points (avg {points_per_year:.0f} points/year)"
 )
 
+
+st.markdown("---")
+
+
+# --- Portfolio TOTAL summary metrics ---
+assets_metrics = portfolio.get_assets_metrics()
+total_metrics = assets_metrics.loc['TOTAL']
+
+st.markdown("#### 🏆 Portfolio Total Summary")
+sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
+with sum_col1:
+    st.metric("CAGR", f"{total_metrics['cagr_pct']:.2f}%")
+with sum_col2:
+    st.metric("CAGR Fitted", f"{total_metrics['cagr_fitted_pct']:.2f}%")
+with sum_col3:
+    st.metric("Latest Value", f"{total_metrics['latest_value']:,.0f}")
+with sum_col4:
+    st.metric("Trend Deviation %",
+              f"{total_metrics['trend_deviation']*100:.2f}%")
+with sum_col5:
+    st.metric("Trend Dev. Z-Score",
+              f"{total_metrics['trend_deviation_z_score']:.2f}")
+st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
+
 st.markdown("---")
 
 st.markdown("#### Portfolio Composition")
-
-
 st.dataframe(
     pd.DataFrame(portfolio.get_assets_metrics().drop(
         columns=['cagr', 'cagr_fitted', 'latest_weights'])),
@@ -100,8 +122,15 @@ st.dataframe(
             label="Latest Weights",
             format="%.1f%%"
         ),
+        "trend_deviation": st.column_config.NumberColumn(
+            label="Trend Deviation",
+            format="percent"
+        )
     })
 
+st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
+
+st.markdown("---")
 
 st.markdown("#### Portfolio Performance")
 
@@ -173,3 +202,24 @@ if asset_fig is None:
     st.warning("No valid data to plot.")
 else:
     st.plotly_chart(asset_fig, use_container_width=True)
+
+# --- Reverse chart: select metric, plot all assets ---
+st.markdown('---')
+st.markdown('#### Compare All Assets by Metric')
+
+# Get available metrics (excluding weights, as those are proportions)
+all_metrics = [m for m in portfolio.timeseries_data.columns.get_level_values('Metric').unique()
+               if m not in ['weights']]
+
+selected_metric = st.selectbox('Select Metric/Column', all_metrics, index=all_metrics.index(
+    'translated_values') if 'translated_values' in all_metrics else 0)
+
+# Prepare data: exclude TOTAL for asset comparison
+asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values(
+    'Ticker').unique() if a != 'TOTAL']
+
+# Use the new chart function
+title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend"
+fig = display_multi_asset_metric_trend(
+    portfolio.timeseries_data, asset_names, selected_metric, title=title)
+st.plotly_chart(fig, use_container_width=True)

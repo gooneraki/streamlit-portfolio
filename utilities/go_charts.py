@@ -377,3 +377,36 @@ def display_efficient_frontier_chart(
     )
 
     return fig
+
+
+def display_multi_asset_metric_trend(df: pd.DataFrame, asset_names: list, selected_metric: str, title: str = None):
+    """
+    Display a trendline chart for all assets for a selected metric.
+
+    Args:
+        df (pd.DataFrame): Multi-index DataFrame with metrics and symbols
+        asset_names (list): List of asset names (columns) to plot
+        selected_metric (str): The metric/column to plot for all assets
+        title (str): Optional chart title
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    metric_df = df[selected_metric][asset_names]
+    fig = go.Figure()
+    for asset in asset_names:
+        fig.add_trace(go.Scatter(
+            x=metric_df.index,
+            y=metric_df[asset],
+            mode='lines',
+            name=asset
+        ))
+    fig.update_layout(
+        title=title or f"All Assets - {selected_metric.replace('_', ' ').title()} Trend",
+        xaxis_title='Date',
+        yaxis_title=selected_metric.replace('_', ' ').title(),
+        template='plotly_white',
+        height=450,
+        margin=dict(t=0, b=0, l=0, r=0),
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    return fig
