@@ -114,7 +114,7 @@ class Portfolio:
 
         # Calculate both optimal weights and efficient frontier data
         self.optimal_weights, self.efficient_frontier_data = self._calculate_portfolio_optimization()
-        print(f"\n🎯 FINAL OPTIMAL WEIGHTS RESULT:\n{self.optimal_weights}\n")
+        # print(f"\n🎯 FINAL OPTIMAL WEIGHTS RESULT:\n{self.optimal_weights}\n")
         # print(
         #     f"\n📈 EFFICIENT FRONTIER DATA:\n{self.efficient_frontier_data}\n")
 
@@ -254,22 +254,39 @@ class Portfolio:
 
     def _calculate_portfolio_optimization(self, num_points=20):
         """ Calculate both optimal weights and efficient frontier data """
+        # Maximum Sharpe Ratio Portfolio
+        def neg_sharpe_ratio(weights, expected_log_returns, cov_log_matrix, risk_free_rate=0):
+
+            port_log_return = np.sum(weights * expected_log_returns)
+            port_log_vol = np.sqrt(
+                np.dot(weights.T, np.dot(cov_log_matrix, weights)))
+            sharpe_ratio = (port_log_return - risk_free_rate) / \
+                port_log_vol if port_log_vol > 0 else 0
+            return -sharpe_ratio
+
+        # Define portfolio variance function for efficient frontier
+        def portfolio_variance(weights, cov_matrix):
+            return np.dot(weights.T, np.dot(cov_matrix, weights))
 
         # Get asset data (excluding TOTAL column and currency conversion symbols)
         asset_data = self.timeseries_data.xs(
             'translated_values', level='Metric', axis=1)
         asset_data = asset_data.drop(columns=['TOTAL'], errors='ignore')
+        if not isinstance(asset_data, pd.DataFrame):
+            raise ValueError("Asset data is not a DataFrame")
 
-        # Calculate returns
-        returns = asset_data.pct_change().dropna()
-        expected_returns = returns.mean()
-        if not isinstance(expected_returns, pd.Series):
-            raise ValueError("Expected returns is not a Series")
+        # Calculate returns (use log returns for annualization)
+        log_returns = np.log(asset_data / asset_data.shift(1)).dropna()
+        if not isinstance(log_returns, pd.DataFrame):
+            raise ValueError("Log returns is not a DataFrame")
+        mean_log_returns = log_returns.mean()
+        cov_log_matrix = log_returns.cov()
 
-        cov_matrix = returns.cov()
-        n_assets = len(asset_data.columns)
+        # Use points_per_year for annualization
+        _, _, _, _, _, points_per_year, _ = self.get_period_info()
 
         # Common optimization setup
+        n_assets = len(asset_data.columns)
         bounds = tuple((0, 1) for _ in range(n_assets))
         initial_guess = np.array([1.0/n_assets] * n_assets)
 
@@ -279,46 +296,48 @@ class Portfolio:
 
         optimal_weights_dict = {}
 
-        # Maximum Sharpe Ratio Portfolio
-        def neg_sharpe_ratio(weights, expected_returns, cov_matrix, risk_free_rate=0.02):
-            portfolio_return = np.sum(weights * expected_returns)
-            portfolio_volatility = np.sqrt(
-                np.dot(weights.T, np.dot(cov_matrix, weights)))
-            sharpe_ratio = (portfolio_return -
-                            risk_free_rate) / portfolio_volatility
-            return -sharpe_ratio  # We minimize, so return negative
-
         # Constraints: weights sum to 1
         constraints = {'type': 'eq', 'fun': lambda x: np.sum(x) - 1}
 
         # Optimize for maximum Sharpe ratio
-
         result = minimize(neg_sharpe_ratio, initial_guess,
-                          args=(expected_returns, cov_matrix),
+                          args=(mean_log_returns, cov_log_matrix),
                           method='SLSQP', bounds=bounds, constraints=constraints)
 
         if result.success:
-
-            optimal_weights_dict['max_sharpe'] = pd.Series(
-                result.x, index=expected_returns.index)
-
+            optimal_weights = pd.Series(
+                result.x, index=mean_log_returns.index)
+            optimal_weights_dict['max_sharpe'] = optimal_weights
+            # Calculate annualized return and volatility for max_sharpe weights (for display)
+            port_log_return = np.sum(optimal_weights * mean_log_returns)
+            port_log_vol = np.sqrt(
+                np.dot(optimal_weights.T, np.dot(cov_log_matrix, optimal_weights)))
+            ann_log_return = port_log_return * points_per_year
+            ann_vol = port_log_vol * np.sqrt(points_per_year)
+            ann_arith_return = np.exp(ann_log_return) - 1
+            print(
+                f"\n🔹 Max Sharpe Portfolio Annualized Return: {ann_arith_return:.4f}")
+            print(
+                f"🔹 Max Sharpe Portfolio Annualized Volatility: {ann_vol:.4f}")
+            print("🔹 Max Sharpe Optimal Weights:")
+            for asset, weight in optimal_weights.items():
+                print(f"    {asset}: {weight:.4f}")
         else:
             print("❌ Max Sharpe optimization failed, using equal weights")
-            optimal_weights_dict['max_sharpe'] = pd.Series(
-                [1.0/n_assets] * n_assets, index=expected_returns.index)
+            optimal_weights = pd.Series(
+                [1.0/n_assets] * n_assets, index=mean_log_returns.index)
+            optimal_weights_dict['max_sharpe'] = optimal_weights
+            print("🔹 Equal Weights:")
+            for asset, weight in optimal_weights.items():
+                print(f"    {asset}: {weight:.4f}")
 
         # ================================
         # PART 2: EFFICIENT FRONTIER
         # ================================
 
-        # Define portfolio variance function for efficient frontier
-
-        def portfolio_variance(weights, cov_matrix):
-            return np.dot(weights.T, np.dot(cov_matrix, weights))
-
         # Create target returns range
-        min_ret = expected_returns.min()
-        max_ret = expected_returns.max()
+        min_ret = mean_log_returns.min()
+        max_ret = mean_log_returns.max()
         target_returns = np.linspace(min_ret, max_ret, num_points)
 
         frontier_data = []
@@ -329,24 +348,24 @@ class Portfolio:
                 {'type': 'eq', 'fun': lambda x: np.sum(
                     x) - 1},  # weights sum to 1
                 {'type': 'eq', 'fun': lambda x, ret=target_return: np.sum(
-                    x * expected_returns) - ret}  # target return
+                    x * mean_log_returns) - ret}  # target return
             ]
 
             # Optimize
             result = minimize(portfolio_variance, initial_guess,
-                              args=(cov_matrix,),
+                              args=(cov_log_matrix,),
                               method='SLSQP', bounds=bounds, constraints=constraints_ef)
 
             if result.success:
-                portfolio_return = np.sum(result.x * expected_returns)
+                portfolio_return = np.sum(result.x * mean_log_returns)
                 portfolio_volatility = np.sqrt(
-                    np.dot(result.x.T, np.dot(cov_matrix, result.x)))
+                    np.dot(result.x.T, np.dot(cov_log_matrix, result.x)))
 
                 frontier_data.append({
                     'return': portfolio_return,
                     'volatility': portfolio_volatility,
                     'sharpe_ratio': (portfolio_return - 0.02) / portfolio_volatility,
-                    'weights': pd.Series(result.x, index=expected_returns.index)
+                    'weights': pd.Series(result.x, index=mean_log_returns.index)
                 })
 
         if frontier_data:
