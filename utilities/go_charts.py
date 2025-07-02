@@ -1,9 +1,10 @@
 """This module contains utility functions for creating Plotly charts."""
 import pandas as pd
 import plotly.graph_objects as go
+from typing import Optional
 
 
-def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', fitted_column='fitted', title_name: str | None = None):
+def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', fitted_column='fitted', title_name: str = ''):
     """Display a clean trend chart using Plotly."""
     df = df.copy()
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
@@ -50,8 +51,8 @@ def display_trend_go_chart(df: pd.DataFrame, base_column='base_value', fitted_co
 
 
 def display_trend_go_chart_2(df: pd.DataFrame, value_column: str, fitted_column: str,
-                             secondary_column: str = None,
-                             title_name: str | None = None):
+                             secondary_column: str = '',
+                             title_name: str = ''):
     """Display a clean trend chart using Plotly."""
     df = df.copy()
 
@@ -173,7 +174,7 @@ def display_daily_annual_returns_chart(df: pd.DataFrame, annual_column='annual_b
     return fig
 
 
-def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[str] = None, title: str = None):
+def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: Optional[list[str]] = None, title: str = ''):
     """
     Display a line chart for a selected symbol showing multiple metrics.
 
@@ -184,7 +185,7 @@ def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[st
         title (str): Optional title for the chart
     """
     if metrics is None:
-        metrics = df.columns.get_level_values('Metric').unique()
+        metrics = list(df.columns.get_level_values('Metric').unique())
 
     fig = go.Figure()
 
@@ -225,7 +226,7 @@ def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[st
     return fig
 
 
-def display_scatter_chart(df: pd.DataFrame, x_column: str, y_column: str, title_name: str | None = None):
+def display_scatter_chart(df: pd.DataFrame, x_column: str, y_column: str, title_name: str = ''):
     """Display a clean scatter chart using Plotly."""
     df = df.copy()
     df = df.dropna(subset=[x_column, y_column])
@@ -282,7 +283,7 @@ def display_efficient_frontier_chart(
     same_risk_return: float = None,
     same_risk_volatility: float = None,
     same_risk_name: str = "Same Risk Portfolio",
-    title_name: str | None = None
+    title_name: str = ''
 ):
     """Display an efficient frontier chart with optional random portfolios, benchmark point, max Sharpe portfolio point, and same-risk portfolio point for comparison."""
     fig = go.Figure()
@@ -379,7 +380,7 @@ def display_efficient_frontier_chart(
     return fig
 
 
-def display_multi_asset_metric_trend(df: pd.DataFrame, asset_names: list, selected_metric: str, title: str = None):
+def display_multi_asset_metric_trend(df: pd.DataFrame, asset_names: list, selected_metric: str, title: str = '', max_lines: int = 5):
     """
     Display a trendline chart for all assets for a selected metric.
 
@@ -388,12 +389,35 @@ def display_multi_asset_metric_trend(df: pd.DataFrame, asset_names: list, select
         asset_names (list): List of asset names (columns) to plot
         selected_metric (str): The metric/column to plot for all assets
         title (str): Optional chart title
+        max_lines (int): Maximum number of lines to display (top assets by translated_values at last date)
     Returns:
         plotly.graph_objects.Figure
     """
-    metric_df = df[selected_metric][asset_names]
+    # Determine top assets by translated_values at the last date
+    if 'translated_values' in df.columns.get_level_values('Metric'):
+        translated_values_last = df['translated_values'].iloc[-1][asset_names]
+
+        if not isinstance(translated_values_last, pd.Series):
+            raise ValueError(
+                f"Translated values last is not a Series: {type(translated_values_last)}")
+
+        top_assets = translated_values_last.sort_values(
+            ascending=False).head(max_lines).index.tolist()
+
+        if not isinstance(top_assets, list):
+            raise ValueError(
+                f"Top assets is not a list: {type(top_assets)}")
+    else:
+        # Fallback: just use the first max_lines assets
+        top_assets = asset_names[:max_lines]
+
+    metric_df = df[selected_metric][top_assets]
+    if not isinstance(metric_df, pd.DataFrame):
+        raise ValueError(
+            f"Metric DataFrame is not a DataFrame: {type(metric_df)}")
+
     fig = go.Figure()
-    for asset in asset_names:
+    for asset in top_assets:
         fig.add_trace(go.Scatter(
             x=metric_df.index,
             y=metric_df[asset],

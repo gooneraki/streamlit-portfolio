@@ -350,12 +350,13 @@ selected_metric = st.selectbox('Select Metric/Column', all_metrics, index=all_me
 asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values(
     'Ticker').unique() if a != 'TOTAL']
 
-# # Use the new chart function
-# title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend"
-# fig = display_multi_asset_metric_trend(
-#     portfolio.timeseries_data, asset_names, selected_metric, title=title)
-# st.plotly_chart(fig, use_container_width=True)
+# Use the new chart function
+if selected_metric:
+    title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend"
+    fig = display_multi_asset_metric_trend(
+        portfolio.timeseries_data, asset_names, selected_metric, title=title)
+    st.plotly_chart(fig, use_container_width=True)
 
 
-for optimal in portfolio.get_optimal_weights().values():
-    print(optimal)
+# for optimal in portfolio.get_optimal_weights().values():
+#     print(optimal)
