@@ -20,51 +20,51 @@ with col1:
                              key="username_input", type="password")
 
 
-def display_portfolio_weights(weights, strategy_name):
-    """Helper function to display portfolio weights with metrics"""
-    # Create a DataFrame for better display
-    weights_df = pd.DataFrame({
-        'Asset': weights.index,
-        'Weight': weights.values,
-        'Weight %': (weights.values * 100)
-    }).sort_values('Weight %', ascending=False)
+# def display_portfolio_weights(weights, strategy_name):
+#     """Helper function to display portfolio weights with metrics"""
+#     # Create a DataFrame for better display
+#     weights_df = pd.DataFrame({
+#         'Asset': weights.index,
+#         'Weight': weights.values,
+#         'Weight %': (weights.values * 100)
+#     }).sort_values('Weight %', ascending=False)
 
-    # Display weights in columns
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.dataframe(
-            weights_df,
-            column_config={
-                "Asset": st.column_config.TextColumn("Asset"),
-                "Weight": st.column_config.NumberColumn(
-                    "Weight", format="%.4f"
-                ),
-                "Weight %": st.column_config.NumberColumn(
-                    "Weight %", format="%.2f%%"
-                )
-            },
-            hide_index=True
-        )
+#     # Display weights in columns
+#     col1, col2 = st.columns([2, 1])
+#     with col1:
+#         st.dataframe(
+#             weights_df,
+#             column_config={
+#                 "Asset": st.column_config.TextColumn("Asset"),
+#                 "Weight": st.column_config.NumberColumn(
+#                     "Weight", format="%.4f"
+#                 ),
+#                 "Weight %": st.column_config.NumberColumn(
+#                     "Weight %", format="%.2f%%"
+#                 )
+#             },
+#             hide_index=True
+#         )
 
-    with col2:
-        # Show summary statistics
-        st.metric("Number of Assets", len(weights))
-        st.metric("Max Weight", f"{weights.max():.2%}")
-        st.metric("Min Weight", f"{weights.min():.2%}")
-        st.metric("Weight Range", f"{weights.max() - weights.min():.2%}")
+#     with col2:
+#         # Show summary statistics
+#         st.metric("Number of Assets", len(weights))
+#         st.metric("Max Weight", f"{weights.max():.2%}")
+#         st.metric("Min Weight", f"{weights.min():.2%}")
+#         st.metric("Weight Range", f"{weights.max() - weights.min():.2%}")
 
-        # Show diversification metrics
-        herfindahl_index = (weights ** 2).sum()
-        effective_n = 1 / herfindahl_index
-        st.metric("Herfindahl Index", f"{herfindahl_index:.4f}")
-        st.metric("Effective N", f"{effective_n:.1f}")
+#         # Show diversification metrics
+#         herfindahl_index = (weights ** 2).sum()
+#         effective_n = 1 / herfindahl_index
+#         st.metric("Herfindahl Index", f"{herfindahl_index:.4f}")
+#         st.metric("Effective N", f"{effective_n:.1f}")
 
-        if effective_n < 3:
-            st.warning("⚠️ Low diversification (Effective N < 3)")
-        elif effective_n < 5:
-            st.info("📊 Moderate diversification")
-        else:
-            st.success("✅ Good diversification")
+#         if effective_n < 3:
+#             st.warning("⚠️ Low diversification (Effective N < 3)")
+#         elif effective_n < 5:
+#             st.info("📊 Moderate diversification")
+#         else:
+#             st.success("✅ Good diversification")
 
 
 def get_assets_positions():
@@ -227,37 +227,37 @@ if optimal_weights:
                 hide_index=True
             )
 
-    with strategy_tabs[1]:
-        st.markdown("##### 🎯 Maximum Sharpe Ratio Portfolio")
-        if 'max_sharpe' in optimal_weights:
-            max_sharpe_weights = optimal_weights['max_sharpe']
-            display_portfolio_weights(max_sharpe_weights, "Max Sharpe")
-        else:
-            st.info("Max Sharpe portfolio not available.")
+    # with strategy_tabs[1]:
+    #     st.markdown("##### 🎯 Maximum Sharpe Ratio Portfolio")
+    #     if 'max_sharpe' in optimal_weights:
+    #         max_sharpe_weights = optimal_weights['max_sharpe']
+    #         display_portfolio_weights(max_sharpe_weights, "Max Sharpe")
+    #     else:
+    #         st.info("Max Sharpe portfolio not available.")
 
-    with strategy_tabs[2]:
-        st.markdown("##### 🚀 Maximum Return Portfolio")
-        if 'max_return' in optimal_weights:
-            max_return_weights = optimal_weights['max_return']
-            display_portfolio_weights(max_return_weights, "Max Return")
-        else:
-            st.info("Max Return portfolio not available.")
+    # with strategy_tabs[2]:
+    #     st.markdown("##### 🚀 Maximum Return Portfolio")
+    #     if 'max_return' in optimal_weights:
+    #         max_return_weights = optimal_weights['max_return']
+    #         display_portfolio_weights(max_return_weights, "Max Return")
+    #     else:
+    #         st.info("Max Return portfolio not available.")
 
-    with strategy_tabs[3]:
-        st.markdown("##### 🛡️ Minimum Volatility Portfolio")
-        if 'min_volatility' in optimal_weights:
-            min_vol_weights = optimal_weights['min_volatility']
-            display_portfolio_weights(min_vol_weights, "Min Volatility")
-        else:
-            st.info("Min Volatility portfolio not available.")
+    # with strategy_tabs[3]:
+    #     st.markdown("##### 🛡️ Minimum Volatility Portfolio")
+    #     if 'min_volatility' in optimal_weights:
+    #         min_vol_weights = optimal_weights['min_volatility']
+    #         display_portfolio_weights(min_vol_weights, "Min Volatility")
+    #     else:
+    #         st.info("Min Volatility portfolio not available.")
 
-    with strategy_tabs[4]:
-        st.markdown("##### ⚖️ Equal Weight Portfolio")
-        if 'equal_weight' in optimal_weights:
-            equal_weights = optimal_weights['equal_weight']
-            display_portfolio_weights(equal_weights, "Equal Weight")
-        else:
-            st.info("Equal Weight portfolio not available.")
+    # with strategy_tabs[4]:
+    #     st.markdown("##### ⚖️ Equal Weight Portfolio")
+    #     if 'equal_weight' in optimal_weights:
+    #         equal_weights = optimal_weights['equal_weight']
+    #         display_portfolio_weights(equal_weights, "Equal Weight")
+    #     else:
+    #         st.info("Equal Weight portfolio not available.")
 else:
     st.info("Optimal weights not available.")
 
@@ -350,8 +350,12 @@ selected_metric = st.selectbox('Select Metric/Column', all_metrics, index=all_me
 asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values(
     'Ticker').unique() if a != 'TOTAL']
 
-# Use the new chart function
-title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend"
-fig = display_multi_asset_metric_trend(
-    portfolio.timeseries_data, asset_names, selected_metric, title=title)
-st.plotly_chart(fig, use_container_width=True)
+# # Use the new chart function
+# title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend"
+# fig = display_multi_asset_metric_trend(
+#     portfolio.timeseries_data, asset_names, selected_metric, title=title)
+# st.plotly_chart(fig, use_container_width=True)
+
+
+for optimal in portfolio.get_optimal_weights().values():
+    print(optimal)

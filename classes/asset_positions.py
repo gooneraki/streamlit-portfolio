@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+from dataclasses import dataclass
+from typing import Any
 
 from utilities.app_yfinance import tickers_yf, yf_ticket_info
 
@@ -21,6 +23,48 @@ class AssetPosition:
     def get_position(self) -> float:
         """ Get the position """
         return self.position
+
+
+class PortfolioOptimizationResult:
+    """ Portfolio optimization result """
+
+    def __init__(
+        self,
+        name: str,
+        emoji: str,
+        weights: pd.Series,
+        log_return: float,
+        log_vol: float,
+        log_sharpe_ratio: float,
+        ann_log_return: float,
+        ann_vol: float,
+        ann_log_sharpe_ratio: float,
+        ann_arith_return: float,
+        ann_arith_sharpe_ratio: float,
+    ):
+        self.name = name
+        self.emoji = emoji
+        self.weights = weights
+        self.log_return = log_return
+        self.log_vol = log_vol
+        self.log_sharpe_ratio = log_sharpe_ratio
+        self.ann_log_return = ann_log_return
+        self.ann_vol = ann_vol
+        self.ann_log_sharpe_ratio = ann_log_sharpe_ratio
+        self.ann_arith_return = ann_arith_return
+        self.ann_arith_sharpe_ratio = ann_arith_sharpe_ratio
+
+    def __repr__(self):
+        print(f"\n{self.emoji} {self.name} Portfolio Optimization Result")
+        print(f"  Annualized Arithmetic Return: {self.ann_arith_return:.2%}")
+        print(f"  Annualized Volatility:        {self.ann_vol:.2%}")
+        print(
+            f"  Annualized Sharpe Ratio:      {self.ann_arith_sharpe_ratio:.2f}")
+        print(f"  Logarithmic Sharpe Ratio:    {self.log_sharpe_ratio:.4f}")
+        print(f"  Weights:")
+        for asset, weight in self.weights.items():
+            print(f"    {asset}: {weight:.2%}")
+        return ""
 
 
 class Portfolio:
@@ -311,7 +355,7 @@ class Portfolio:
         # PORTFOLIO OPTIMIZATION - MULTIPLE STRATEGIES
         # ================================
 
-        optimal_weights_dict = {}
+        optimal_weights_dict: dict[str, PortfolioOptimizationResult] = {}
 
         # Define optimization strategies
         strategies = [
@@ -367,20 +411,21 @@ class Portfolio:
                 ann_arith_sharpe_ratio = (ann_arith_return - risk_free_rate) / \
                     ann_vol if ann_vol > 0 else 0
 
-                optimal_weights_dict[strategy['key']] = {
-                    'weights': optimal_weights,
+                optimal_weights_dict[strategy['key']] = PortfolioOptimizationResult(
+                    name=strategy['name'],
+                    emoji=strategy['emoji'],
+                    weights=optimal_weights,
 
-                    'log_return': port_log_return,
-                    'log_vol': port_log_vol,
-                    'log_sharpe_ratio': port_log_sharpe_ratio,
+                    log_return=port_log_return,
+                    log_vol=port_log_vol,
+                    log_sharpe_ratio=port_log_sharpe_ratio,
 
-                    'ann_log_return': ann_log_return,
-                    'ann_vol': ann_vol,
-                    'ann_log_sharpe_ratio': ann_log_sharpe_ratio,
-
-                    'ann_arith_return': ann_arith_return,
-                    'ann_arith_sharpe_ratio': ann_arith_sharpe_ratio,
-                }
+                    ann_log_return=ann_log_return,
+                    ann_vol=ann_vol,
+                    ann_log_sharpe_ratio=ann_log_sharpe_ratio,
+                    ann_arith_return=ann_arith_return,
+                    ann_arith_sharpe_ratio=ann_arith_sharpe_ratio,
+                )
 
             else:
                 print(
