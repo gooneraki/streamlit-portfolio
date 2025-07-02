@@ -482,23 +482,13 @@ class Portfolio:
         # Loop through each strategy
         for strategy in strategies:
 
-            # Try multiple methods if SLSQP fails (in all my checks SLSQP worked)
-            methods_to_try = ['SLSQP', 'trust-constr']
-            result = None
+            result = minimize(strategy['objective_func'], strategy['initial_guess'],
+                              args=strategy['args'],
+                              method='SLSQP', bounds=bounds, constraints=constraints,
+                              # this ftol option really fixed some issues
+                              options={'ftol': 1e-9})
 
-            for method in methods_to_try:
-
-                result = minimize(strategy['objective_func'], strategy['initial_guess'],
-                                  args=strategy['args'],
-                                  method=method, bounds=bounds, constraints=constraints,
-                                  # this ftol option really fixed some issues
-                                  options={'ftol': 1e-9})
-
-                # Check if optimization truly succeeded
-                if result.success:
-                    break
-
-            if result is not None and result.success:
+            if result.success:
 
                 optimal_weights = pd.Series(
                     result.x, index=mean_log_returns.index)
@@ -539,9 +529,8 @@ class Portfolio:
                 )
 
             else:
-                error_msg = result.message if result else "Unknown error"
                 print(
-                    f"❌ {strategy['name']} optimization failed: {error_msg}")
+                    f"❌ {strategy['name']} optimization failed: {result.message}")
 
         # Validations
         if 'max_return' in optimal_weights_dict:
