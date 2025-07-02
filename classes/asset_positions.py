@@ -3,26 +3,30 @@
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
+from pandas.core.window.rolling import Rolling
 from scipy.optimize import minimize
 
 
 from utilities.app_yfinance import tickers_yf, yf_ticket_info
 
 
+@dataclass
+class RollingStats:
+    """ Rolling stats """
+    rolling_mean: pd.DataFrame
+    rolling_mean_z_score: pd.DataFrame
+    rolling_std: pd.DataFrame
+    rolling_std_z_score: pd.DataFrame
+    rolling_sum: pd.DataFrame
+    rolling_sum_z_score: pd.DataFrame
+    rolling_annualised_return: pd.DataFrame
+
+
+@dataclass
 class AssetPosition:
     """ Asset position """
-
-    def __init__(self, symbol: str, position: float):
-        self.symbol = symbol
-        self.position = position
-
-    def get_symbol(self) -> str:
-        """ Get the symbol """
-        return self.symbol
-
-    def get_position(self) -> float:
-        """ Get the position """
-        return self.position
+    symbol: str
+    position: float
 
 
 @dataclass
@@ -60,11 +64,11 @@ class Portfolio:
 
     def __init__(self, asset_positions: list[AssetPosition], reference_currency: str):
         positions_series = pd.Series(
-            data=[position.get_position() for position in asset_positions],
-            index=[position.get_symbol() for position in asset_positions],
+            data=[ass_pos.position for ass_pos in asset_positions],
+            index=[ass_pos.symbol for ass_pos in asset_positions],
         )
 
-        asset_symbols = [position.get_symbol() for position in asset_positions]
+        asset_symbols = [ass_pos.symbol for ass_pos in asset_positions]
 
         reference_currency = reference_currency.upper()
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -74,7 +78,7 @@ class Portfolio:
 
         currencies_series = pd.Series(
             data=[info['currency'] for info in self.symbols_info_list],
-            index=[position.get_symbol() for position in asset_positions],
+            index=[ass_pos.symbol for ass_pos in asset_positions],
         )
 
         currency_symbols = [(target_currency + reference_currency + "=X")
@@ -95,8 +99,9 @@ class Portfolio:
         translated_fitted_values, trend_deviation, trend_deviation_z_score = self._get_fitted_values(
             translated_values)
 
-        log_returns, cumulative_log_returns, annualized_to_date_return = self._get_logarithmic_values(
-            translated_values)
+        log_returns, cumulative_log_returns, annualized_to_date_return, \
+            rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y = self._get_logarithmic_values(
+                translated_values)
 
         self.optimal_weights = self._calculate_portfolio_optimization(
             log_returns)
@@ -111,14 +116,18 @@ class Portfolio:
                 translated_values, translated_fitted_values,
                 trend_deviation, trend_deviation_z_score,
                 log_returns, cumulative_log_returns,
-                annualized_to_date_return],
+                annualized_to_date_return,
+                rolling_stats_1m.rolling_mean_z_score, rolling_stats_1q.rolling_mean_z_score,
+                rolling_stats_1y.rolling_mean_z_score, rolling_stats_3y.rolling_mean_z_score],
             axis=1,
             keys=[
                 'weights',
                 'translated_values', 'translated_fitted_values',
                 'trend_deviation', 'trend_deviation_z_score',
                 'log_returns', 'cumulative_log_returns',
-                'annualized_to_date_return'])
+                'annualized_to_date_return',
+                'rolling_1m_mean_z_score', 'rolling_1q_mean_z_score',
+                'rolling_1y_mean_z_score', 'rolling_3y_mean_z_score'])
 
         self.timeseries_data.columns.names = ['Metric', 'Ticker']
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -250,7 +259,6 @@ class Portfolio:
         if not isinstance(cumulative_log_returns, pd.DataFrame):
             raise ValueError("Cumulative log returns is not a DataFrame")
 
-        # Annualize using correct exponent for each row
         annualized_to_date_return = (pd.DataFrame(
             np.exp(cumulative_log_returns),
             index=cumulative_log_returns.index,
@@ -265,7 +273,72 @@ class Portfolio:
         annualized_to_date_return = annualized_to_date_return.iloc[round(
             points_per_year * 1):]
 
-        return log_returns, cumulative_log_returns, annualized_to_date_return
+        rolling_stats_1m = self._get_rolling_stats(
+            log_returns, period_info.points_per_month)
+
+        rolling_stats_1q = self._get_rolling_stats(
+            log_returns, period_info.points_per_year / 4)
+
+        rolling_stats_1y = self._get_rolling_stats(
+            log_returns, period_info.points_per_year)
+
+        rolling_stats_3y = self._get_rolling_stats(
+            log_returns, period_info.points_per_year * 3)
+
+        return log_returns, cumulative_log_returns, annualized_to_date_return, \
+            rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y
+
+    def _get_rolling_stats(self, p_log_returns: pd.DataFrame, p_window: float):
+        """ Get rolling stats for the given log returns """
+        period_info = self.get_period_info()
+
+        rolling = p_log_returns.rolling(window=round(p_window))
+        if not isinstance(rolling, Rolling):
+            raise ValueError("Rolling is not a Rolling")
+
+        rolling_mean = rolling.mean().dropna()
+        if not isinstance(rolling_mean, pd.DataFrame):
+            raise ValueError("Rolling mean is not a DataFrame")
+
+        rolling_mean_z_score = (
+            rolling_mean - rolling_mean.mean()) / rolling_mean.std()
+        if not isinstance(rolling_mean_z_score, pd.DataFrame):
+            raise ValueError("Rolling mean z-score is not a DataFrame")
+
+        rolling_std = rolling.std().dropna()
+        if not isinstance(rolling_std, pd.DataFrame):
+            raise ValueError("Rolling std is not a DataFrame")
+
+        rolling_std_z_score = (
+            rolling_std - rolling_std.mean()) / rolling_std.std()
+        if not isinstance(rolling_std_z_score, pd.DataFrame):
+            raise ValueError("Rolling std z-score is not a DataFrame")
+
+        rolling_sum = rolling.sum().dropna()
+        if not isinstance(rolling_sum, pd.DataFrame):
+            raise ValueError("Rolling sum is not a DataFrame")
+
+        rolling_sum_z_score = (
+            rolling_sum - rolling_sum.mean()) / rolling_sum.std()
+        if not isinstance(rolling_sum_z_score, pd.DataFrame):
+            raise ValueError("Rolling sum z-score is not a DataFrame")
+
+        rolling_annualised_return = pd.DataFrame(
+            np.exp(rolling_sum),
+            index=rolling_sum.index,
+            columns=rolling_sum.columns) ** (p_window/period_info.points_per_year) - 1
+
+        if not isinstance(rolling_annualised_return, pd.DataFrame):
+            raise ValueError("Rolling annualised return is not a DataFrame")
+
+        return RollingStats(
+            rolling_mean=rolling_mean,
+            rolling_mean_z_score=rolling_mean_z_score,
+            rolling_std=rolling_std,
+            rolling_std_z_score=rolling_std_z_score,
+            rolling_sum=rolling_sum,
+            rolling_sum_z_score=rolling_sum_z_score,
+            rolling_annualised_return=rolling_annualised_return)
 
     def _get_fitted_values(self, translated_values: pd.DataFrame):
         """ Get fitted values for each symbol individually """
@@ -324,8 +397,8 @@ class Portfolio:
         translated_values = assets_history.copy()
 
         # Create a dictionary to map asset_symbols to positions for quick lookup
-        positions_dict = {pos.get_symbol(): pos.get_position()
-                          for pos in asset_positions}
+        positions_dict = {ass_pos.symbol: ass_pos.position
+                          for ass_pos in asset_positions}
 
         for symbol, info in zip(assets_history.columns, self.symbols_info_list):
             position_value = positions_dict[symbol]
