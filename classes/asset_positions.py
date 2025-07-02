@@ -282,7 +282,7 @@ class Portfolio:
             port_log_vol = portfolio_volatility(weights, cov_log_matrix)
 
             if port_log_vol > 0:
-                return ((neg_port_log_return - risk_free_rate) / port_log_vol)
+                return (neg_port_log_return - risk_free_rate) / port_log_vol
             else:
                 return 0
 
@@ -290,7 +290,12 @@ class Portfolio:
         log_returns = p_log_returns.copy()
         log_returns = log_returns.drop(columns=['TOTAL'], errors='ignore')
         mean_log_returns = log_returns.mean()
+        if not isinstance(mean_log_returns, pd.Series):
+            raise ValueError("Mean log returns is not a Series")
+
         cov_log_matrix = log_returns.cov()
+        if not isinstance(cov_log_matrix, pd.DataFrame):
+            raise ValueError("Covariance matrix is not a DataFrame")
 
         # Use points_per_year for annualization
         _, _, _, _, _, points_per_year, _ = self.get_period_info()
