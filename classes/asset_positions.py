@@ -32,6 +32,7 @@ class AssetPosition:
 @dataclass
 class PortfolioOptimizationResult:
     """ Portfolio optimization result """
+    key: str
     name: str
     emoji: str
     weights: pd.Series
@@ -368,19 +369,6 @@ class Portfolio:
 
         return fitted_values, trend_deviation, trend_deviation_z_score
 
-    def _get_fitted_total_values(self, translated_total: pd.Series):
-        """ Get fitted values for the total portfolio """
-
-        x = np.arange(len(translated_total))
-        y_log = np.log(translated_total)
-        z_exp = np.polyfit(x, y_log, 1)
-        p_exp = np.poly1d(z_exp)
-        y_exp = np.exp(p_exp(x))
-
-        fitted_total = pd.Series(
-            y_exp, index=translated_total.index, name='fitted_total')
-        return fitted_total
-
     def _get_translated_history(
             self,
             asset_positions: list[AssetPosition],
@@ -455,7 +443,6 @@ class Portfolio:
         # Common optimization setup
         n_assets = len(log_returns.columns)
         bounds = tuple((0, 1) for _ in range(n_assets))
-        initial_guess = np.array([1.0/n_assets] * n_assets)
         constraints = {'type': 'eq', 'fun': lambda x: np.sum(x) - 1}
 
         # ================================
@@ -471,32 +458,48 @@ class Portfolio:
                 'emoji': '🎯',
                 'key': 'max_sharpe',
                 'objective_func': neg_sharpe_ratio,
-                'args': (mean_log_returns, cov_log_matrix, risk_free_rate)
+                'args': (mean_log_returns, cov_log_matrix, risk_free_rate),
+                'initial_guess': np.array([1.0/n_assets] * n_assets)
             },
             {
                 'name': 'Maximum Return',
                 'emoji': '🚀',
                 'key': 'max_return',
                 'objective_func': neg_portfolio_return,
-                'args': (mean_log_returns,)
+                'args': (mean_log_returns),
+                'initial_guess': mean_log_returns.values / mean_log_returns.sum()
             },
             {
                 'name': 'Minimum Volatility',
                 'emoji': '🛡️',
                 'key': 'min_volatility',
                 'objective_func': portfolio_volatility,
-                'args': (cov_log_matrix,)
+                'args': (cov_log_matrix),
+                'initial_guess': (1 / np.diag(cov_log_matrix.values)) / np.sum(1 / np.diag(cov_log_matrix.values))
             }
         ]
 
         # Loop through each strategy
         for strategy in strategies:
 
-            result = minimize(strategy['objective_func'], initial_guess,
-                              args=strategy['args'],
-                              method='SLSQP', bounds=bounds, constraints=constraints)
+            # Try multiple methods if SLSQP fails (in all my checks SLSQP worked)
+            methods_to_try = ['SLSQP', 'trust-constr']
+            result = None
 
-            if result.success:
+            for method in methods_to_try:
+
+                result = minimize(strategy['objective_func'], strategy['initial_guess'],
+                                  args=strategy['args'],
+                                  method=method, bounds=bounds, constraints=constraints,
+                                  # this ftol option really fixed some issues
+                                  options={'ftol': 1e-9})
+
+                # Check if optimization truly succeeded
+                if result.success:
+                    break
+
+            if result is not None and result.success:
+
                 optimal_weights = pd.Series(
                     result.x, index=mean_log_returns.index)
 
@@ -519,6 +522,7 @@ class Portfolio:
                     ann_vol if ann_vol > 0 else 0
 
                 optimal_weights_dict[strategy['key']] = PortfolioOptimizationResult(
+                    key=strategy['key'],
                     name=strategy['name'],
                     emoji=strategy['emoji'],
                     weights=optimal_weights,
@@ -535,7 +539,28 @@ class Portfolio:
                 )
 
             else:
+                error_msg = result.message if result else "Unknown error"
                 print(
-                    f"❌ {strategy['name']} optimization failed. {result.message}")
+                    f"❌ {strategy['name']} optimization failed: {error_msg}")
+
+        # Validations
+        if 'max_return' in optimal_weights_dict:
+            max_return_result = optimal_weights_dict['max_return']
+            other_results = [
+                ele for ele in optimal_weights_dict.values() if ele.key != 'max_return']
+            for other_result in other_results:
+                if max_return_result.ann_arith_return < other_result.ann_arith_return:
+                    raise ValueError(f"⚠️ Warning: Max Return strategy ({max_return_result.ann_arith_return:.4f}) "
+                                     f"has lower return than {other_result.name} ({other_result.ann_arith_return:.4f})")
+
+        if 'min_volatility' in optimal_weights_dict:
+            min_volatility_result = optimal_weights_dict['min_volatility']
+            other_results = [
+                ele for ele in optimal_weights_dict.values() if ele.key != 'min_volatility']
+
+            for other_result in other_results:
+                if min_volatility_result.ann_vol > other_result.ann_vol:
+                    raise ValueError(f"⚠️ Warning: Min Volatility strategy ({min_volatility_result.ann_vol:.4f}) "
+                                     f"has higher volatility than {other_result.name} ({other_result.ann_vol:.4f})")
 
         return optimal_weights_dict

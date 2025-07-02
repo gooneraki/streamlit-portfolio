@@ -302,7 +302,7 @@ if optimal_weights:
         current_weights_df = pd.DataFrame({
             'Asset': current_weights.index,
             'Weight': current_weights.values,
-            'Weight %': (current_weights.values * 100)
+            'Weight %': (current_weights * 100).values
         }).sort_values('Weight %', ascending=False)
 
         current_col1, current_col2 = st.columns([2, 1])
