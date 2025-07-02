@@ -303,8 +303,6 @@ class Portfolio:
 
         rolling_mean_z_score = (
             rolling_mean - rolling_mean.mean()) / rolling_mean.std()
-        if not isinstance(rolling_mean_z_score, pd.DataFrame):
-            raise ValueError("Rolling mean z-score is not a DataFrame")
 
         rolling_std = rolling.std().dropna()
         if not isinstance(rolling_std, pd.DataFrame):
@@ -312,8 +310,6 @@ class Portfolio:
 
         rolling_std_z_score = (
             rolling_std - rolling_std.mean()) / rolling_std.std()
-        if not isinstance(rolling_std_z_score, pd.DataFrame):
-            raise ValueError("Rolling std z-score is not a DataFrame")
 
         rolling_sum = rolling.sum().dropna()
         if not isinstance(rolling_sum, pd.DataFrame):
@@ -321,16 +317,11 @@ class Portfolio:
 
         rolling_sum_z_score = (
             rolling_sum - rolling_sum.mean()) / rolling_sum.std()
-        if not isinstance(rolling_sum_z_score, pd.DataFrame):
-            raise ValueError("Rolling sum z-score is not a DataFrame")
 
         rolling_annualised_return = pd.DataFrame(
             np.exp(rolling_sum),
             index=rolling_sum.index,
             columns=rolling_sum.columns) ** (p_window/period_info.points_per_year) - 1
-
-        if not isinstance(rolling_annualised_return, pd.DataFrame):
-            raise ValueError("Rolling annualised return is not a DataFrame")
 
         return RollingStats(
             rolling_mean=rolling_mean,
