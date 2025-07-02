@@ -428,12 +428,12 @@ class Portfolio:
         # Maximum Sharpe Ratio Portfolio
         def neg_sharpe_ratio(weights, expected_log_returns, cov_log_matrix, risk_free_rate):
 
-            neg_port_log_return = neg_portfolio_return(
+            port_log_return = -neg_portfolio_return(
                 weights, expected_log_returns)
             port_log_vol = portfolio_volatility(weights, cov_log_matrix)
 
             if port_log_vol > 0:
-                return (neg_port_log_return - risk_free_rate) / port_log_vol
+                return -(port_log_return - risk_free_rate) / port_log_vol
             else:
                 return 0
 
