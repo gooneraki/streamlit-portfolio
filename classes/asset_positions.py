@@ -95,7 +95,7 @@ class Portfolio:
         translated_fitted_values, trend_deviation, trend_deviation_z_score = self._get_fitted_values(
             translated_values)
 
-        log_returns, cumulative_log_returns, cumulative_arithmetic_returns = self._get_logarithmic_values(
+        log_returns, cumulative_log_returns, annualized_to_date_return = self._get_logarithmic_values(
             translated_values)
 
         self.optimal_weights = self._calculate_portfolio_optimization(
@@ -111,14 +111,14 @@ class Portfolio:
                 translated_values, translated_fitted_values,
                 trend_deviation, trend_deviation_z_score,
                 log_returns, cumulative_log_returns,
-                cumulative_arithmetic_returns],
+                annualized_to_date_return],
             axis=1,
             keys=[
                 'weights',
                 'translated_values', 'translated_fitted_values',
                 'trend_deviation', 'trend_deviation_z_score',
                 'log_returns', 'cumulative_log_returns',
-                'cumulative_arithmetic_returns'])
+                'annualized_to_date_return'])
 
         self.timeseries_data.columns.names = ['Metric', 'Ticker']
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -251,21 +251,21 @@ class Portfolio:
             raise ValueError("Cumulative log returns is not a DataFrame")
 
         # Annualize using correct exponent for each row
-        cumulative_arithmetic_returns = (pd.DataFrame(
+        annualized_to_date_return = (pd.DataFrame(
             np.exp(cumulative_log_returns),
             index=cumulative_log_returns.index,
             columns=cumulative_log_returns.columns
         ).pow(1/period_info.years_series, axis=0) - 1).dropna()
 
-        if not isinstance(cumulative_arithmetic_returns, pd.DataFrame):
+        if not isinstance(annualized_to_date_return, pd.DataFrame):
             raise ValueError(
-                "Cumulative arithmetic returns is not a DataFrame")
+                "Annualized to date return is not a DataFrame")
 
         # just remove 1 year of data (to remove starting values which are created from very few data points)
-        cumulative_arithmetic_returns = cumulative_arithmetic_returns.iloc[round(
+        annualized_to_date_return = annualized_to_date_return.iloc[round(
             points_per_year * 1):]
 
-        return log_returns, cumulative_log_returns, cumulative_arithmetic_returns
+        return log_returns, cumulative_log_returns, annualized_to_date_return
 
     def _get_fitted_values(self, translated_values: pd.DataFrame):
         """ Get fitted values for each symbol individually """
