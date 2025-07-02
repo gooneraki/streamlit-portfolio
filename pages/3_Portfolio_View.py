@@ -93,32 +93,28 @@ portfolio = Portfolio(assets_positions, base_currency)
 
 st.title("Portfolio Information")
 
-# Get period info as a dict
+# Get period info
 period_info = portfolio.get_period_info()
-first_date = period_info['first_date']
-last_date = period_info['last_date']
-number_of_points = period_info['number_of_points']
-number_of_days = period_info['number_of_days']
-number_of_years = period_info['number_of_years']
-points_per_year = period_info['points_per_year']
-points_per_month = period_info['points_per_month']
+
+last_date = period_info.last_date
+points_per_year = period_info.points_per_year
 
 # Display sampling period information
 st.markdown("#### 📊 Data Sampling Period")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Start Date", first_date.strftime('%Y-%m-%d'))
+    st.metric("Start Date", period_info.first_date.strftime('%Y-%m-%d'))
 with col2:
     st.metric("End Date", last_date.strftime('%Y-%m-%d'))
 with col3:
-    st.metric("Sample Period", f"{number_of_years:.1f} years")
+    st.metric("Sample Period", f"{period_info.number_of_years:.1f} years")
 with col4:
-    st.metric("Data Points", f"{number_of_points:,}")
+    st.metric("Data Points", f"{period_info.number_of_points:,}")
 
 st.info(
-    f"📈 **Analysis Coverage:** {number_of_days:,} days ({number_of_years:.1f} years) "
-    f"with {number_of_points:,} data points (avg {points_per_year:.0f} points/year)"
+    f"📈 **Analysis Coverage:** {period_info.number_of_days:,} days ({period_info.number_of_years:.1f} years) "
+    f"with {period_info.number_of_points:,} data points (avg {points_per_year:.0f} points/year)"
 )
 
 
@@ -290,7 +286,7 @@ with col1:
 
 with col2:
     # Time period filter - check available data range
-    total_years = number_of_years
+    total_years = period_info.number_of_years
     year_options = []
 
     if total_years >= 1:

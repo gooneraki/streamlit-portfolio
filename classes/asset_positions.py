@@ -41,6 +41,20 @@ class PortfolioOptimizationResult:
     ann_arith_sharpe_ratio: float
 
 
+@dataclass
+class PeriodInfo:
+    """ Period info """
+    first_date: pd.Timestamp
+    last_date: pd.Timestamp
+    number_of_points: int
+    number_of_days: int
+    points_per_day: float
+    number_of_years: float
+    points_per_year: float
+    points_per_month: float
+    years_series: pd.Series
+
+
 class Portfolio:
     """ Portfolio class """
 
@@ -88,7 +102,7 @@ class Portfolio:
             log_returns)
 
         period_info = self.get_period_info()
-        number_of_years = period_info['number_of_years']
+        number_of_years = period_info.number_of_years
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
@@ -142,11 +156,11 @@ class Portfolio:
                 'trend_deviation', 'trend_deviation_z_score'])
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-    def get_assets_metrics(self):
+    def get_assets_metrics(self) -> pd.DataFrame:
         """ Get the assets metrics """
         return self.assets_metrics
 
-    def get_optimal_weights(self):
+    def get_optimal_weights(self) -> dict[str, PortfolioOptimizationResult]:
         """ Get the optimal weights """
         return self.optimal_weights
 
@@ -180,8 +194,14 @@ class Portfolio:
 
         return first_value, last_value, first_fitted_value, last_fitted_value
 
-    def get_period_info(self):
+    def get_period_info(self) -> PeriodInfo:
         """ Get the period info for the given history """
+        period_series = pd.Series(
+            data=np.arange(0, len(self.tickers_data['history'])),
+            index=self.tickers_data['history'].index,
+            name='period'
+        )
+
         first_date = self.tickers_data['history'].index[0]
         last_date = self.tickers_data['history'].index[-1]
 
@@ -197,31 +217,27 @@ class Portfolio:
         points_per_year = number_of_points / number_of_years
         points_per_month = points_per_year / 12
 
-        return {
-            'first_date': first_date,
-            'last_date': last_date,
-            'number_of_points': number_of_points,
-            'number_of_days': number_of_days,
-            'points_per_day': points_per_day,
-            'number_of_years': number_of_years,
-            'points_per_year': points_per_year,
-            'points_per_month': points_per_month
-        }
+        years_series = period_series / points_per_year
+        if not isinstance(years_series, pd.Series):
+            raise ValueError("Years series is not a Series")
+
+        return PeriodInfo(
+            first_date=first_date,
+            last_date=last_date,
+            number_of_points=number_of_points,
+            number_of_days=number_of_days,
+            points_per_day=points_per_day,
+            number_of_years=number_of_years,
+            points_per_year=points_per_year,
+            points_per_month=points_per_month,
+            years_series=years_series
+        )
 
     def _get_logarithmic_values(self, translated_values: pd.DataFrame):
         """ Get logarithmic values for the given history """
 
         period_info = self.get_period_info()
-        points_per_year: float = period_info['points_per_year']
-
-        period_series = pd.Series(
-            data=np.arange(1, len(translated_values) + 1),
-            index=translated_values.index,
-            name='period'
-        )
-        years_series = period_series / points_per_year
-        if not isinstance(years_series, pd.Series):
-            raise ValueError("Years series is not a Series")
+        points_per_year = period_info.points_per_year
 
         log_returns = np.log(translated_values /
                              translated_values.shift(1)).dropna()
@@ -235,11 +251,11 @@ class Portfolio:
             raise ValueError("Cumulative log returns is not a DataFrame")
 
         # Annualize using correct exponent for each row
-        cumulative_arithmetic_returns = pd.DataFrame(
+        cumulative_arithmetic_returns = (pd.DataFrame(
             np.exp(cumulative_log_returns),
             index=cumulative_log_returns.index,
             columns=cumulative_log_returns.columns
-        ).pow(1/years_series, axis=0) - 1
+        ).pow(1/period_info.years_series, axis=0) - 1).dropna()
 
         if not isinstance(cumulative_arithmetic_returns, pd.DataFrame):
             raise ValueError(
@@ -361,7 +377,7 @@ class Portfolio:
 
         # Use points_per_year for annualization
         period_info = self.get_period_info()
-        points_per_year = period_info['points_per_year']
+        points_per_year = period_info.points_per_year
 
         # Common optimization setup
         n_assets = len(log_returns.columns)
