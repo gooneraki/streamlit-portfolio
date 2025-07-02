@@ -1,5 +1,5 @@
 """ Module for asset positions and portfolio """
-from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
@@ -7,11 +7,12 @@ from scipy.optimize import minimize
 from utilities.app_yfinance import tickers_yf, yf_ticket_info
 
 
-@dataclass
 class AssetPosition:
     """ Asset position """
-    symbol: str
-    position: float
+
+    def __init__(self, symbol: str, position: float):
+        self.symbol = symbol
+        self.position = position
 
     def get_symbol(self) -> str:
         """ Get the symbol """
@@ -312,8 +313,6 @@ class Portfolio:
 
         optimal_weights_dict = {}
 
-        # Constraints: weights sum to 1
-
         # Define optimization strategies
         strategies = [
             {
@@ -341,8 +340,6 @@ class Portfolio:
 
         # Loop through each strategy
         for strategy in strategies:
-            print(
-                f"\n{strategy['emoji']} Optimizing for {strategy['name']} Portfolio...")
 
             result = minimize(strategy['objective_func'], initial_guess,
                               args=strategy['args'],
@@ -351,30 +348,42 @@ class Portfolio:
             if result.success:
                 optimal_weights = pd.Series(
                     result.x, index=mean_log_returns.index)
-                optimal_weights_dict[strategy['key']] = optimal_weights
 
-                # Calculate annualized return and volatility
+                # Daily logarithmic return and volatility
                 port_log_return = np.sum(optimal_weights * mean_log_returns)
                 port_log_vol = np.sqrt(
                     np.dot(optimal_weights.T, np.dot(cov_log_matrix, optimal_weights)))
+                port_log_sharpe_ratio = (
+                    port_log_return - risk_free_rate) / port_log_vol
+
+                # Annualized logarithmic return and volatility
                 ann_log_return = port_log_return * points_per_year
                 ann_vol = port_log_vol * np.sqrt(points_per_year)
+                ann_log_sharpe_ratio = (
+                    ann_log_return - risk_free_rate) / ann_vol
+
+                # Annualized arithmetic return and sharpe ratio
                 ann_arith_return = np.exp(ann_log_return) - 1
-                sharpe_ratio = (ann_arith_return - risk_free_rate) / \
+                ann_arith_sharpe_ratio = (ann_arith_return - risk_free_rate) / \
                     ann_vol if ann_vol > 0 else 0
 
-                print(f"✅ {strategy['name']} Portfolio:")
-                print(f"   Annualized Return: {ann_arith_return:.4f}")
-                print(f"   Annualized Volatility: {ann_vol:.4f}")
-                print(f"   Sharpe Ratio: {sharpe_ratio:.4f}")
-                print("   Optimal Weights:")
-                for asset, weight in optimal_weights.items():
-                    print(f"     {asset}: {weight:.4f}")
+                optimal_weights_dict[strategy['key']] = {
+                    'weights': optimal_weights,
+
+                    'log_return': port_log_return,
+                    'log_vol': port_log_vol,
+                    'log_sharpe_ratio': port_log_sharpe_ratio,
+
+                    'ann_log_return': ann_log_return,
+                    'ann_vol': ann_vol,
+                    'ann_log_sharpe_ratio': ann_log_sharpe_ratio,
+
+                    'ann_arith_return': ann_arith_return,
+                    'ann_arith_sharpe_ratio': ann_arith_sharpe_ratio,
+                }
+
             else:
                 print(
                     f"❌ {strategy['name']} optimization failed, using equal weights")
-                optimal_weights = pd.Series(
-                    [1.0/n_assets] * n_assets, index=mean_log_returns.index)
-                optimal_weights_dict[strategy['key']] = optimal_weights
 
         return optimal_weights_dict
