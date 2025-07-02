@@ -1,10 +1,10 @@
 """ Module for asset positions and portfolio """
 
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
-from dataclasses import dataclass
-from typing import Any
+
 
 from utilities.app_yfinance import tickers_yf, yf_ticket_info
 
@@ -25,46 +25,20 @@ class AssetPosition:
         return self.position
 
 
+@dataclass
 class PortfolioOptimizationResult:
     """ Portfolio optimization result """
-
-    def __init__(
-        self,
-        name: str,
-        emoji: str,
-        weights: pd.Series,
-        log_return: float,
-        log_vol: float,
-        log_sharpe_ratio: float,
-        ann_log_return: float,
-        ann_vol: float,
-        ann_log_sharpe_ratio: float,
-        ann_arith_return: float,
-        ann_arith_sharpe_ratio: float,
-    ):
-        self.name = name
-        self.emoji = emoji
-        self.weights = weights
-        self.log_return = log_return
-        self.log_vol = log_vol
-        self.log_sharpe_ratio = log_sharpe_ratio
-        self.ann_log_return = ann_log_return
-        self.ann_vol = ann_vol
-        self.ann_log_sharpe_ratio = ann_log_sharpe_ratio
-        self.ann_arith_return = ann_arith_return
-        self.ann_arith_sharpe_ratio = ann_arith_sharpe_ratio
-
-    def __repr__(self):
-        print(f"\n{self.emoji} {self.name} Portfolio Optimization Result")
-        print(f"  Annualized Arithmetic Return: {self.ann_arith_return:.2%}")
-        print(f"  Annualized Volatility:        {self.ann_vol:.2%}")
-        print(
-            f"  Annualized Sharpe Ratio:      {self.ann_arith_sharpe_ratio:.2f}")
-        print(f"  Logarithmic Sharpe Ratio:    {self.log_sharpe_ratio:.4f}")
-        print(f"  Weights:")
-        for asset, weight in self.weights.items():
-            print(f"    {asset}: {weight:.2%}")
-        return ""
+    name: str
+    emoji: str
+    weights: pd.Series
+    log_return: float
+    log_vol: float
+    log_sharpe_ratio: float
+    ann_log_return: float
+    ann_vol: float
+    ann_log_sharpe_ratio: float
+    ann_arith_return: float
+    ann_arith_sharpe_ratio: float
 
 
 class Portfolio:
@@ -107,13 +81,14 @@ class Portfolio:
         translated_fitted_values, trend_deviation, trend_deviation_z_score = self._get_fitted_values(
             translated_values)
 
-        log_returns, cumulative_log_returns = self._get_logarithmic_values(
+        log_returns, cumulative_log_returns, cumulative_arithmetic_returns = self._get_logarithmic_values(
             translated_values)
 
         self.optimal_weights = self._calculate_portfolio_optimization(
             log_returns)
 
-        _, _, _, _, number_of_years, _, _ = self.get_period_info()
+        period_info = self.get_period_info()
+        number_of_years = period_info['number_of_years']
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
@@ -121,13 +96,15 @@ class Portfolio:
                 weights,
                 translated_values, translated_fitted_values,
                 trend_deviation, trend_deviation_z_score,
-                log_returns, cumulative_log_returns],
+                log_returns, cumulative_log_returns,
+                cumulative_arithmetic_returns],
             axis=1,
             keys=[
                 'weights',
                 'translated_values', 'translated_fitted_values',
                 'trend_deviation', 'trend_deviation_z_score',
-                'log_returns', 'cumulative_log_returns'])
+                'log_returns', 'cumulative_log_returns',
+                'cumulative_arithmetic_returns'])
 
         self.timeseries_data.columns.names = ['Metric', 'Ticker']
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -215,15 +192,37 @@ class Portfolio:
 
         number_of_points = self.tickers_data['history'].shape[0]
         number_of_days = (last_date - first_date).days + 1
+        points_per_day = number_of_points / number_of_days
         number_of_years = number_of_days / 365.25
         points_per_year = number_of_points / number_of_years
         points_per_month = points_per_year / 12
 
-        return first_date, last_date, number_of_points, number_of_days, \
-            number_of_years, points_per_year, points_per_month
+        return {
+            'first_date': first_date,
+            'last_date': last_date,
+            'number_of_points': number_of_points,
+            'number_of_days': number_of_days,
+            'points_per_day': points_per_day,
+            'number_of_years': number_of_years,
+            'points_per_year': points_per_year,
+            'points_per_month': points_per_month
+        }
 
     def _get_logarithmic_values(self, translated_values: pd.DataFrame):
         """ Get logarithmic values for the given history """
+
+        period_info = self.get_period_info()
+        points_per_year: float = period_info['points_per_year']
+
+        period_series = pd.Series(
+            data=np.arange(1, len(translated_values) + 1),
+            index=translated_values.index,
+            name='period'
+        )
+        years_series = period_series / points_per_year
+        if not isinstance(years_series, pd.Series):
+            raise ValueError("Years series is not a Series")
+
         log_returns = np.log(translated_values /
                              translated_values.shift(1)).dropna()
 
@@ -232,7 +231,25 @@ class Portfolio:
 
         cumulative_log_returns = log_returns.cumsum()
 
-        return log_returns, cumulative_log_returns
+        if not isinstance(cumulative_log_returns, pd.DataFrame):
+            raise ValueError("Cumulative log returns is not a DataFrame")
+
+        # Annualize using correct exponent for each row
+        cumulative_arithmetic_returns = pd.DataFrame(
+            np.exp(cumulative_log_returns),
+            index=cumulative_log_returns.index,
+            columns=cumulative_log_returns.columns
+        ).pow(1/years_series, axis=0) - 1
+
+        if not isinstance(cumulative_arithmetic_returns, pd.DataFrame):
+            raise ValueError(
+                "Cumulative arithmetic returns is not a DataFrame")
+
+        # just remove 1 year of data (to remove starting values which are created from very few data points)
+        cumulative_arithmetic_returns = cumulative_arithmetic_returns.iloc[round(
+            points_per_year * 1):]
+
+        return log_returns, cumulative_log_returns, cumulative_arithmetic_returns
 
     def _get_fitted_values(self, translated_values: pd.DataFrame):
         """ Get fitted values for each symbol individually """
@@ -343,7 +360,8 @@ class Portfolio:
             raise ValueError("Covariance matrix is not a DataFrame")
 
         # Use points_per_year for annualization
-        _, _, _, _, _, points_per_year, _ = self.get_period_info()
+        period_info = self.get_period_info()
+        points_per_year = period_info['points_per_year']
 
         # Common optimization setup
         n_assets = len(log_returns.columns)
@@ -429,6 +447,6 @@ class Portfolio:
 
             else:
                 print(
-                    f"❌ {strategy['name']} optimization failed, using equal weights")
+                    f"❌ {strategy['name']} optimization failed. {result.message}")
 
         return optimal_weights_dict

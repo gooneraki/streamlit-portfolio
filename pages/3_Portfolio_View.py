@@ -93,9 +93,15 @@ portfolio = Portfolio(assets_positions, base_currency)
 
 st.title("Portfolio Information")
 
-first_date, last_date, \
-    number_of_points, number_of_days, number_of_years, \
-    points_per_year, points_per_month = portfolio.get_period_info()
+# Get period info as a dict
+period_info = portfolio.get_period_info()
+first_date = period_info['first_date']
+last_date = period_info['last_date']
+number_of_points = period_info['number_of_points']
+number_of_days = period_info['number_of_days']
+number_of_years = period_info['number_of_years']
+points_per_year = period_info['points_per_year']
+points_per_month = period_info['points_per_month']
 
 # Display sampling period information
 st.markdown("#### 📊 Data Sampling Period")
