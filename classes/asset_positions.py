@@ -150,8 +150,7 @@ class Portfolio:
         self.optimisation_results = self._calculate_portfolio_optimisation(
             log_returns)
 
-        latest_timeseries_data: pd.Series = self.timeseries_data.iloc[-1]
-        self.assets_snapshot: pd.DataFrame = latest_timeseries_data.unstack(
+        self.assets_snapshot: pd.DataFrame = self.timeseries_data.iloc[-1].unstack(
             level='Metric')
 
         # Add additional metrics
@@ -162,14 +161,17 @@ class Portfolio:
             100)
         self.assets_snapshot['cagr_pct'] = self.assets_snapshot['annualized_to_date_return'].mul(
             100)
+        self.assets_snapshot['trend_deviation_pct'] = self.assets_snapshot['trend_deviation'].mul(
+            100)
+        self.assets_snapshot['rolling_1m_return_pct'] = self.assets_snapshot['rolling_1m_return'].mul(
+            100)
+        self.assets_snapshot['rolling_1q_return_pct'] = self.assets_snapshot['rolling_1q_return'].mul(
+            100)
+        self.assets_snapshot['rolling_1y_return_pct'] = self.assets_snapshot['rolling_1y_return'].mul(
+            100)
+        self.assets_snapshot['rolling_3y_return_pct'] = self.assets_snapshot['rolling_3y_return'].mul(
+            100)
 
-        # Rename columns for clarity
-        self.assets_snapshot = self.assets_snapshot.rename(columns={
-            'weights': 'latest_weights',
-            'annualized_to_date_return': 'cagr',
-            'translated_values': 'latest_value',
-            'translated_fitted_values': 'latest_fitted_value'
-        })
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     def get_assets_snapshot(self) -> pd.DataFrame:

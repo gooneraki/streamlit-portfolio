@@ -155,60 +155,70 @@ st.markdown("---")
 
 # --- Portfolio TOTAL summary metrics ---
 assets_snapshot = portfolio.get_assets_snapshot()
-print(f"\nassets_snapshot:\n{assets_snapshot.T}")
+
 
 total_metrics = assets_snapshot.loc['TOTAL']
 
 st.markdown("#### 🏆 Portfolio Total Summary")
 sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
 with sum_col1:
-    st.metric("CAGR", f"{total_metrics['cagr_pct']:.2f}%")
+    st.metric("Rolling 1Q Return",
+              f"{total_metrics['rolling_1q_return_pct']:.1f}%")
 with sum_col2:
-    st.metric("CAGR Fitted", f"{total_metrics['cagr_fitted_pct']:.2f}%")
+    st.metric("Rolling 1Y Return",
+              f"{total_metrics['rolling_1y_return_pct']:.1f}%")
 with sum_col3:
-    st.metric("Latest Value", f"{total_metrics['latest_value']:,.0f}")
+    st.metric("All-Time Return Smoothed",
+              f"{total_metrics['cagr_fitted_pct']:.1f}%")
 with sum_col4:
-    st.metric("Trend Deviation %",
-              f"{total_metrics['trend_deviation']*100:.2f}%")
+    st.metric("All time Return", f"{total_metrics['cagr_pct']:.1f}%")
 with sum_col5:
-    st.metric("Trend Dev. Z-Score",
-              f"{total_metrics['trend_deviation_z_score']:.2f}")
+    st.metric("Latest Value", f"{total_metrics['translated_values']:,.0f}")
+
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 
 st.markdown("---")
 
 st.markdown("#### Current Portfolio Composition")
+
+# Select and reorder columns for better display
+display_columns = [
+    'currency', 'position', 'translated_close', 'translated_values', 'latest_weights_pct',
+    'cagr_pct', 'cagr_fitted_pct', 'rolling_1q_return_pct', 'rolling_1y_return_pct',
+    'trend_deviation_z_score', 'rolling_1q_return_z_score', 'rolling_1y_return_z_score']
+
+# Get the assets snapshot and select only the columns we want to display
+assets_display = portfolio.get_assets_snapshot()[display_columns]
+
 st.dataframe(
-    pd.DataFrame(portfolio.get_assets_snapshot().drop(
-        columns=['cagr', 'cagr_fitted', 'latest_weights'])),
+    assets_display,
     column_config={
-        "position": st.column_config.NumberColumn(label="Position", format="localized"),
-        "cagr_pct": st.column_config.NumberColumn(
-            label="CAGR",
-            format="%.1f%%",
-            help="Compound Annual Growth Rate",
-        ),
-        "cagr_fitted_pct": st.column_config.NumberColumn(
-            label="CAGR Fitted",
-            format="%.1f%%",
-            help="Compound Annual Growth Rate Fitted",
-        ),
-        "latest_value": st.column_config.NumberColumn(
-            label="Latest Value",
-            format="localized"
-        ),
-        "latest_fitted_value": st.column_config.NumberColumn(
-            label="Latest Fitted Value",
-            format="localized"
-        ),
+        "position": st.column_config.NumberColumn(
+            label="Position", format="localized"),
         "latest_weights_pct": st.column_config.NumberColumn(
-            label="Latest Weights",
-            format="%.1f%%"
-        ),
-        "trend_deviation": st.column_config.NumberColumn(
-            label="Trend Deviation",
-            format="percent"
-        )
+            label="Weight", format="%.1f%%"),
+        "translated_close": st.column_config.NumberColumn(
+            label="Close Price", format="%.2f"),
+        "translated_values": st.column_config.NumberColumn(
+            label="Value", format="localized"),
+
+        "trend_deviation_z_score": st.column_config.NumberColumn(
+            label="All-Time Trend Z", format="%.2f"),
+        "cagr_pct": st.column_config.NumberColumn(
+            label="All time Return", format="%.1f%%"),
+        "cagr_fitted_pct": st.column_config.NumberColumn(
+            label="All time Return Smoothed", format="%.1f%%"),
+
+        "rolling_1q_return_pct": st.column_config.NumberColumn(
+            label="1Q Return", format="%.1f%%"),
+        "rolling_1q_return_z_score": st.column_config.NumberColumn(
+            label="1Q Return Z", format="%.2f"),
+        "rolling_1y_return_pct": st.column_config.NumberColumn(
+            label="1Y Return", format="%.1f%%"),
+        "rolling_1y_return_z_score": st.column_config.NumberColumn(
+            label="1Y Return Z", format="%.2f"),
+
+        "currency": st.column_config.TextColumn(label="Currency")
     })
 
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
@@ -262,13 +272,13 @@ if optimisation_results:
                 })
 
         # Add current portfolio to comparison
-        current_weights = assets_snapshot.drop('TOTAL')['latest_weights']
+        current_weights = assets_snapshot.drop('TOTAL')['weights']
         current_herfindahl = (current_weights ** 2).sum()
         current_effective_n = 1 / current_herfindahl
         current_max_weight = current_weights.max()
 
         # Calculate current portfolio return (convert CAGR to annual arithmetic return)
-        current_cagr = total_metrics['cagr']
+        current_cagr = total_metrics['cagr_pct'] / 100
 
         comparison_data.append({
             'Strategy': "💼 Current Portfolio",
@@ -313,7 +323,7 @@ if optimisation_results:
         st.markdown("##### 📋 Current Portfolio Analysis")
 
         # Show current portfolio as comparison
-        current_weights = assets_snapshot.drop('TOTAL')['latest_weights']
+        current_weights = assets_snapshot.drop('TOTAL')['weights']
         current_weights_df = pd.DataFrame({
             'Asset': current_weights.index,
             'Weight': current_weights.values,
@@ -355,12 +365,13 @@ if optimisation_results:
         st.markdown("**Current Portfolio Performance**")
         perf_col1, perf_col2, perf_col3 = st.columns(3)
         with perf_col1:
-            st.metric("CAGR", f"{total_metrics['cagr_pct']:.2f}%")
+            st.metric("CAGR", f"{total_metrics['cagr_pct']:.1f}%")
         with perf_col2:
-            st.metric("Latest Value", f"{total_metrics['latest_value']:,.0f}")
+            st.metric("Latest Value",
+                      f"{total_metrics['translated_values']:,.0f}")
         with perf_col3:
-            st.metric("Trend Deviation",
-                      f"{total_metrics['trend_deviation']*100:.2f}%")
+            st.metric("All-Time Trend Dev",
+                      f"{total_metrics['trend_deviation_pct']:.1f}%")
 
 else:
     st.info(
