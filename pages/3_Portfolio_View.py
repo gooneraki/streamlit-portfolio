@@ -229,8 +229,13 @@ st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 # --- Optimal Portfolio Weights ---
 st.markdown("---")
 st.markdown("#### 🎯 Portfolio Optimization Strategies")
-
 optimisation_results = portfolio.get_optimisation_results()
+current_portfolio_index = [index for index, result in enumerate(
+    optimisation_results) if result.key == 'current_portfolio'][0]
+
+st.caption(
+    f"💡 **Note:** Current Portfolio Annual Return ({optimisation_results[current_portfolio_index].ann_arith_return:.1%}) is calculated from individual asset mean log returns with covariance, then annualized. CAGR ({total_metrics['cagr_pct']:.1f}%) is calculated directly from the TOTAL portfolio values over time.")
+
 if optimisation_results:
     # Create tabs dynamically based on available optimization results
     tab_names = ["📊 Strategy Comparison"]
