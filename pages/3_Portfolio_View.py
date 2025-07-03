@@ -19,6 +19,17 @@ with col1:
     username = st.text_input(label="Enter username",
                              key="username_input", type="password")
 
+    # Display authentication status
+    try:
+        if username == st.secrets["DB_USERNAME"]:
+            st.success("✅ Authenticated - Loading personalized portfolio data")
+        elif username:
+            st.warning("⚠️ Using default portfolio data")
+    except KeyError:
+        # Handle case where DB_USERNAME secret is missing
+        if username:
+            st.warning("⚠️ Using default portfolio data")
+
 
 def display_portfolio_weights(result):
     """Enhanced function to display portfolio weights with metrics and performance"""
@@ -288,35 +299,6 @@ if optimisation_results:
                 hide_index=True,
                 use_container_width=True
             )
-
-        st.markdown("---")
-        st.markdown("##### 📊 Key Insights")
-
-        if len(comparison_data) >= 2:
-            # Find best performing strategies
-            best_return_idx = max(range(len(comparison_data)),
-                                  key=lambda i: float(comparison_data[i]['Annual Return'].strip('%'))/100)
-
-            # Find best Sharpe ratio (excluding N/A values)
-            valid_sharpe_indices = [i for i in range(len(comparison_data))
-                                    if comparison_data[i]['Sharpe Ratio'] != 'N/A']
-            if valid_sharpe_indices:
-                best_sharpe_idx = max(valid_sharpe_indices,
-                                      key=lambda i: float(comparison_data[i]['Sharpe Ratio']))
-            else:
-                best_sharpe_idx = None
-
-            insight_col1, insight_col2 = st.columns(2)
-            with insight_col1:
-                st.success(f"🏆 **Highest Return:** {comparison_data[best_return_idx]['Strategy']} "
-                           f"({comparison_data[best_return_idx]['Annual Return']})")
-            with insight_col2:
-                if best_sharpe_idx is not None:
-                    st.success(f"⭐ **Best Risk-Adjusted:** {comparison_data[best_sharpe_idx]['Strategy']} "
-                               f"(Sharpe: {comparison_data[best_sharpe_idx]['Sharpe Ratio']})")
-                else:
-                    st.info(
-                        "⭐ **Best Risk-Adjusted:** No valid Sharpe ratios available")
 
     # Dynamic strategy tabs - start from index 1 (after comparison tab)
     tab_index = 1
