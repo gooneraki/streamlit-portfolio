@@ -360,8 +360,37 @@ st.markdown('#### Compare All Assets by Metric')
 all_metrics = [m for m in portfolio.timeseries_data.columns.get_level_values('Metric').unique()
                if m not in ['weights']]
 
-selected_metric = st.selectbox('Select Metric/Column', all_metrics, index=all_metrics.index(
-    'translated_values') if 'translated_values' in all_metrics else 0)
+# Create columns for metric selection and time period filter
+metric_col1, metric_col2 = st.columns([1, 1])
+
+with metric_col1:
+    selected_metric = st.selectbox('Select Metric/Column', all_metrics, index=all_metrics.index(
+        'translated_values') if 'translated_values' in all_metrics else 0)
+
+with metric_col2:
+    # Time period filter - reuse the same logic as single asset view
+    total_years = period_info.number_of_years
+    year_options = []
+
+    if total_years >= 1:
+        year_options.append("1 Year")
+    if total_years >= 3:
+        year_options.append("3 Years")
+    if total_years >= 5:
+        year_options.append("5 Years")
+    if total_years >= 10:
+        year_options.append("10 Years")
+    if total_years > 10:
+        year_options.append("10+ Years (All)")
+
+    # Default to the longest available period
+    default_period = year_options[-1] if year_options else "1 Year"
+
+    selected_period_multi = st.selectbox(
+        "Display Period",
+        year_options,
+        key="multi_asset_period"
+    )
 
 # Prepare data: exclude TOTAL for asset comparison
 asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values(
@@ -369,7 +398,20 @@ asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values(
 
 # Use the new chart function
 if selected_metric:
-    title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend"
+    # Filter data based on selected period
+    filtered_data = portfolio.timeseries_data.copy()
+
+    if selected_period_multi == "1 Year":
+        filtered_data = filtered_data.tail(round(points_per_year))
+    elif selected_period_multi == "3 Years":
+        filtered_data = filtered_data.tail(round(points_per_year * 3))
+    elif selected_period_multi == "5 Years":
+        filtered_data = filtered_data.tail(round(points_per_year * 5))
+    elif selected_period_multi == "10 Years":
+        filtered_data = filtered_data.tail(round(points_per_year * 10))
+    # For "10+ Years (All)", use all data (no filtering)
+
+    title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend ({selected_period_multi})"
     fig = display_multi_asset_metric_trend(
-        portfolio.timeseries_data, asset_names, selected_metric, title=title)
+        filtered_data, asset_names, selected_metric, title=title)
     st.plotly_chart(fig, use_container_width=True)
