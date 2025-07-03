@@ -116,11 +116,11 @@ class Portfolio:
         if not isinstance(log_returns, pd.DataFrame):
             raise ValueError("Log returns is not a DataFrame")
 
-        translated_fitted_values, trend_deviation, trend_deviation_z_score, cagr, cagr_fitted = self._calculate_fitted_values_and_metrics(
-            translated_values)
+        translated_fitted_values, trend_deviation, trend_deviation_z_score, cagr, cagr_fitted \
+            = self._calculate_fitted_values_and_metrics(translated_values)
 
-        rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y = self._calculate_rolling_statistics_for_periods(
-            log_returns)
+        rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y \
+            = self._calculate_rolling_statistics_for_periods(log_returns)
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
