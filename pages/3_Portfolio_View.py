@@ -141,7 +141,6 @@ st.markdown("---")
 
 # --- Portfolio TOTAL summary metrics ---
 assets_snapshot = portfolio.get_assets_snapshot()
-print(f"assets_snapshot: \n{assets_snapshot.T}\n")
 
 
 total_metrics = assets_snapshot.loc['TOTAL']
@@ -181,8 +180,10 @@ st.markdown("#### Current Portfolio Composition")
 # Select and reorder columns for better display
 display_columns = [
     'currency', 'position', 'translated_close', 'translated_values', 'weights_pct',
-    'cagr_pct', 'cagr_fitted_pct', 'rolling_1q_return_pct', 'rolling_1y_return_pct',
-    'trend_deviation_z_score', 'rolling_1q_return_z_score', 'rolling_1y_return_z_score']
+
+    'cagr_pct', 'rolling_1y_return_pct', 'rolling_1q_return_pct', 'rolling_1m_return_pct',
+    'cagr_fitted_pct',
+    'trend_deviation_z_score', 'rolling_1y_return_z_score', 'rolling_1q_return_z_score', 'rolling_1m_return_z_score']
 
 # Get the assets snapshot and select only the columns we want to display
 assets_display = portfolio.get_assets_snapshot()[display_columns]
@@ -197,21 +198,26 @@ st.dataframe(
         "translated_close": st.column_config.NumberColumn(
             label="Close Price", format="%.2f"),
         "translated_values": st.column_config.NumberColumn(
-            label="Value", format="localized"),
-
+            label="Value", format="accounting"),
         "trend_deviation_z_score": st.column_config.NumberColumn(
-            label="All-Time Trend Z", format="%.2f"),
-        "cagr_pct": st.column_config.NumberColumn(
-            label="All time Return", format="%.1f%%"),
-        "cagr_fitted_pct": st.column_config.NumberColumn(
-            label="All time Return Smoothed", format="%.1f%%"),
+            label="Value Trend Z", format="%.2f"),
 
+        "cagr_pct": st.column_config.NumberColumn(
+            label="CAGR", format="%.1f%%"),
+        "cagr_fitted_pct": st.column_config.NumberColumn(
+            label="CAGR Fitted", format="%.1f%%"),
+
+        "rolling_1m_return_pct": st.column_config.NumberColumn(
+            label="1M Return", format="%.1f%%"),
         "rolling_1q_return_pct": st.column_config.NumberColumn(
             label="1Q Return", format="%.1f%%"),
-        "rolling_1q_return_z_score": st.column_config.NumberColumn(
-            label="1Q Return Z", format="%.2f"),
         "rolling_1y_return_pct": st.column_config.NumberColumn(
             label="1Y Return", format="%.1f%%"),
+
+        "rolling_1m_return_z_score": st.column_config.NumberColumn(
+            label="1M Return Z", format="%.2f"),
+        "rolling_1q_return_z_score": st.column_config.NumberColumn(
+            label="1Q Return Z", format="%.2f"),
         "rolling_1y_return_z_score": st.column_config.NumberColumn(
             label="1Y Return Z", format="%.2f"),
 
