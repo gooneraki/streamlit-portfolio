@@ -154,8 +154,10 @@ st.markdown("---")
 
 
 # --- Portfolio TOTAL summary metrics ---
-assets_metrics = portfolio.get_assets_metrics()
-total_metrics = assets_metrics.loc['TOTAL']
+assets_snapshot = portfolio.get_assets_snapshot()
+print(f"\nassets_snapshot:\n{assets_snapshot.T}")
+
+total_metrics = assets_snapshot.loc['TOTAL']
 
 st.markdown("#### 🏆 Portfolio Total Summary")
 sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
@@ -177,7 +179,7 @@ st.markdown("---")
 
 st.markdown("#### Current Portfolio Composition")
 st.dataframe(
-    pd.DataFrame(portfolio.get_assets_metrics().drop(
+    pd.DataFrame(portfolio.get_assets_snapshot().drop(
         columns=['cagr', 'cagr_fitted', 'latest_weights'])),
     column_config={
         "position": st.column_config.NumberColumn(label="Position", format="localized"),
@@ -260,7 +262,7 @@ if optimisation_results:
                 })
 
         # Add current portfolio to comparison
-        current_weights = assets_metrics.drop('TOTAL')['latest_weights']
+        current_weights = assets_snapshot.drop('TOTAL')['latest_weights']
         current_herfindahl = (current_weights ** 2).sum()
         current_effective_n = 1 / current_herfindahl
         current_max_weight = current_weights.max()
@@ -311,7 +313,7 @@ if optimisation_results:
         st.markdown("##### 📋 Current Portfolio Analysis")
 
         # Show current portfolio as comparison
-        current_weights = assets_metrics.drop('TOTAL')['latest_weights']
+        current_weights = assets_snapshot.drop('TOTAL')['latest_weights']
         current_weights_df = pd.DataFrame({
             'Asset': current_weights.index,
             'Weight': current_weights.values,
