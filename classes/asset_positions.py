@@ -48,6 +48,7 @@ class PortfolioOptimizationResult:
     ann_log_sharpe_ratio: float
     ann_arith_return: float
     ann_arith_sharpe_ratio: float
+    herfindahl_index: float
 
 
 @dataclass
@@ -178,7 +179,7 @@ class Portfolio:
         """ Get the assets snapshot """
         return self.assets_snapshot
 
-    def get_optimisation_results(self) -> dict[str, PortfolioOptimizationResult]:
+    def get_optimisation_results(self) -> list[PortfolioOptimizationResult]:
         """ Get the optimization results """
         return self.optimisation_results
 
@@ -440,11 +441,52 @@ class Portfolio:
         bounds = tuple((0, 1) for _ in range(n_assets))
         constraints = {'type': 'eq', 'fun': lambda x: np.sum(x) - 1}
 
+        # Helper function to calculate portfolio metrics
+        def calculate_portfolio_metrics(weights, key, name, emoji):
+            port_log_return = np.sum(weights * mean_log_returns)
+            port_log_vol = np.sqrt(
+                np.dot(weights.T, np.dot(cov_log_matrix, weights)))
+            port_log_sharpe_ratio = (
+                port_log_return - risk_free_rate) / port_log_vol if port_log_vol > 0 else 0
+
+            ann_log_return = port_log_return * points_per_year
+            ann_vol = port_log_vol * np.sqrt(points_per_year)
+            ann_log_sharpe_ratio = (
+                ann_log_return - risk_free_rate) / ann_vol if ann_vol > 0 else 0
+
+            ann_arith_return = np.exp(ann_log_return) - 1
+            ann_arith_sharpe_ratio = (
+                ann_arith_return - risk_free_rate) / ann_vol if ann_vol > 0 else 0
+
+            herfindahl_index = np.sum(weights ** 2)
+
+            return PortfolioOptimizationResult(
+                key=key,
+                name=name,
+                emoji=emoji,
+                weights=weights,
+                log_return=port_log_return,
+                log_vol=port_log_vol,
+                log_sharpe_ratio=port_log_sharpe_ratio,
+                ann_log_return=ann_log_return,
+                ann_vol=ann_vol,
+                ann_log_sharpe_ratio=ann_log_sharpe_ratio,
+                ann_arith_return=ann_arith_return,
+                ann_arith_sharpe_ratio=ann_arith_sharpe_ratio,
+                herfindahl_index=herfindahl_index
+            )
+
         # ================================
         # PORTFOLIO OPTIMIZATION - MULTIPLE STRATEGIES
         # ================================
 
-        optimal_weights_dict: dict[str, PortfolioOptimizationResult] = {}
+        # Initialize with current portfolio
+        optimal_weights: list[PortfolioOptimizationResult] = [calculate_portfolio_metrics(
+            self.timeseries_data.xs(
+                'weights', level='Metric', axis=1).iloc[-1].drop('TOTAL', errors='ignore'),
+            'current_portfolio',
+            'Current Portfolio',
+            '💼')]
 
         # Define optimization strategies
         strategies = [
@@ -482,58 +524,31 @@ class Portfolio:
                               method='SLSQP', bounds=bounds, constraints=constraints)
 
             if result.success:
-
-                optimal_weights = pd.Series(
+                weights = pd.Series(
                     result.x, index=mean_log_returns.index)
-
-                # Daily logarithmic return and volatility
-                port_log_return = np.sum(optimal_weights * mean_log_returns)
-                port_log_vol = np.sqrt(
-                    np.dot(optimal_weights.T, np.dot(cov_log_matrix, optimal_weights)))
-                port_log_sharpe_ratio = (
-                    port_log_return - risk_free_rate) / port_log_vol
-
-                # Annualized logarithmic return and volatility
-                ann_log_return = port_log_return * points_per_year
-                ann_vol = port_log_vol * np.sqrt(points_per_year)
-                ann_log_sharpe_ratio = (
-                    ann_log_return - risk_free_rate) / ann_vol
-
-                # Annualized arithmetic return and sharpe ratio
-                ann_arith_return = np.exp(ann_log_return) - 1
-                ann_arith_sharpe_ratio = (ann_arith_return - risk_free_rate) / \
-                    ann_vol if ann_vol > 0 else 0
-
-                optimal_weights_dict[strategy['key']] = PortfolioOptimizationResult(
-                    key=strategy['key'],
-                    name=strategy['name'],
-                    emoji=strategy['emoji'],
-                    weights=optimal_weights,
-
-                    log_return=port_log_return,
-                    log_vol=port_log_vol,
-                    log_sharpe_ratio=port_log_sharpe_ratio,
-
-                    ann_log_return=ann_log_return,
-                    ann_vol=ann_vol,
-                    ann_log_sharpe_ratio=ann_log_sharpe_ratio,
-                    ann_arith_return=ann_arith_return,
-                    ann_arith_sharpe_ratio=ann_arith_sharpe_ratio,
-                )
+                optimal_weights.append(calculate_portfolio_metrics(
+                    weights, strategy['key'], strategy['name'], strategy['emoji']))
 
             else:
                 print(
                     f"❌ {strategy['name']} optimization failed: {result.message}")
 
-        # Validations
-        if 'min_volatility' in optimal_weights_dict:
-            min_volatility_result = optimal_weights_dict['min_volatility']
+        # Sort by ann_vol ascending
+        optimal_weights.sort(key=lambda x: x.ann_vol)
+
+        # Validations - exclude current portfolio from min volatility validation
+        min_volatility_results = [
+            r for r in optimal_weights if r.key == 'min_volatility']
+        if min_volatility_results:
+            min_volatility_result = min_volatility_results[0]
             other_results = [
-                ele for ele in optimal_weights_dict.values() if ele.key != 'min_volatility']
+                r for r in optimal_weights
+                if r.key not in ['min_volatility', 'current_portfolio']
+            ]
 
             for other_result in other_results:
                 if min_volatility_result.ann_vol > other_result.ann_vol:
                     raise ValueError(f"⚠️ Warning: Min Volatility strategy ({min_volatility_result.ann_vol:.4f}) "
                                      f"has higher volatility than {other_result.name} ({other_result.ann_vol:.4f})")
 
-        return optimal_weights_dict
+        return optimal_weights
