@@ -23,12 +23,11 @@ with col1:
     try:
         if username == st.secrets["DB_USERNAME"]:
             st.success("✅ Authenticated - Loading personalized portfolio data")
-        elif username:
-            st.warning("⚠️ Using default portfolio data")
+        else:
+            st.warning(
+                "⚠️ Using default portfolio data. Enter your username to load personalized portfolio data.")
     except KeyError:
-        # Handle case where DB_USERNAME secret is missing
-        if username:
-            st.warning("⚠️ Using default portfolio data")
+        st.warning("⚠️ Using default portfolio data")
 
 
 def display_portfolio_weights(result):

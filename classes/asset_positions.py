@@ -90,12 +90,13 @@ class Portfolio:
             asset_symbols+currency_symbols, period='max')
         # <<<
 
-        translated_values = self._get_translated_history(
+        translated_close, translated_values = self._get_translated_history(
             asset_positions, reference_currency, currency_symbols)
 
         weights = translated_values.div(translated_values.sum(axis=1), axis=0)
 
         translated_values['TOTAL'] = translated_values.sum(axis=1)
+        weights['TOTAL'] = weights.sum(axis=1)
 
         translated_fitted_values, trend_deviation, trend_deviation_z_score = self._get_fitted_values(
             translated_values)
@@ -114,6 +115,7 @@ class Portfolio:
         self.timeseries_data = pd.concat(
             objs=[
                 weights,
+                translated_close,
                 translated_values, translated_fitted_values,
                 trend_deviation, trend_deviation_z_score,
                 log_returns, cumulative_log_returns,
@@ -123,6 +125,7 @@ class Portfolio:
             axis=1,
             keys=[
                 'weights',
+                'translated_close',
                 'translated_values', 'translated_fitted_values',
                 'trend_deviation', 'trend_deviation_z_score',
                 'log_returns', 'cumulative_log_returns',
@@ -136,6 +139,7 @@ class Portfolio:
         latest_timeseries_data: pd.Series = self.timeseries_data.iloc[-1]
         latest_timeseries_df: pd.DataFrame = latest_timeseries_data.unstack(
             level='Metric')
+        print(f"latest_timeseries_df CSPX.L: {latest_timeseries_df['CSPX.L']}")
 
         first_value, last_value, first_fitted_value, last_fitted_value = self.get_first_last_values(
             translated_values, translated_fitted_values)
@@ -374,6 +378,7 @@ class Portfolio:
             raise ValueError("Currency history is not a DataFrame")
 
         translated_values = assets_history.copy()
+        translated_close = assets_history.copy()
 
         # Create a dictionary to map asset_symbols to positions for quick lookup
         positions_dict = {ass_pos.symbol: ass_pos.position
@@ -390,7 +395,10 @@ class Portfolio:
                 translated_values[symbol] = translated_values[symbol] * \
                     currency_history[currency_column]
 
-        return translated_values
+                translated_close[symbol] = translated_close[symbol] * \
+                    currency_history[currency_column]
+
+        return translated_close, translated_values
 
     def _calculate_portfolio_optimisation(self, p_log_returns: pd.DataFrame):
         """ Calculate optimal weights  """
