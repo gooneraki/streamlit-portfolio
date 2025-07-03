@@ -188,43 +188,74 @@ display_columns = [
 # Get the assets snapshot and select only the columns we want to display
 assets_display = portfolio.get_assets_snapshot()[display_columns]
 
+# Function to apply conditional formatting to z-scores
+
+
+def color_z_scores(val):
+    """
+    Color z-scores: green for positive, red for negative
+    """
+    if pd.isna(val):
+        return ''
+    elif val > 0:
+        # Light green background
+        return 'background-color: #d4edda; color: #155724; font-weight: bold'
+    elif val < 0:
+        # Light red background
+        return 'background-color: #f8d7da; color: #721c24; font-weight: bold'
+    else:
+        return 'color: #6c757d; font-weight: bold'  # Gray for zero
+
+
+# Apply styling to z-score columns
+z_score_columns = ['trend_deviation_z_score', 'rolling_1m_return_z_score',
+                   'rolling_1q_return_z_score', 'rolling_1y_return_z_score']
+
+# Rename columns for better display
+assets_display_renamed = assets_display.rename(columns={
+    'position': 'Position',
+    'weights_pct': 'Weight',
+    'translated_close': 'Close Price',
+    'translated_values': 'Value',
+    'trend_deviation_z_score': 'Value Z',
+    'cagr_pct': 'CAGR',
+    'cagr_fitted_pct': 'CAGR Fitted',
+    'rolling_1m_return_pct': '1M Return',
+    'rolling_1q_return_pct': '1Q Return',
+    'rolling_1y_return_pct': '1Y Return',
+    'rolling_1m_return_z_score': '1M Return Z',
+    'rolling_1q_return_z_score': '1Q Return Z',
+    'rolling_1y_return_z_score': '1Y Return Z',
+    'currency': 'Currency'
+})
+
+z_score_columns_renamed = ['Value Z',
+                           '1M Return Z', '1Q Return Z', '1Y Return Z']
+
+styled_assets_display = assets_display_renamed.style.format({
+    'Position': '{:,.0f}',
+    'Weight': '{:.1f}%',
+    'Close Price': '{:.2f}',
+    'Value': '{:,.0f}',
+    'CAGR': '{:.1f}%',
+    '1Y Return': '{:.1f}%',
+    '1Q Return': '{:.1f}%',
+    '1M Return': '{:.1f}%',
+    'CAGR Fitted': '{:.1f}%',
+    'Value Z': '{:.2f}',
+    '1Y Return Z': '{:.2f}',
+    '1Q Return Z': '{:.2f}',
+    '1M Return Z': '{:.2f}'
+}).apply(lambda x: [color_z_scores(val) if x.name in z_score_columns_renamed else '' for val in x], axis=0)
+
+# Display the styled dataframe
 st.dataframe(
-    assets_display,
-    column_config={
-        "position": st.column_config.NumberColumn(
-            label="Position", format="localized"),
-        "weights_pct": st.column_config.NumberColumn(
-            label="Weight", format="%.1f%%"),
-        "translated_close": st.column_config.NumberColumn(
-            label="Close Price", format="%.2f"),
-        "translated_values": st.column_config.NumberColumn(
-            label="Value", format="accounting"),
-        "trend_deviation_z_score": st.column_config.NumberColumn(
-            label="Value Trend Z", format="%.2f"),
+    styled_assets_display,
+    use_container_width=True
+)
 
-        "cagr_pct": st.column_config.NumberColumn(
-            label="CAGR", format="%.1f%%"),
-        "cagr_fitted_pct": st.column_config.NumberColumn(
-            label="CAGR Fitted", format="%.1f%%"),
-
-        "rolling_1m_return_pct": st.column_config.NumberColumn(
-            label="1M Return", format="%.1f%%"),
-        "rolling_1q_return_pct": st.column_config.NumberColumn(
-            label="1Q Return", format="%.1f%%"),
-        "rolling_1y_return_pct": st.column_config.NumberColumn(
-            label="1Y Return", format="%.1f%%"),
-
-        "rolling_1m_return_z_score": st.column_config.NumberColumn(
-            label="1M Return Z", format="%.2f"),
-        "rolling_1q_return_z_score": st.column_config.NumberColumn(
-            label="1Q Return Z", format="%.2f"),
-        "rolling_1y_return_z_score": st.column_config.NumberColumn(
-            label="1Y Return Z", format="%.2f"),
-
-        "currency": st.column_config.TextColumn(label="Currency")
-    })
-
-st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
+st.caption(
+    f"All values as of {last_date.strftime('%Y-%m-%d')} • Z-scores: 🟢 Positive (above average) 🔴 Negative (below average)")
 
 # --- Optimal Portfolio Weights ---
 st.markdown("---")
