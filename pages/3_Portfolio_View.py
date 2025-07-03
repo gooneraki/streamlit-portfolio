@@ -150,9 +150,11 @@ sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
 with sum_col1:
     st.metric("Rolling 1Q Return",
               f"{total_metrics['rolling_1q_return_pct']:.1f}%")
+    st.caption(f"Z-Score: {total_metrics['rolling_1q_return_z_score']:.2f}")
 with sum_col2:
     st.metric("Rolling 1Y Return",
               f"{total_metrics['rolling_1y_return_pct']:.1f}%")
+    st.caption(f"Z-Score: {total_metrics['rolling_1y_return_z_score']:.2f}")
 with sum_col3:
     st.metric("All-Time Return Smoothed",
               f"{total_metrics['cagr_fitted_pct']:.1f}%")
@@ -160,6 +162,8 @@ with sum_col4:
     st.metric("All time Return", f"{total_metrics['cagr_pct']:.1f}%")
 with sum_col5:
     st.metric("Latest Value", f"{total_metrics['translated_values']:,.0f}")
+    st.caption(
+        f"Trend Z-Score: {total_metrics['trend_deviation_z_score']:.2f}")
 
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 
