@@ -1,6 +1,7 @@
 """ Module for asset positions and portfolio """
 
 from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from pandas.core.window.rolling import Rolling
@@ -20,6 +21,7 @@ class RollingStats:
     rolling_sum: pd.DataFrame
     rolling_sum_z_score: pd.DataFrame
     rolling_annualised_return: pd.DataFrame
+    rolling_annualised_return_z_score: pd.DataFrame
 
 
 @dataclass
@@ -57,7 +59,6 @@ class PeriodInfo:
     number_of_years: float
     points_per_year: float
     points_per_month: float
-    years_series: pd.Series
 
 
 class Portfolio:
@@ -95,6 +96,13 @@ class Portfolio:
 
         weights = translated_values.div(translated_values.sum(axis=1), axis=0)
 
+        position_df = pd.DataFrame(
+            data=[positions_series.reindex(
+                translated_values.columns)] * len(translated_values),
+            index=translated_values.index,
+            columns=translated_values.columns)
+
+        # Add a total column to the translated values and weights
         translated_values['TOTAL'] = translated_values.sum(axis=1)
         weights['TOTAL'] = weights.sum(axis=1)
 
@@ -105,47 +113,53 @@ class Portfolio:
             rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y = self._get_logarithmic_values(
                 translated_values)
 
-        self.optimisation_results = self._calculate_portfolio_optimisation(
-            log_returns)
-
-        period_info = self.get_period_info()
-        number_of_years = period_info.number_of_years
-
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
             objs=[
+                position_df,
                 weights,
                 translated_close,
                 translated_values, translated_fitted_values,
                 trend_deviation, trend_deviation_z_score,
                 log_returns, cumulative_log_returns,
                 annualized_to_date_return,
-                rolling_stats_1m.rolling_mean_z_score, rolling_stats_1q.rolling_mean_z_score,
-                rolling_stats_1y.rolling_mean_z_score, rolling_stats_3y.rolling_mean_z_score],
+                rolling_stats_1m.rolling_annualised_return, rolling_stats_1q.rolling_annualised_return,
+                rolling_stats_1y.rolling_annualised_return, rolling_stats_3y.rolling_annualised_return],
             axis=1,
             keys=[
+                'position',
                 'weights',
                 'translated_close',
                 'translated_values', 'translated_fitted_values',
                 'trend_deviation', 'trend_deviation_z_score',
                 'log_returns', 'cumulative_log_returns',
                 'annualized_to_date_return',
-                'rolling_1m_mean_z_score', 'rolling_1q_mean_z_score',
-                'rolling_1y_mean_z_score', 'rolling_3y_mean_z_score'])
+                'rolling_1m_annualised_return', 'rolling_1q_annualised_return',
+                'rolling_1y_annualised_return', 'rolling_3y_annualised_return'])
 
         self.timeseries_data.columns.names = ['Metric', 'Ticker']
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+        self.optimisation_results = self._calculate_portfolio_optimisation(
+            log_returns)
+
+        period_info = self.get_period_info()
+        number_of_years = period_info.number_of_years
+
         latest_timeseries_data: pd.Series = self.timeseries_data.iloc[-1]
         latest_timeseries_df: pd.DataFrame = latest_timeseries_data.unstack(
             level='Metric')
-        print(f"latest_timeseries_df CSPX.L: {latest_timeseries_df['CSPX.L']}")
+
+        # Debug with proper DataFrame access
+        print(
+            f"\nlatest_timeseries_df CSPX.L:\n{latest_timeseries_df.loc[['CSPX.L', 'TOTAL']].T}")
 
         first_value, last_value, first_fitted_value, last_fitted_value = self.get_first_last_values(
             translated_values, translated_fitted_values)
 
         cagr: pd.Series = (
             last_value / first_value) ** (1 / number_of_years) - 1
+
         cagr_fitted: pd.Series = (last_fitted_value /
                                   first_fitted_value) ** (1 / number_of_years) - 1
 
@@ -210,11 +224,6 @@ class Portfolio:
 
     def get_period_info(self) -> PeriodInfo:
         """ Get the period info for the given history """
-        period_series = pd.Series(
-            data=np.arange(0, len(self.tickers_data['history'])),
-            index=self.tickers_data['history'].index,
-            name='period'
-        )
 
         first_date = self.tickers_data['history'].index[0]
         last_date = self.tickers_data['history'].index[-1]
@@ -226,14 +235,11 @@ class Portfolio:
 
         number_of_points = self.tickers_data['history'].shape[0]
         number_of_days = (last_date - first_date).days + 1
+
         points_per_day = number_of_points / number_of_days
         number_of_years = number_of_days / 365.25
         points_per_year = number_of_points / number_of_years
         points_per_month = points_per_year / 12
-
-        years_series = period_series / points_per_year
-        if not isinstance(years_series, pd.Series):
-            raise ValueError("Years series is not a Series")
 
         return PeriodInfo(
             first_date=first_date,
@@ -243,8 +249,7 @@ class Portfolio:
             points_per_day=points_per_day,
             number_of_years=number_of_years,
             points_per_year=points_per_year,
-            points_per_month=points_per_month,
-            years_series=years_series
+            points_per_month=points_per_month
         )
 
     def _get_logarithmic_values(self, translated_values: pd.DataFrame):
@@ -264,11 +269,8 @@ class Portfolio:
         if not isinstance(cumulative_log_returns, pd.DataFrame):
             raise ValueError("Cumulative log returns is not a DataFrame")
 
-        annualized_to_date_return = (pd.DataFrame(
-            np.exp(cumulative_log_returns),
-            index=cumulative_log_returns.index,
-            columns=cumulative_log_returns.columns
-        ).pow(1/period_info.years_series, axis=0) - 1).dropna()
+        annualized_to_date_return = np.exp(
+            cumulative_log_returns*period_info.points_per_year/cumulative_log_returns.shape[0]) - 1
 
         if not isinstance(annualized_to_date_return, pd.DataFrame):
             raise ValueError(
@@ -297,35 +299,37 @@ class Portfolio:
         """ Get rolling stats for the given log returns """
         period_info = self.get_period_info()
 
-        rolling = p_log_returns.rolling(window=round(p_window))
+        window = round(p_window)
+
+        rolling = p_log_returns.rolling(window=window)
         if not isinstance(rolling, Rolling):
             raise ValueError("Rolling is not a Rolling")
 
-        rolling_mean = rolling.mean().dropna()
+        rolling_mean = rolling.mean()
+        rolling_std = rolling.std()
+        rolling_sum = rolling.sum()
+
+        rolling_annualised_return = np.exp(
+            rolling_sum * period_info.points_per_year / window) - 1
+
         if not isinstance(rolling_mean, pd.DataFrame):
             raise ValueError("Rolling mean is not a DataFrame")
+        if not isinstance(rolling_std, pd.DataFrame):
+            raise ValueError("Rolling std is not a DataFrame")
+        if not isinstance(rolling_sum, pd.DataFrame):
+            raise ValueError("Rolling sum is not a DataFrame")
 
         rolling_mean_z_score = (
             rolling_mean - rolling_mean.mean()) / rolling_mean.std()
 
-        rolling_std = rolling.std().dropna()
-        if not isinstance(rolling_std, pd.DataFrame):
-            raise ValueError("Rolling std is not a DataFrame")
-
         rolling_std_z_score = (
             rolling_std - rolling_std.mean()) / rolling_std.std()
-
-        rolling_sum = rolling.sum().dropna()
-        if not isinstance(rolling_sum, pd.DataFrame):
-            raise ValueError("Rolling sum is not a DataFrame")
 
         rolling_sum_z_score = (
             rolling_sum - rolling_sum.mean()) / rolling_sum.std()
 
-        rolling_annualised_return = pd.DataFrame(
-            np.exp(rolling_sum),
-            index=rolling_sum.index,
-            columns=rolling_sum.columns) ** (p_window/period_info.points_per_year) - 1
+        rolling_annualised_return_z_score = (
+            rolling_annualised_return - rolling_annualised_return.mean()) / rolling_annualised_return.std()
 
         return RollingStats(
             rolling_mean=rolling_mean,
@@ -334,7 +338,8 @@ class Portfolio:
             rolling_std_z_score=rolling_std_z_score,
             rolling_sum=rolling_sum,
             rolling_sum_z_score=rolling_sum_z_score,
-            rolling_annualised_return=rolling_annualised_return)
+            rolling_annualised_return=rolling_annualised_return,
+            rolling_annualised_return_z_score=rolling_annualised_return_z_score)
 
     def _get_fitted_values(self, translated_values: pd.DataFrame):
         """ Get fitted values for each symbol individually """
