@@ -141,6 +141,7 @@ st.markdown("---")
 
 # --- Portfolio TOTAL summary metrics ---
 assets_snapshot = portfolio.get_assets_snapshot()
+print(f"assets_snapshot: \n{assets_snapshot.T}\n")
 
 
 total_metrics = assets_snapshot.loc['TOTAL']
@@ -148,22 +149,28 @@ total_metrics = assets_snapshot.loc['TOTAL']
 st.markdown("#### 🏆 Portfolio Total Summary")
 sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
 with sum_col1:
+    st.metric("Rolling 1M Return",
+              f"{total_metrics['rolling_1m_return_pct']:.1f}%")
+    st.caption(f"Z-Score: {total_metrics['rolling_1m_return_z_score']:.2f}")
+
+with sum_col2:
     st.metric("Rolling 1Q Return",
               f"{total_metrics['rolling_1q_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1q_return_z_score']:.2f}")
-with sum_col2:
+
+with sum_col3:
     st.metric("Rolling 1Y Return",
               f"{total_metrics['rolling_1y_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1y_return_z_score']:.2f}")
-with sum_col3:
-    st.metric("All-Time Return Smoothed",
-              f"{total_metrics['cagr_fitted_pct']:.1f}%")
+
 with sum_col4:
-    st.metric("All time Return", f"{total_metrics['cagr_pct']:.1f}%")
+    st.metric("CAGR", f"{total_metrics['cagr_pct']:.1f}%")
+    st.caption(f"Fitted: {total_metrics['cagr_fitted_pct']:.1f}%")
+
 with sum_col5:
-    st.metric("Latest Value", f"{total_metrics['translated_values']:,.0f}")
+    st.metric("Portfolio Value", f"{total_metrics['translated_values']:,.0f}")
     st.caption(
-        f"Trend Z-Score: {total_metrics['trend_deviation_z_score']:.2f}")
+        f"Z-Score: {total_metrics['trend_deviation_z_score']:.2f}")
 
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 
@@ -173,7 +180,7 @@ st.markdown("#### Current Portfolio Composition")
 
 # Select and reorder columns for better display
 display_columns = [
-    'currency', 'position', 'translated_close', 'translated_values', 'latest_weights_pct',
+    'currency', 'position', 'translated_close', 'translated_values', 'weights_pct',
     'cagr_pct', 'cagr_fitted_pct', 'rolling_1q_return_pct', 'rolling_1y_return_pct',
     'trend_deviation_z_score', 'rolling_1q_return_z_score', 'rolling_1y_return_z_score']
 
@@ -185,7 +192,7 @@ st.dataframe(
     column_config={
         "position": st.column_config.NumberColumn(
             label="Position", format="localized"),
-        "latest_weights_pct": st.column_config.NumberColumn(
+        "weights_pct": st.column_config.NumberColumn(
             label="Weight", format="%.1f%%"),
         "translated_close": st.column_config.NumberColumn(
             label="Close Price", format="%.2f"),

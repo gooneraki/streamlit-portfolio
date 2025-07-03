@@ -95,7 +95,7 @@ class Portfolio:
             asset_symbols+currency_symbols, period='max')
         # <<<
 
-        translated_close, translated_values = self._get_translated_history(
+        translated_close, translated_values = self._calculate_currency_translated_history(
             asset_positions, reference_currency, currency_symbols)
 
         weights = translated_values.div(translated_values.sum(axis=1), axis=0)
@@ -110,12 +110,17 @@ class Portfolio:
         translated_values['TOTAL'] = translated_values.sum(axis=1)
         weights['TOTAL'] = weights.sum(axis=1)
 
-        translated_fitted_values, trend_deviation, trend_deviation_z_score, cagr_fitted = self._get_fitted_values(
+        log_returns = np.log(translated_values /
+                             translated_values.shift(1)).dropna()
+
+        if not isinstance(log_returns, pd.DataFrame):
+            raise ValueError("Log returns is not a DataFrame")
+
+        translated_fitted_values, trend_deviation, trend_deviation_z_score, cagr, cagr_fitted = self._calculate_fitted_values_and_metrics(
             translated_values)
 
-        log_returns, cumulative_log_returns, annualized_to_date_return, \
-            rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y = self._get_logarithmic_values(
-                translated_values)
+        rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y = self._calculate_rolling_statistics_for_periods(
+            log_returns)
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
@@ -124,9 +129,9 @@ class Portfolio:
                 weights,
                 translated_close,
                 translated_values, translated_fitted_values,
+                cagr, cagr_fitted,
                 trend_deviation, trend_deviation_z_score,
-                log_returns, cumulative_log_returns,
-                annualized_to_date_return,
+                log_returns,
                 rolling_stats_1m.rolling_return, rolling_stats_1q.rolling_return,
                 rolling_stats_1y.rolling_return, rolling_stats_3y.rolling_return,
                 rolling_stats_1m.rolling_return_z_score, rolling_stats_1q.rolling_return_z_score,
@@ -137,9 +142,9 @@ class Portfolio:
                 'weights',
                 'translated_close',
                 'translated_values', 'translated_fitted_values',
+                'cagr', 'cagr_fitted',
                 'trend_deviation', 'trend_deviation_z_score',
-                'log_returns', 'cumulative_log_returns',
-                'annualized_to_date_return',
+                'log_returns',
                 'rolling_1m_return', 'rolling_1q_return',
                 'rolling_1y_return', 'rolling_3y_return',
                 'rolling_1m_return_z_score', 'rolling_1q_return_z_score',
@@ -156,11 +161,12 @@ class Portfolio:
 
         # Add additional metrics
         self.assets_snapshot['currency'] = currencies_series
-        self.assets_snapshot['cagr_fitted'] = cagr_fitted
-        self.assets_snapshot['cagr_fitted_pct'] = cagr_fitted.mul(100)
-        self.assets_snapshot['latest_weights_pct'] = self.assets_snapshot['weights'].mul(
+
+        self.assets_snapshot['cagr_pct'] = self.assets_snapshot['cagr'].mul(
             100)
-        self.assets_snapshot['cagr_pct'] = self.assets_snapshot['annualized_to_date_return'].mul(
+        self.assets_snapshot['cagr_fitted_pct'] = self.assets_snapshot['cagr_fitted'].mul(
+            100)
+        self.assets_snapshot['weights_pct'] = self.assets_snapshot['weights'].mul(
             100)
         self.assets_snapshot['trend_deviation_pct'] = self.assets_snapshot['trend_deviation'].mul(
             100)
@@ -183,13 +189,13 @@ class Portfolio:
         """ Get the optimization results """
         return self.optimisation_results
 
-    def get_asset_series(self, p_asset: str):
+    def get_asset_series(self, asset: str):
         """ Get the series for the given asset """
 
-        if not p_asset in self.timeseries_data.columns.get_level_values('Ticker').unique():
-            raise ValueError(f"Asset {p_asset} not found in timeseries data")
+        if not asset in self.timeseries_data.columns.get_level_values('Ticker').unique():
+            raise ValueError(f"Asset {asset} not found in timeseries data")
 
-        return self.timeseries_data.xs(p_asset, level='Ticker', axis=1)
+        return self.timeseries_data.xs(asset, level='Ticker', axis=1)
 
     def get_period_info(self) -> PeriodInfo:
         """ Get the period info for the given history """
@@ -221,56 +227,32 @@ class Portfolio:
             points_per_month=points_per_month
         )
 
-    def _get_logarithmic_values(self, translated_values: pd.DataFrame):
-        """ Get logarithmic values for the given history """
+    def _calculate_rolling_statistics_for_periods(self, log_returns: pd.DataFrame):
+        """ Calculate rolling statistics for different time periods (1m, 1q, 1y, 3y) """
 
         period_info = self.get_period_info()
-        points_per_year = period_info.points_per_year
 
-        log_returns = np.log(translated_values /
-                             translated_values.shift(1)).dropna()
-
-        if not isinstance(log_returns, pd.DataFrame):
-            raise ValueError("Log returns is not a DataFrame")
-
-        cumulative_log_returns = log_returns.cumsum()
-
-        if not isinstance(cumulative_log_returns, pd.DataFrame):
-            raise ValueError("Cumulative log returns is not a DataFrame")
-
-        annualized_to_date_return = np.exp(
-            cumulative_log_returns*period_info.points_per_year/cumulative_log_returns.shape[0]) - 1
-
-        if not isinstance(annualized_to_date_return, pd.DataFrame):
-            raise ValueError(
-                "Annualized to date return is not a DataFrame")
-
-        # just remove 1 year of data (to remove starting values which are created from very few data points)
-        annualized_to_date_return = annualized_to_date_return.iloc[round(
-            points_per_year * 1):]
-
-        rolling_stats_1m = self._get_rolling_stats(
+        rolling_stats_1m = self._calculate_rolling_statistics(
             log_returns, period_info.points_per_month)
 
-        rolling_stats_1q = self._get_rolling_stats(
+        rolling_stats_1q = self._calculate_rolling_statistics(
             log_returns, period_info.points_per_year / 4)
 
-        rolling_stats_1y = self._get_rolling_stats(
+        rolling_stats_1y = self._calculate_rolling_statistics(
             log_returns, period_info.points_per_year)
 
-        rolling_stats_3y = self._get_rolling_stats(
+        rolling_stats_3y = self._calculate_rolling_statistics(
             log_returns, period_info.points_per_year * 3)
 
-        return log_returns, cumulative_log_returns, annualized_to_date_return, \
-            rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y
+        return rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y
 
-    def _get_rolling_stats(self, p_log_returns: pd.DataFrame, p_window: float):
-        """ Get rolling stats for the given log returns """
+    def _calculate_rolling_statistics(self, log_returns: pd.DataFrame, window_size: float):
+        """ Calculate rolling statistics for the given log returns and window size """
         period_info = self.get_period_info()
 
-        window = round(p_window)
+        window = round(window_size)
 
-        rolling = p_log_returns.rolling(window=window)
+        rolling = log_returns.rolling(window=window)
         if not isinstance(rolling, Rolling):
             raise ValueError("Rolling is not a Rolling")
 
@@ -319,8 +301,8 @@ class Portfolio:
             rolling_annualised_return=rolling_annualised_return,
             rolling_annualised_return_z_score=rolling_annualised_return_z_score)
 
-    def _get_fitted_values(self, translated_values: pd.DataFrame):
-        """ Get fitted values for each symbol individually """
+    def _calculate_fitted_values_and_metrics(self, translated_values: pd.DataFrame):
+        """ Calculate fitted values, trend deviations, and CAGR metrics for each symbol """
 
         fitted_values = pd.DataFrame(index=translated_values.index)
 
@@ -336,23 +318,9 @@ class Portfolio:
         trend_deviation = (
             translated_values / fitted_values) - 1
 
-        if not isinstance(trend_deviation, pd.DataFrame):
-            raise ValueError("Trend deviation is not a DataFrame")
-
         trend_deviation_z_score = (trend_deviation - trend_deviation.mean()) / \
             trend_deviation.std()
 
-        if not isinstance(trend_deviation_z_score, pd.DataFrame):
-            raise ValueError("Trend deviation z-score is not a DataFrame")
-
-        cagr_fitted = (fitted_values.iloc[-1] / fitted_values.iloc[0]) ** (
-            1 / self.get_period_info().number_of_years) - 1
-
-        if not isinstance(cagr_fitted, pd.Series):
-            raise ValueError("CAGR fitted is not a Series")
-
-        # This should divide each column by its first value
-        # Create time matrix: each column has the same time index (0, 1, 2, ...)
         time_indices = np.arange(len(translated_values))
         time_matrix = pd.DataFrame(
             columns=translated_values.columns,
@@ -360,14 +328,15 @@ class Portfolio:
             data=np.tile(time_indices, (len(translated_values.columns), 1)).T
         )
 
-        cagr_2 = translated_values.div(translated_values.iloc[0]).pow(
+        cagr = translated_values.div(translated_values.iloc[0]).pow(
             self.get_period_info().points_per_year / time_matrix) - 1
 
-        print(f"cagr_2 first few rows: \n{cagr_2}\n")
+        cagr_fitted = fitted_values.div(fitted_values.iloc[0]).pow(
+            self.get_period_info().points_per_year / time_matrix) - 1
 
-        return fitted_values, trend_deviation, trend_deviation_z_score, cagr_fitted
+        return fitted_values, trend_deviation, trend_deviation_z_score, cagr, cagr_fitted
 
-    def _get_translated_history(
+    def _calculate_currency_translated_history(
             self,
             asset_positions: list[AssetPosition],
             reference_currency: str,
@@ -403,7 +372,7 @@ class Portfolio:
 
         return translated_close, translated_values
 
-    def _calculate_portfolio_optimisation(self, p_log_returns: pd.DataFrame):
+    def _calculate_portfolio_optimisation(self, log_returns: pd.DataFrame):
         """ Calculate optimal weights  """
         risk_free_rate = 0
 
@@ -436,7 +405,7 @@ class Portfolio:
             return np.sum((risk_contrib - target_contrib) ** 2)
 
         # Get asset data (excluding TOTAL column and currency conversion symbols)
-        log_returns = p_log_returns.copy()
+        log_returns = log_returns.copy()
         log_returns = log_returns.drop(columns=['TOTAL'], errors='ignore')
         mean_log_returns = log_returns.mean()
         if not isinstance(mean_log_returns, pd.Series):
