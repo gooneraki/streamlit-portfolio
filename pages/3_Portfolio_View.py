@@ -205,18 +205,26 @@ st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 st.markdown("---")
 st.markdown("#### 🎯 Portfolio Optimization Strategies")
 
-optimal_weights = portfolio.get_optimal_weights()
-if optimal_weights:
-    # Create tabs for different strategies
-    strategy_tabs = st.tabs(["📊 Strategy Comparison", "🎯 Max Sharpe",
-                            "🚀 Max Return", "🛡️ Min Volatility", "⚖️ Current Portfolio"])
+optimisation_results = portfolio.get_optimisation_results()
+if optimisation_results:
+    # Create tabs dynamically based on available optimization results
+    tab_names = ["📊 Strategy Comparison"]
+
+    # Add tabs for each available optimization strategy
+    for strategy_key, strategy_result in optimisation_results.items():
+        tab_names.append(f"{strategy_result.emoji} {strategy_result.name}")
+
+    # Always add current portfolio tab at the end
+    tab_names.append("⚖️ Current Portfolio")
+
+    strategy_tabs = st.tabs(tab_names)
 
     with strategy_tabs[0]:
         st.markdown("##### 📈 Portfolio Strategy Performance Comparison")
 
         # Create comprehensive comparison DataFrame
         comparison_data = []
-        for strategy_key, optimal_result in optimal_weights.items():
+        for strategy_key, optimal_result in optimisation_results.items():
             if hasattr(optimal_result, 'weights') and isinstance(optimal_result.weights, pd.Series):
                 strategy_weights = optimal_result.weights
 
@@ -240,6 +248,29 @@ if optimal_weights:
                     if strategy_effective_n < 5
                     else "Good"
                 })
+
+        # Add current portfolio to comparison
+        current_weights = assets_metrics.drop('TOTAL')['latest_weights']
+        current_herfindahl = (current_weights ** 2).sum()
+        current_effective_n = 1 / current_herfindahl
+        current_max_weight = current_weights.max()
+
+        # Calculate current portfolio return (convert CAGR to annual arithmetic return)
+        current_cagr = total_metrics['cagr']
+
+        comparison_data.append({
+            'Strategy': "💼 Current Portfolio",
+            'Annual Return': f"{current_cagr:.2%}",
+            'Annual Volatility': "N/A",  # We don't have volatility for current portfolio
+            'Sharpe Ratio': "N/A",      # We don't have Sharpe ratio for current portfolio
+            'Max Weight': f"{current_max_weight:.1%}",
+            'Effective N': f"{current_effective_n:.1f}",
+            'Diversification': "Low"
+            if current_effective_n < 3
+            else "Moderate"
+            if current_effective_n < 5
+            else "Good"
+        })
 
         if comparison_data:
             comparison_df = pd.DataFrame(comparison_data)
@@ -265,36 +296,37 @@ if optimal_weights:
             # Find best performing strategies
             best_return_idx = max(range(len(comparison_data)),
                                   key=lambda i: float(comparison_data[i]['Annual Return'].strip('%'))/100)
-            best_sharpe_idx = max(range(len(comparison_data)),
-                                  key=lambda i: float(comparison_data[i]['Sharpe Ratio']))
+
+            # Find best Sharpe ratio (excluding N/A values)
+            valid_sharpe_indices = [i for i in range(len(comparison_data))
+                                    if comparison_data[i]['Sharpe Ratio'] != 'N/A']
+            if valid_sharpe_indices:
+                best_sharpe_idx = max(valid_sharpe_indices,
+                                      key=lambda i: float(comparison_data[i]['Sharpe Ratio']))
+            else:
+                best_sharpe_idx = None
 
             insight_col1, insight_col2 = st.columns(2)
             with insight_col1:
                 st.success(f"🏆 **Highest Return:** {comparison_data[best_return_idx]['Strategy']} "
                            f"({comparison_data[best_return_idx]['Annual Return']})")
             with insight_col2:
-                st.success(f"⭐ **Best Risk-Adjusted:** {comparison_data[best_sharpe_idx]['Strategy']} "
-                           f"(Sharpe: {comparison_data[best_sharpe_idx]['Sharpe Ratio']})")
+                if best_sharpe_idx is not None:
+                    st.success(f"⭐ **Best Risk-Adjusted:** {comparison_data[best_sharpe_idx]['Strategy']} "
+                               f"(Sharpe: {comparison_data[best_sharpe_idx]['Sharpe Ratio']})")
+                else:
+                    st.info(
+                        "⭐ **Best Risk-Adjusted:** No valid Sharpe ratios available")
 
-    with strategy_tabs[1]:
-        if 'max_sharpe' in optimal_weights:
-            display_portfolio_weights(optimal_weights['max_sharpe'])
-        else:
-            st.info("Max Sharpe portfolio optimization not available.")
+    # Dynamic strategy tabs - start from index 1 (after comparison tab)
+    tab_index = 1
+    for strategy_key, strategy_result in optimisation_results.items():
+        with strategy_tabs[tab_index]:
+            display_portfolio_weights(strategy_result)
+        tab_index += 1
 
-    with strategy_tabs[2]:
-        if 'max_return' in optimal_weights:
-            display_portfolio_weights(optimal_weights['max_return'])
-        else:
-            st.info("Max Return portfolio optimization not available.")
-
-    with strategy_tabs[3]:
-        if 'min_volatility' in optimal_weights:
-            display_portfolio_weights(optimal_weights['min_volatility'])
-        else:
-            st.info("Min Volatility portfolio optimization not available.")
-
-    with strategy_tabs[4]:
+    # Current portfolio tab (always last)
+    with strategy_tabs[-1]:
         st.markdown("##### 📋 Current Portfolio Analysis")
 
         # Show current portfolio as comparison

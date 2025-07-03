@@ -104,7 +104,7 @@ class Portfolio:
             rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y = self._get_logarithmic_values(
                 translated_values)
 
-        self.optimal_weights = self._calculate_portfolio_optimization(
+        self.optimisation_results = self._calculate_portfolio_optimisation(
             log_returns)
 
         period_info = self.get_period_info()
@@ -170,9 +170,9 @@ class Portfolio:
         """ Get the assets metrics """
         return self.assets_metrics
 
-    def get_optimal_weights(self) -> dict[str, PortfolioOptimizationResult]:
-        """ Get the optimal weights """
-        return self.optimal_weights
+    def get_optimisation_results(self) -> dict[str, PortfolioOptimizationResult]:
+        """ Get the optimization results """
+        return self.optimisation_results
 
     def get_asset_series(self, p_asset: str):
         """ Get the series for the given asset """
@@ -392,13 +392,9 @@ class Portfolio:
 
         return translated_values
 
-    def _calculate_portfolio_optimization(self, p_log_returns: pd.DataFrame):
+    def _calculate_portfolio_optimisation(self, p_log_returns: pd.DataFrame):
         """ Calculate optimal weights  """
         risk_free_rate = 0
-
-        # Maximum Return Portfolio
-        def neg_portfolio_return(weights, expected_log_returns):
-            return -np.sum(weights * expected_log_returns)
 
         # Minimum Volatility Portfolio
         def portfolio_volatility(weights, cov_matrix):
@@ -407,14 +403,26 @@ class Portfolio:
         # Maximum Sharpe Ratio Portfolio
         def neg_sharpe_ratio(weights, expected_log_returns, cov_log_matrix, risk_free_rate):
 
-            port_log_return = -neg_portfolio_return(
-                weights, expected_log_returns)
+            port_log_return = np.sum(weights * expected_log_returns)
             port_log_vol = portfolio_volatility(weights, cov_log_matrix)
 
             if port_log_vol > 0:
                 return -(port_log_return - risk_free_rate) / port_log_vol
             else:
                 return 0
+
+        # Risk Parity Portfolio
+        def risk_parity_objective(weights, cov_matrix):
+
+            portfolio_variance = np.dot(weights.T, np.dot(cov_matrix, weights))
+
+            marginal_contrib = np.dot(cov_matrix, weights)
+
+            risk_contrib = weights * marginal_contrib / portfolio_variance
+
+            target_contrib = np.ones(len(weights)) / len(weights)
+
+            return np.sum((risk_contrib - target_contrib) ** 2)
 
         # Get asset data (excluding TOTAL column and currency conversion symbols)
         log_returns = p_log_returns.copy()
@@ -453,12 +461,12 @@ class Portfolio:
                 'initial_guess': np.array([1.0/n_assets] * n_assets)
             },
             {
-                'name': 'Maximum Return',
-                'emoji': '🚀',
-                'key': 'max_return',
-                'objective_func': neg_portfolio_return,
-                'args': (mean_log_returns),
-                'initial_guess': mean_log_returns.values / mean_log_returns.sum()
+                'name': 'Risk Parity',
+                'emoji': '⚖️',
+                'key': 'risk_parity',
+                'objective_func': risk_parity_objective,
+                'args': (cov_log_matrix),
+                'initial_guess': np.array([1.0/n_assets] * n_assets)
             },
             {
                 'name': 'Minimum Volatility',
@@ -475,9 +483,7 @@ class Portfolio:
 
             result = minimize(strategy['objective_func'], strategy['initial_guess'],
                               args=strategy['args'],
-                              method='SLSQP', bounds=bounds, constraints=constraints,
-                              # this ftol option really fixed some issues
-                              options={'ftol': 1e-9})
+                              method='SLSQP', bounds=bounds, constraints=constraints)
 
             if result.success:
 
@@ -524,15 +530,6 @@ class Portfolio:
                     f"❌ {strategy['name']} optimization failed: {result.message}")
 
         # Validations
-        if 'max_return' in optimal_weights_dict:
-            max_return_result = optimal_weights_dict['max_return']
-            other_results = [
-                ele for ele in optimal_weights_dict.values() if ele.key != 'max_return']
-            for other_result in other_results:
-                if max_return_result.ann_arith_return < other_result.ann_arith_return:
-                    raise ValueError(f"⚠️ Warning: Max Return strategy ({max_return_result.ann_arith_return:.4f}) "
-                                     f"has lower return than {other_result.name} ({other_result.ann_arith_return:.4f})")
-
         if 'min_volatility' in optimal_weights_dict:
             min_volatility_result = optimal_weights_dict['min_volatility']
             other_results = [
