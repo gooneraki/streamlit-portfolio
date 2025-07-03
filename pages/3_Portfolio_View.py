@@ -361,13 +361,13 @@ all_metrics = [m for m in portfolio.timeseries_data.columns.get_level_values('Me
                if m not in ['weights']]
 
 # Create columns for metric selection and time period filter
-metric_col1, metric_col2 = st.columns([1, 1])
+metric_select_col1, metric_select_col2 = st.columns([1, 1])
 
-with metric_col1:
+with metric_select_col1:
     selected_metric = st.selectbox('Select Metric/Column', all_metrics, index=all_metrics.index(
         'translated_values') if 'translated_values' in all_metrics else 0)
 
-with metric_col2:
+with metric_select_col2:
     # Time period filter - reuse the same logic as single asset view
     total_years = period_info.number_of_years
     year_options = []
