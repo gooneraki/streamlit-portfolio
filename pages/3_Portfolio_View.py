@@ -20,10 +20,15 @@ with col1:
                              key="username_input", type="password")
 
     # Display authentication status
-    if username == st.secrets["DB_USERNAME"]:
-        st.success("✅ Authenticated - Loading personalized portfolio data")
-    elif username:
-        st.warning("⚠️ Using default portfolio data")
+    try:
+        if username == st.secrets["DB_USERNAME"]:
+            st.success("✅ Authenticated - Loading personalized portfolio data")
+        elif username:
+            st.warning("⚠️ Using default portfolio data")
+    except KeyError:
+        # Handle case where DB_USERNAME secret is missing
+        if username:
+            st.warning("⚠️ Using default portfolio data")
 
 
 def display_portfolio_weights(result):
