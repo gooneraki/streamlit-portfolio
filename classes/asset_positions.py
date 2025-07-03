@@ -351,6 +351,20 @@ class Portfolio:
         if not isinstance(cagr_fitted, pd.Series):
             raise ValueError("CAGR fitted is not a Series")
 
+        # This should divide each column by its first value
+        # Create time matrix: each column has the same time index (0, 1, 2, ...)
+        time_indices = np.arange(len(translated_values))
+        time_matrix = pd.DataFrame(
+            columns=translated_values.columns,
+            index=translated_values.index,
+            data=np.tile(time_indices, (len(translated_values.columns), 1)).T
+        )
+
+        cagr_2 = translated_values.div(translated_values.iloc[0]).pow(
+            self.get_period_info().points_per_year / time_matrix) - 1
+
+        print(f"cagr_2 first few rows: \n{cagr_2}\n")
+
         return fitted_values, trend_deviation, trend_deviation_z_score, cagr_fitted
 
     def _get_translated_history(
