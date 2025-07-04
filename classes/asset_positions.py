@@ -122,6 +122,10 @@ class Portfolio:
         rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y \
             = self._calculate_rolling_statistics_for_periods(log_returns)
 
+        # Calculate drawdown metrics
+        drawdown, max_drawdown, drawdown_duration = self._calculate_drawdown_metrics(
+            translated_values)
+
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
             objs=[
@@ -132,6 +136,7 @@ class Portfolio:
                 cagr, cagr_fitted,
                 trend_deviation, trend_deviation_z_score,
                 log_returns,
+                drawdown, max_drawdown, drawdown_duration,
                 rolling_stats_1m.rolling_return, rolling_stats_1q.rolling_return,
                 rolling_stats_1y.rolling_return, rolling_stats_3y.rolling_return,
                 rolling_stats_1m.rolling_return_z_score, rolling_stats_1q.rolling_return_z_score,
@@ -145,6 +150,7 @@ class Portfolio:
                 'cagr', 'cagr_fitted',
                 'trend_deviation', 'trend_deviation_z_score',
                 'log_returns',
+                'drawdown', 'max_drawdown', 'drawdown_duration',
                 'rolling_1m_return', 'rolling_1q_return',
                 'rolling_1y_return', 'rolling_3y_return',
                 'rolling_1m_return_z_score', 'rolling_1q_return_z_score',
@@ -169,6 +175,10 @@ class Portfolio:
         self.assets_snapshot['weights_pct'] = self.assets_snapshot['weights'].mul(
             100)
         self.assets_snapshot['trend_deviation_pct'] = self.assets_snapshot['trend_deviation'].mul(
+            100)
+        self.assets_snapshot['drawdown_pct'] = self.assets_snapshot['drawdown'].mul(
+            100)
+        self.assets_snapshot['max_drawdown_pct'] = self.assets_snapshot['max_drawdown'].mul(
             100)
         self.assets_snapshot['rolling_1m_return_pct'] = self.assets_snapshot['rolling_1m_return'].mul(
             100)
@@ -535,3 +545,34 @@ class Portfolio:
                                      f"has higher volatility than {other_result.name} ({other_result.ann_vol:.4f})")
 
         return optimal_weights
+
+    def _calculate_drawdown_metrics(self, translated_values: pd.DataFrame):
+        """Calculate drawdown metrics for each asset based on ALL-TIME highs"""
+
+        # Calculate running maximum (ALL-TIME peak values at each point in time)
+        running_max = translated_values.expanding().max()
+
+        # Calculate current drawdown from ALL-TIME high (always negative or zero)
+        drawdown = (translated_values - running_max) / running_max
+
+        # Overall maximum drawdown (worst decline from ANY all-time high in entire history)
+        max_drawdown = drawdown.expanding().min()
+
+        # Calculate drawdown duration (days since last ALL-TIME peak)
+        drawdown_duration = pd.DataFrame(
+            index=translated_values.index, columns=translated_values.columns)
+
+        for column in translated_values.columns:
+            duration = 0
+            duration_series = []
+
+            for i in range(len(translated_values)):
+                if i == 0 or translated_values.iloc[i][column] >= running_max.iloc[i][column]:
+                    duration = 0  # New ALL-TIME peak reached
+                else:
+                    duration += 1  # Still in drawdown from last all-time peak
+                duration_series.append(duration)
+
+            drawdown_duration[column] = duration_series
+
+        return drawdown, max_drawdown, drawdown_duration

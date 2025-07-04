@@ -252,6 +252,36 @@ st.dataframe(
 
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 
+# --- Risk Analysis Section ---
+st.markdown("---")
+st.markdown("#### 📉 Risk Analysis - Drawdown from ALL-TIME Highs")
+
+# Select drawdown columns for a focused risk view
+risk_columns = ['drawdown_pct', 'max_drawdown_pct', 'drawdown_duration']
+risk_display = portfolio.get_assets_snapshot().loc[:, risk_columns]
+
+# Rename columns for better display
+risk_display_renamed = risk_display.rename(columns={
+    'drawdown_pct': 'Current Drawdown',
+    'max_drawdown_pct': 'Max Drawdown',
+    'drawdown_duration': 'Days Since Peak'
+})
+
+# Format the risk dataframe
+risk_styled = risk_display_renamed.style.format({
+    'Current Drawdown': '{:.1f}%',
+    'Max Drawdown': '{:.1f}%',
+    'Days Since Peak': '{:.0f}'
+})
+
+# Display risk metrics
+st.dataframe(
+    risk_styled,
+    use_container_width=True
+)
+
+st.caption("All metrics calculated from ALL-TIME highs (not recent peaks) showing complete historical perspective")
+
 # --- Optimal Portfolio Weights ---
 st.markdown("---")
 st.markdown("#### 🎯 Portfolio Optimization Strategies")
