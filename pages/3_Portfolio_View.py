@@ -14,7 +14,7 @@ print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
 
 st.set_page_config(page_title="Portfolio View", layout="wide")
 
-col1, col2 = st.columns([1, 2])
+col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
     username = st.text_input(label="Enter username",
                              key="username_input", type="password")
@@ -28,6 +28,9 @@ with col1:
                 "⚠️ Using default portfolio data. Enter your username to load personalized portfolio data.")
     except KeyError:
         st.warning("⚠️ Using default portfolio data")
+with col2:
+    base_currency = st.selectbox(
+        "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
 
 
 def display_portfolio_weights(result, p_assets_snapshot=None):
@@ -101,11 +104,6 @@ def get_assets_positions():
 
 assets_positions = get_assets_positions()
 
-
-col1, col2 = st.columns([1, 2])
-with col1:
-    base_currency = st.selectbox(
-        "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
 
 portfolio = Portfolio(assets_positions, base_currency)
 
@@ -186,9 +184,7 @@ display_columns = [
     'trend_deviation_z_score', 'rolling_1y_return_z_score', 'rolling_1q_return_z_score', 'rolling_1m_return_z_score']
 
 # Get the assets snapshot and select only the columns we want to display
-assets_display = portfolio.get_assets_snapshot()[display_columns]
-
-# Function to apply conditional formatting to z-scores
+assets_display = portfolio.get_assets_snapshot().loc[:, display_columns]
 
 
 def color_z_scores(val):
@@ -254,8 +250,7 @@ st.dataframe(
     use_container_width=True
 )
 
-st.caption(
-    f"All values as of {last_date.strftime('%Y-%m-%d')} • Z-scores: 🟢 Positive (above average) 🔴 Negative (below average)")
+st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 
 # --- Optimal Portfolio Weights ---
 st.markdown("---")
