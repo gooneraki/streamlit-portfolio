@@ -25,29 +25,122 @@ st.set_page_config(
 BENCHMARK_SYMBOL = "SPY"
 
 STOCK_SYMBOLS = [
-    "XLC",
-    "XLY",
-    "XLP",
-    "XLE",
-    "XLF",
-    "XLV",
-    "XLI",
-    "XLK",
-    "XLB",
-    "XLRE",
-    "XLU",
-    "KOKO"
+    "AAPL",  # Apple
+    "MSFT",  # Microsoft
+    "GOOGL", # Google
+    "AMZN",  # Amazon
+    "TSLA",  # Tesla
+    "META",  # Meta
+    "NVDA",  # Nvidia
+    "SPY",   # S&P 500 ETF
+    "QQQ",   # Nasdaq ETF
+    "VTI"    # Total Stock Market ETF
 ]
 
-exp_fit_backtester = ExpFitBacktester(STOCK_SYMBOLS)
-tickers_history = exp_fit_backtester.get_tickers_history()
+# Add error handling for data fetching
+try:
+    exp_fit_backtester = ExpFitBacktester(STOCK_SYMBOLS)
+    tickers_history = exp_fit_backtester.get_tickers_history()
+    main_dataframes = exp_fit_backtester.get_main_dataframes()
+    
+    # Continue with the rest of the page
+    first_level_columns = [*set(main_dataframes.columns.get_level_values(0))]
+    second_level_columns = sorted([*set(main_dataframes.columns.get_level_values(1))])
 
-main_dataframes = exp_fit_backtester.get_main_dataframes()
-first_level_columns = [*set(main_dataframes.columns.get_level_values(0))]
-
-
-second_level_columns = sorted(
-    [*set(main_dataframes.columns.get_level_values(1))])
+except Exception as e:
+    # Show error but also provide a demo mode with mock data
+    st.error(f"Error fetching data: {str(e)}")
+    st.info("This might be due to network connectivity issues or invalid symbols. Please check your internet connection and try again.")
+    
+    # Add demo mode toggle
+    use_demo_mode = st.checkbox("Enable Demo Mode (with mock data)", value=False)
+    
+    if use_demo_mode:
+        st.warning("Using demo mode with mock data for testing purposes.")
+        
+        # Create mock data for demonstration
+        import numpy as np
+        
+        # Generate mock price data
+        dates = pd.date_range(start='2020-01-01', end='2024-01-01', freq='D')
+        symbols = ['AAPL', 'MSFT', 'GOOGL', 'SPY', 'TOTAL']
+        
+        # Create realistic mock price data with trends
+        np.random.seed(42)  # For reproducible demo data
+        mock_prices = {}
+        
+        for i, symbol in enumerate(symbols):
+            # Different starting prices and growth patterns
+            base_price = 100 + i * 50
+            growth_rate = 0.0002 + i * 0.0001  # Different growth rates
+            volatility = 0.02 + i * 0.005  # Different volatilities
+            
+            # Generate price series with trend and noise
+            trend = np.exp(growth_rate * np.arange(len(dates)))
+            noise = np.random.normal(0, volatility, len(dates))
+            prices = base_price * trend * (1 + noise)
+            mock_prices[symbol] = prices
+        
+        # Create mock tickers_history
+        tickers_history = pd.DataFrame(mock_prices, index=dates)
+        tickers_history = tickers_history.drop('TOTAL', axis=1)  # Remove TOTAL for now
+        
+        # Create mock main_dataframes structure similar to ExpFitBacktester output
+        price_data = tickers_history.copy()
+        
+        # Add TOTAL column
+        price_data['TOTAL'] = price_data.mean(axis=1)
+        
+        # Create benchmark positions (equal weight)
+        n_symbols = len(price_data.columns)
+        initial_capital = 1000
+        equal_weight = 1.0 / (n_symbols - 1)  # Exclude TOTAL from weight calculation
+        
+        b_position_data = pd.DataFrame(index=price_data.index, columns=price_data.columns)
+        for symbol in price_data.columns:
+            if symbol != 'TOTAL':
+                initial_price = price_data[symbol].iloc[0]
+                position = (initial_capital * equal_weight) / initial_price
+                b_position_data[symbol] = position
+        
+        # Calculate portfolio values
+        b_value_data = price_data * b_position_data
+        b_value_data['TOTAL'] = b_value_data.drop('TOTAL', axis=1).sum(axis=1)
+        
+        # Calculate weights
+        b_weight_data = b_value_data.div(b_value_data['TOTAL'], axis=0)
+        b_weight_data['TOTAL'] = 1.0
+        
+        # Calculate log returns
+        b_log_returns_data = np.log(price_data / price_data.shift(1))
+        b_log_returns_data['TOTAL'] = np.log(b_value_data['TOTAL'] / b_value_data['TOTAL'].shift(1))
+        
+        # Create SMAs for demonstration
+        sma_1m = price_data.rolling(window=30).mean()
+        sma_3m = price_data.rolling(window=90).mean()
+        
+        # Build the multi-index structure
+        frames = []
+        metrics = ['Price', 'B_Position', 'B_Value', 'B_Weight', 'B_log_returns', 'SMA_1m', 'SMA_3m']
+        data_frames = [price_data, b_position_data, b_value_data, b_weight_data, b_log_returns_data, sma_1m, sma_3m]
+        
+        for metric, df in zip(metrics, data_frames):
+            # Stack the DataFrame and add metric level
+            stacked = df.T.assign(Metric=metric).set_index('Metric', append=True)
+            stacked.index = stacked.index.reorder_levels([1, 0])  # Metric, Symbol
+            frames.append(stacked)
+        
+        # Combine all metrics
+        combined = pd.concat(frames)
+        main_dataframes = combined.T  # Transpose back to have dates as rows
+        
+        # Set up the column selectors
+        first_level_columns = [*set(main_dataframes.columns.get_level_values(0))]
+        second_level_columns = sorted([*set(main_dataframes.columns.get_level_values(1))])
+        
+        st.success("Demo mode enabled! You can now explore the functionality with mock data.")
+    else:
+        st.stop()
 
 
 st.multiselect(
@@ -60,7 +153,7 @@ st.multiselect(
 st.multiselect(
     "Select columns",
     options=second_level_columns,
-    default=['TOTAL', 'XLB', 'XLC'],
+    default=['TOTAL', 'AAPL', 'SPY'] if 'TOTAL' in second_level_columns and 'AAPL' in second_level_columns and 'SPY' in second_level_columns else second_level_columns[:3],
     key="second_level_columns"
 )
 
@@ -74,13 +167,215 @@ for first_level in st.session_state.first_level_columns:
 filtered_main_dataframes = main_dataframes.loc[:, selected_columns]
 
 st.dataframe(filtered_main_dataframes, use_container_width=True)
-# st.dataframe(filtered_main_dataframes.tail().T, use_container_width=True)
 
+# Show transposed tail for easier reading
+st.subheader("Latest Values (Transposed)")
+st.dataframe(filtered_main_dataframes.tail().T, use_container_width=True)
+
+st.subheader("Complete Dataset")
 st.dataframe(main_dataframes, use_container_width=True)
 
+# Add some useful analysis from the commented code
+st.subheader("Data Analysis")
 
-# st.dataframe(filtered_main_dataframes.head(), use_container_width=True)
-# st.dataframe(filtered_main_dataframes.tail(), use_container_width=True)
+# Get basic information about the data
+first_date = tickers_history.index[0]
+last_date = tickers_history.index[-1]
+days_duration = (last_date - first_date).days + 1
+years_duration = days_duration / 365.25
+total_points = tickers_history.shape[0]
+points_per_year = total_points / years_duration
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("First Date", first_date.strftime('%Y-%m-%d'))
+with col2:
+    st.metric("Last Date", last_date.strftime('%Y-%m-%d'))
+with col3:
+    st.metric("Years Duration", f"{years_duration:.2f}")
+with col4:
+    st.metric("Points per Year", f"{points_per_year:.1f}")
+
+# Create price charts for individual symbols
+st.subheader("Individual Symbol Analysis")
+
+# Get available symbols for price analysis
+price_columns = [col[1] for col in main_dataframes.columns if col[0] == 'Price' and col[1] != 'TOTAL']
+
+selected_symbol = st.selectbox(
+    "Select a Symbol for Analysis",
+    options=price_columns,
+    index=0 if price_columns else None
+)
+
+if selected_symbol:
+    # Get price and fitted data for the selected symbol
+    price_data = main_dataframes[('Price', selected_symbol)]
+    
+    # Check if we have SMA data
+    sma_columns = [col for col in main_dataframes.columns if col[0].startswith('SMA_') and col[1] == selected_symbol]
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write(f"**{selected_symbol} Price Analysis**")
+        
+        # Create a simple line chart for price
+        import plotly.graph_objects as go
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=price_data.index,
+            y=price_data.values,
+            mode='lines',
+            name=f'{selected_symbol} Price',
+            line=dict(color='blue')
+        ))
+        
+        # Add SMA lines if available
+        colors = ['red', 'orange', 'green', 'purple', 'brown', 'pink']
+        for i, sma_col in enumerate(sma_columns[:6]):  # Limit to 6 SMAs
+            sma_data = main_dataframes[sma_col]
+            fig.add_trace(go.Scatter(
+                x=sma_data.index,
+                y=sma_data.values,
+                mode='lines',
+                name=sma_col[0],
+                line=dict(color=colors[i % len(colors)], dash='dash')
+            ))
+        
+        fig.update_layout(
+            title=f'{selected_symbol} Price with Moving Averages',
+            xaxis_title='Date',
+            yaxis_title='Price',
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.write(f"**{selected_symbol} Statistics**")
+        
+        # Calculate some basic statistics
+        current_price = price_data.iloc[-1]
+        first_price = price_data.iloc[0]
+        price_change = (current_price / first_price) ** (1/years_duration) - 1
+        
+        st.metric("Current Price", f"${current_price:.2f}")
+        st.metric("First Price", f"${first_price:.2f}")
+        st.metric("Annualized Return", f"{price_change:.2%}")
+        
+        # Show recent price movements
+        st.write("**Recent Prices (Last 10 days)**")
+        recent_prices = price_data.tail(10)
+        st.dataframe(recent_prices.to_frame(), use_container_width=True)
+
+# Portfolio Performance Analysis
+st.subheader("Portfolio Performance Analysis")
+
+# Get portfolio value data (TOTAL)
+portfolio_value = main_dataframes[('B_Value', 'TOTAL')]
+portfolio_returns = main_dataframes[('B_log_returns', 'TOTAL')]
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.write("**Portfolio Value Over Time**")
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=portfolio_value.index,
+        y=portfolio_value.values,
+        mode='lines',
+        name='Portfolio Value',
+        line=dict(color='green', width=2)
+    ))
+    
+    fig.update_layout(
+        title='Portfolio Total Value',
+        xaxis_title='Date',
+        yaxis_title='Value ($)',
+        height=400
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+with col2:
+    st.write("**Portfolio Statistics**")
+    
+    # Calculate portfolio metrics
+    initial_value = portfolio_value.iloc[0]
+    current_value = portfolio_value.iloc[-1]
+    total_return = (current_value / initial_value) - 1
+    annualized_return = (current_value / initial_value) ** (1/years_duration) - 1
+    
+    # Calculate volatility from log returns
+    portfolio_returns_clean = portfolio_returns.dropna()
+    if len(portfolio_returns_clean) > 0:
+        daily_vol = portfolio_returns_clean.std()
+        annualized_vol = daily_vol * (points_per_year ** 0.5)
+        sharpe_ratio = annualized_return / annualized_vol if annualized_vol > 0 else 0
+    else:
+        annualized_vol = 0
+        sharpe_ratio = 0
+    
+    st.metric("Initial Value", f"${initial_value:.2f}")
+    st.metric("Current Value", f"${current_value:.2f}")
+    st.metric("Total Return", f"{total_return:.2%}")
+    st.metric("Annualized Return", f"{annualized_return:.2%}")
+    st.metric("Annualized Volatility", f"{annualized_vol:.2%}")
+    st.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
+
+# Individual Asset Performance Comparison
+st.subheader("Asset Performance Comparison")
+
+# Get all asset values and calculate returns
+asset_symbols = [col[1] for col in main_dataframes.columns if col[0] == 'B_Value' and col[1] != 'TOTAL']
+
+if asset_symbols:
+    performance_data = []
+    
+    for symbol in asset_symbols:
+        asset_value = main_dataframes[('B_Value', symbol)]
+        if len(asset_value) > 0:
+            initial_val = asset_value.iloc[0]
+            current_val = asset_value.iloc[-1]
+            if initial_val > 0:
+                total_ret = (current_val / initial_val) - 1
+                annual_ret = (current_val / initial_val) ** (1/years_duration) - 1
+                performance_data.append({
+                    'Symbol': symbol,
+                    'Initial Value': initial_val,
+                    'Current Value': current_val,
+                    'Total Return': total_ret,
+                    'Annualized Return': annual_ret
+                })
+    
+    if performance_data:
+        perf_df = pd.DataFrame(performance_data)
+        
+        # Format the DataFrame for display
+        perf_df_display = perf_df.copy()
+        perf_df_display['Initial Value'] = perf_df_display['Initial Value'].apply(lambda x: f"${x:.2f}")
+        perf_df_display['Current Value'] = perf_df_display['Current Value'].apply(lambda x: f"${x:.2f}")
+        perf_df_display['Total Return'] = perf_df_display['Total Return'].apply(lambda x: f"{x:.2%}")
+        perf_df_display['Annualized Return'] = perf_df_display['Annualized Return'].apply(lambda x: f"{x:.2%}")
+        
+        st.dataframe(perf_df_display, use_container_width=True, hide_index=True)
+        
+        # Create a bar chart of annualized returns
+        fig = go.Figure(data=[
+            go.Bar(x=perf_df['Symbol'], y=perf_df['Annualized Return'], 
+                   name='Annualized Return',
+                   marker_color='lightblue')
+        ])
+        
+        fig.update_layout(
+            title='Annualized Returns by Asset',
+            xaxis_title='Symbol',
+            yaxis_title='Annualized Return',
+            height=400,
+            yaxis=dict(tickformat='%')
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # CURRENCY_SYMBOLS = [
