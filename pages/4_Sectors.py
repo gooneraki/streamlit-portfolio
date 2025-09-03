@@ -196,7 +196,7 @@ if assets_info:
     with col1:
         st.dataframe(
             assets_df,
-            width="stretch",
+            use_container_width=True,
             hide_index=True,
             height=min(400, len(assets_df) * 35 + 40)
         )
