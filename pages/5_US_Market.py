@@ -24,22 +24,25 @@ st.set_page_config(
 
 BENCHMARK_SYMBOL = "SPY"
 
-STOCK_SYMBOLS = [
-    "AAPL",  # Apple
-    "MSFT",  # Microsoft
-    "GOOGL", # Google
-    "AMZN",  # Amazon
-    "TSLA",  # Tesla
-    "META",  # Meta
-    "NVDA",  # Nvidia
-    "SPY",   # S&P 500 ETF
-    "QQQ",   # Nasdaq ETF
-    "VTI"    # Total Stock Market ETF
+# Sector ETF symbols for sector-based analysis
+SECTOR_SYMBOLS = [
+    "XLC",   # Communication Services
+    "XLY",   # Consumer Discretionary
+    "XLP",   # Consumer Staples
+    "XLE",   # Energy
+    "XLF",   # Financial
+    "XLV",   # Health Care
+    "XLI",   # Industrial
+    "XLK",   # Technology
+    "XLB",   # Materials
+    "XLRE",  # Real Estate
+    "XLU",   # Utilities
+    "KOKO"   # Custom symbol
 ]
 
 # Add error handling for data fetching
 try:
-    exp_fit_backtester = ExpFitBacktester(STOCK_SYMBOLS)
+    exp_fit_backtester = ExpFitBacktester(SECTOR_SYMBOLS)
     tickers_history = exp_fit_backtester.get_tickers_history()
     main_dataframes = exp_fit_backtester.get_main_dataframes()
     
@@ -63,7 +66,7 @@ except Exception as e:
         
         # Generate mock price data
         dates = pd.date_range(start='2020-01-01', end='2024-01-01', freq='D')
-        symbols = ['AAPL', 'MSFT', 'GOOGL', 'SPY', 'TOTAL']
+        symbols = ['XLC', 'XLY', 'XLP', 'XLE', 'TOTAL']
         
         # Create realistic mock price data with trends
         np.random.seed(42)  # For reproducible demo data
