@@ -30,14 +30,19 @@ country = "US"
 
 market_symbol: str = ""
 if DYNAMIC_MARKET:
+    try:
+        market_data = market_yf(country)
 
-    market_data = market_yf(country)
-
-    if isinstance(market_data, str):
-        raise ValueError(f"Error retrieving market data: {market_data}")
-
-    market_symbol = market_data['first_summary_symbol']
-
+        if isinstance(market_data, str):
+            st.warning(f"⚠️ Unable to fetch live market data: {market_data}")
+            st.info("📊 Falling back to static market data (S&P 500)")
+            market_symbol = "^GSPC"
+        else:
+            market_symbol = market_data['first_summary_symbol']
+    except Exception as e:
+        st.warning(f"⚠️ Network connectivity issue: {str(e)}")
+        st.info("📊 Using static market data (S&P 500) for demonstration")
+        market_symbol = "^GSPC"
 else:
     market_symbol = "^GSPC"
 
@@ -46,27 +51,85 @@ sector_symbols: list[str] = []
 sector_weights: list[float] = []
 
 if DYNAMIC_MARKET:
-    sector_data, sector_errors = fetch_multiple_sectors_data()
+    try:
+        sector_data, sector_errors = fetch_multiple_sectors_data()
 
-    if sector_errors:
-        st.error(f"Error retrieving sector data: {sector_errors}")
-        st.stop()
-
-    sector_symbols = [
-        list(sector_data[sector_id]['top_etfs'].keys())[0] for sector_id in range(len(sector_data))]
-    sector_weights = [
-        sector_data[sector_id]['overview']['market_weight'] for sector_id in range(len(sector_data))]
+        if sector_errors:
+            st.warning(f"⚠️ Some sector data could not be retrieved: {sector_errors}")
+            st.info("📊 Using static sector data for demonstration")
+            sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
+                              "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+            sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 
+                              0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
+        else:
+            sector_symbols = [
+                list(sector_data[sector_id]['top_etfs'].keys())[0] for sector_id in range(len(sector_data))]
+            sector_weights = [
+                sector_data[sector_id]['overview']['market_weight'] for sector_id in range(len(sector_data))]
+    except Exception as e:
+        st.warning(f"⚠️ Network connectivity issue: {str(e)}")
+        st.info("📊 Using static sector data for demonstration")
+        sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
+                          "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+        sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 
+                          0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
 else:
     sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
                       "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
-    sector_weights = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 
+                      0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
 
 
-multi_asset = MultiAsset(
-    sector_symbols,
-    period='10y',
-    weights=sector_weights)
-symbol_metrics, timeseries_data = multi_asset.get_data()
+try:
+    multi_asset = MultiAsset(
+        sector_symbols,
+        period='10y',
+        weights=sector_weights)
+    symbol_metrics, timeseries_data = multi_asset.get_data()
+except Exception as e:
+    st.error(f"⚠️ Unable to fetch financial data: {str(e)}")
+    st.info("📊 The Sectors page requires internet connectivity to fetch live financial data from Yahoo Finance.")
+    st.info("💡 Please check your internet connection and try again, or use the application in an environment with internet access.")
+    
+    # Create a simple demonstration message
+    st.subheader("Sectors Page - Demo Mode")
+    st.write("""
+    This page would normally display:
+    - **Assets Overview**: Summary table of sector ETFs with their weights and performance metrics
+    - **Interactive Charts**: Time series analysis with technical indicators
+    - **Key Metrics**: CAGR, volatility, and risk-adjusted returns
+    - **Data Sample Information**: Period coverage and data quality metrics
+    
+    **Sector ETFs that would be analyzed:**
+    """)
+    
+    # Display the sector symbols we would analyze
+    sector_names = {
+        "XLC": "Communication Services",
+        "XLY": "Consumer Discretionary", 
+        "XLP": "Consumer Staples",
+        "XLE": "Energy",
+        "XLF": "Financial Services",
+        "XLV": "Health Care",
+        "XLI": "Industrials", 
+        "XLK": "Technology",
+        "XLB": "Materials",
+        "XLRE": "Real Estate",
+        "XLU": "Utilities"
+    }
+    
+    demo_data = []
+    for symbol, weight in zip(sector_symbols, sector_weights):
+        demo_data.append({
+            'ETF Symbol': symbol,
+            'Sector': sector_names.get(symbol, 'Unknown'),
+            'Weight': f"{weight:.1%}"
+        })
+    
+    demo_df = pd.DataFrame(demo_data)
+    st.dataframe(demo_df, width="stretch", hide_index=True)
+    
+    st.stop()  # Stop execution here in offline mode
 
 # # UI
 selected_currency = st.selectbox("Select currency", options=["EUR", "USD"])
@@ -133,7 +196,7 @@ if assets_info:
     with col1:
         st.dataframe(
             assets_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=min(400, len(assets_df) * 35 + 40)
         )
@@ -168,7 +231,7 @@ selected_asset = st.selectbox(
 # Create dual-axis chart using MultiAsset method
 if selected_asset:
     fig = multi_asset.create_asset_analysis_chart(selected_asset)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 else:
     st.error("No asset selected")
 
