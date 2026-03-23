@@ -3,6 +3,9 @@
 import sys
 import streamlit as st
 
+DEV_VERSION = "3.14.3"
+PROD_VERSION = sys.version.split()[0]
+
 # Set the page title and layout
 st.set_page_config(
     page_title="Portfolio Historical Data Analysis", layout="centered")
@@ -12,6 +15,8 @@ st.title("Welcome to Portfolio Historical Data Analysis")
 
 # print python version
 st.write(f"Python version: {sys.version}")
+if DEV_VERSION != PROD_VERSION:
+    st.warning(f"Development version ({DEV_VERSION}) does not match production version ({PROD_VERSION}).")
 
 # Add an introduction
 st.write("""
@@ -27,7 +32,7 @@ st.write("""
 """)
 
 # Disclaimer section
-st.warning("""
+st.info("""
 **Disclaimer**: While historical data can help forecast future trends, such predictions are inherently uncertain and should be used cautiously.  
 This app is intended for informational purposes only and is not responsible for any financial losses incurred based on its use.
 """)
