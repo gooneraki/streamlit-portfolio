@@ -8,7 +8,7 @@ from pandas.core.window.rolling import Rolling
 from scipy.optimize import minimize
 
 
-from utilities.app_yfinance import tickers_yf, yf_ticket_info
+from utilities.app_yfinance import tickers_yf, yf_ticket_currency
 
 
 @dataclass
@@ -77,8 +77,10 @@ class Portfolio:
 
         reference_currency = reference_currency.upper()
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        self.symbols_info_list = [yf_ticket_info(
-            symbol) for symbol in asset_symbols]
+        self.symbols_info_list = [
+            {'symbol': symbol, 'currency': yf_ticket_currency(symbol)}
+            for symbol in asset_symbols
+        ]
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         currencies_series = pd.Series(

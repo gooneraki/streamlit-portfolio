@@ -1,9 +1,13 @@
 """ Yfinance utilities for Streamlit app """
 from dataclasses import dataclass
-from typing import Union, TypedDict,  Any
+from typing import Union, TypedDict, Any
 import pandas as pd
 import yfinance as yf
 import streamlit as st
+
+
+YF_CACHE_TTL = "6h"
+YF_CACHE_MAX_ENTRIES = 256
 
 
 def get_sector_keys():
@@ -66,7 +70,7 @@ class SectorData(TypedDict):
     top_etfs: dict[str, str]
 
 
-@st.cache_data
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def sector_yf(sector_key: str) -> Union[str, SectorData]:
     """ Fetch the sector data """
     try:
@@ -104,7 +108,7 @@ def sector_yf(sector_key: str) -> Union[str, SectorData]:
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
 
-@st.cache_data
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def search_yf(search_input: str):
     """ Search for a symbol """
     try:
@@ -123,18 +127,41 @@ def search_yf(search_input: str):
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
 
-@st.cache_data
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def yf_ticket_info(symbol: str):
     """ Fetch the asset info for a given symbol """
     try:
-        ticker = yf.Ticker(symbol)
-        return ticker.info
+        return yf.Ticker(symbol).info
     except Exception as err:
         raise ValueError(
             f"Error retrieving ticker details for '{symbol}': {err}") from err
 
 
-@st.cache_data
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
+def yf_ticket_currency(symbol: str) -> str:
+    """Fetch the trading currency for a symbol without relying on full .info."""
+
+    try:
+        ticker = yf.Ticker(symbol)
+
+        fast_info = getattr(ticker, 'fast_info', None)
+        if fast_info is not None:
+            currency = fast_info.get('currency')
+            if isinstance(currency, str) and currency.strip():
+                return currency.strip().upper()
+
+        info = ticker.info
+        currency = info.get('currency') or info.get('financialCurrency')
+        if isinstance(currency, str) and currency.strip():
+            return currency.strip().upper()
+
+        raise ValueError("currency not found")
+    except Exception as err:
+        raise ValueError(
+            f"Error retrieving currency for '{symbol}': {err}") from err
+
+
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def yf_ticket_history(symbol: str, period='max'):
     """ Fetch the asset history for a given symbol """
     try:
@@ -144,7 +171,7 @@ def yf_ticket_history(symbol: str, period='max'):
         return f"Error retrieving ticker details for '{symbol}': {err}"
 
 
-@st.cache_data
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def get_fx_history(base_currency, target_currency):
     """Get the historical data of a currency pair from Yahoo Finance API."""
 
@@ -182,7 +209,7 @@ class MarketData(TypedDict):
     first_summary_symbol: str
 
 
-@st.cache_data
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def market_yf(market: str) -> Union[str, MarketData]:
     """ Fetch the market info for a given market """
     try:
@@ -230,7 +257,7 @@ class TickersData(TypedDict):
     history: pd.DataFrame
 
 
-@st.cache_data
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def tickers_yf(symbols: list[str], period='max') -> TickersData:
     """ Fetch the tickers data """
     try:

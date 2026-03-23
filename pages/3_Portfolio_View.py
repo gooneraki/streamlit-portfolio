@@ -105,7 +105,16 @@ def get_assets_positions():
 assets_positions = get_assets_positions()
 
 
-portfolio = Portfolio(assets_positions, base_currency)
+try:
+    with st.spinner("Loading portfolio data..."):
+        portfolio = Portfolio(assets_positions, base_currency)
+except ValueError as err:
+    st.error(f"Portfolio data could not be loaded right now: {err}")
+    st.info(
+        "This is usually a temporary Yahoo Finance data issue. "
+        "Please rerun the page in a moment."
+    )
+    st.stop()
 
 st.title("Portfolio Information")
 
