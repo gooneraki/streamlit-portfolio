@@ -220,14 +220,14 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
 
     filtered_main_dataframes = main_dataframes.loc[:, selected_columns]
 
-    st.dataframe(filtered_main_dataframes, use_container_width=True)
+    st.dataframe(filtered_main_dataframes, width='stretch')
 
     # Show transposed tail for easier reading
     st.subheader("Latest Values (Transposed)")
-    st.dataframe(filtered_main_dataframes.tail().T, use_container_width=True)
+    st.dataframe(filtered_main_dataframes.tail().T, width='stretch')
 
     st.subheader("Complete Dataset")
-    st.dataframe(main_dataframes, use_container_width=True)
+    st.dataframe(main_dataframes, width='stretch')
 
     # Add some useful analysis from the commented code
     st.subheader("Data Analysis")
@@ -304,7 +304,7 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
                 yaxis_title='Price',
                 height=400
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         with col2:
             st.write(f"**{selected_symbol} Statistics**")
@@ -321,7 +321,7 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
             # Show recent price movements
             st.write("**Recent Prices (Last 10 days)**")
             recent_prices = price_data.tail(10)
-            st.dataframe(recent_prices.to_frame(), use_container_width=True)
+            st.dataframe(recent_prices.to_frame(), width='stretch')
 
     # Portfolio Performance Analysis
     st.subheader("Portfolio Performance Analysis")
@@ -350,7 +350,7 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
             yaxis_title='Value ($)',
             height=400
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     with col2:
         st.write("**Portfolio Statistics**")
@@ -413,7 +413,7 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
             perf_df_display['Total Return'] = perf_df_display['Total Return'].apply(lambda x: f"{x:.2%}")
             perf_df_display['Annualized Return'] = perf_df_display['Annualized Return'].apply(lambda x: f"{x:.2%}")
             
-            st.dataframe(perf_df_display, use_container_width=True, hide_index=True)
+            st.dataframe(perf_df_display, width='stretch', hide_index=True)
             
             # Create a bar chart of annualized returns
             fig = go.Figure(data=[
@@ -429,7 +429,7 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
                 height=400,
                 yaxis=dict(tickformat='%')
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
 else:
     st.error("No data available to display. Please check your internet connection or try again later.")

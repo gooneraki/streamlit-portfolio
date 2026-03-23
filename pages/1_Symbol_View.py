@@ -187,7 +187,7 @@ with tab1:
             st.warning("No valid data to plot.")
         else:
             st.plotly_chart(value_fig, config={
-                            "displayModeBar": False}, use_container_width=True)
+                            "displayModeBar": False}, width='stretch')
 
     st.markdown("#### Daily Annual Returns")
 
@@ -208,7 +208,7 @@ with tab1:
         if annual_returns_fig is None:
             st.warning("No valid data to plot.")
         else:
-            st.plotly_chart(annual_returns_fig, use_container_width=True, config={
+            st.plotly_chart(annual_returns_fig, width='stretch', config={
                             "displayModeBar": False})
 
 with tab2:

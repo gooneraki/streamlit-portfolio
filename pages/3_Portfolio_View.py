@@ -84,7 +84,7 @@ def display_portfolio_weights(result, p_assets_snapshot=None):
         weights_display_df,
         column_config=column_config,
         hide_index=True,
-        use_container_width=True
+        width='stretch'
     )
 
 
@@ -247,7 +247,7 @@ styled_assets_display = assets_display_renamed.style.format({
 # Display the styled dataframe
 st.dataframe(
     styled_assets_display,
-    use_container_width=True
+    width='stretch'
 )
 
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
@@ -277,7 +277,7 @@ risk_styled = risk_display_renamed.style.format({
 # Display risk metrics
 st.dataframe(
     risk_styled,
-    use_container_width=True
+    width='stretch'
 )
 
 st.caption("All metrics calculated from ALL-TIME highs (not recent peaks) showing complete historical perspective")
@@ -345,7 +345,7 @@ if optimisation_results:
                     "Diversification": st.column_config.TextColumn("Diversification")
                 },
                 hide_index=True,
-                use_container_width=True
+                width='stretch'
             )
 
     # Dynamic strategy tabs - start from index 1 (after comparison tab)
@@ -431,7 +431,7 @@ asset_fig = display_trend_go_chart_2(
 if asset_fig is None:
     st.warning("No valid data to plot.")
 else:
-    st.plotly_chart(asset_fig, use_container_width=True)
+    st.plotly_chart(asset_fig, width='stretch')
 
 # --- Reverse chart: select metric, plot all assets ---
 st.markdown('---')
@@ -495,4 +495,4 @@ if selected_metric:
     title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend ({selected_period_multi})"
     fig = display_multi_asset_metric_trend(
         filtered_data, asset_names, selected_metric, title=title)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
