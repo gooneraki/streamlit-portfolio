@@ -3,7 +3,7 @@
 import sys
 import streamlit as st
 
-DEV_VERSION = "3.14.3"
+DEV_VERSION = "3.14.4"
 PROD_VERSION = sys.version.split()[0]
 
 # Set the page title and layout

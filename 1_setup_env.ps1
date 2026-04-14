@@ -1,32 +1,39 @@
-# Step 0: Display python version (streamlit uses 3.12)
-Write-Host "Checking Python version..." -ForegroundColor Cyan
-$pythonVersion = python --version 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Python is not installed or not found in PATH." -ForegroundColor Red
-    exit 1
-} else {
-    Write-Host "Python version: $pythonVersion" -ForegroundColor Green
-}
+# Step 0-2: Resolve Python source, create venv if needed, activate, then display active version/path
+Write-Host "Checking Python and virtual environment..." -ForegroundColor Cyan
 
-# Step 1: Check if 'venv' folder exists
-if (-Not (Test-Path -Path "./venv")) {
+$venvPath = Join-Path $PSScriptRoot "venv"
+$venvPythonPath = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
+
+if (Test-Path -Path $venvPythonPath) {
+    Write-Host "Virtual environment already exists. Activating..." -ForegroundColor Yellow
+} else {
+    Write-Host "Virtual environment not found. Checking global Python..." -ForegroundColor Cyan
+    $globalPythonPath = python -c "import sys; print(sys.executable)" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "No virtual environment found and Python is not installed or not found in PATH." -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "Global Python path: $globalPythonPath" -ForegroundColor Green
     Write-Host "Creating virtual environment..." -ForegroundColor Cyan
-    python -m venv venv
+    python -m venv $venvPath
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to create virtual environment." -ForegroundColor Red
         exit 1
     }
-} else {
-    Write-Host "Virtual environment already exists. Skipping creation." -ForegroundColor Yellow
 }
 
-# Step 2: Activate the virtual environment
 Write-Host "Activating virtual environment..." -ForegroundColor Cyan
 & .\venv\Scripts\Activate.ps1
 if (-Not (Get-Command "deactivate" -ErrorAction SilentlyContinue)) {
     Write-Host "Failed to activate the virtual environment." -ForegroundColor Red
     exit 1
 }
+
+$activePythonVersion = python --version 2>&1
+$activePythonPath = python -c "import sys; print(sys.executable)" 2>&1
+Write-Host "Active Python version: $activePythonVersion" -ForegroundColor Green
+Write-Host "Active Python path: $activePythonPath" -ForegroundColor Green
 
 # Step 3: Upgrade pip
 Write-Host "Upgrading pip..." -ForegroundColor Cyan
