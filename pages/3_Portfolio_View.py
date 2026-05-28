@@ -153,6 +153,11 @@ assets_snapshot = portfolio.get_assets_snapshot()
 total_metrics = assets_snapshot.loc['TOTAL']
 
 st.markdown("#### 🏆 Portfolio Total Summary")
+
+st.info(
+    "📊 **Z-Score:** Measures standard deviations from average. |Z| < 1 (typical); 1 <= |Z| < 2 (elevated); 2 <= |Z| < 3 (unusual); |Z| >= 3 (extreme)."
+)
+
 sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
 with sum_col1:
     st.metric("Rolling 1M Return",
