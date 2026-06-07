@@ -1,4 +1,9 @@
 
+"""Streamlit page for viewing historical currency and cryptocurrency rates."""
+
+# Streamlit multipage apps commonly use numeric filename prefixes for ordering.
+# pylint: disable=invalid-name
+
 import datetime
 import streamlit as st
 from utilities.constants import BASE_CURRENCY_OPTIONS
@@ -25,8 +30,8 @@ if target_currency:
     if history.empty:
         st.error("Currency not found.")
     else:
-        symbol_type = "Currency" if '=X' in symbol else "Crypto"
-        st.write(f"{symbol_type}: {symbol}")
+        SYMBOL_TYPE = "Currency" if '=X' in symbol else "Crypto"
+        st.write(f"{SYMBOL_TYPE}: {symbol}")
 
         st.line_chart(history)
 
