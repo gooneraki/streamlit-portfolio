@@ -1,35 +1,37 @@
-""" Yfinance utilities for Streamlit app """
+"""Yfinance utilities for Streamlit app"""
+
 from dataclasses import dataclass
 from typing import Union, TypedDict, Any
 import pandas as pd
 import yfinance as yf
 import streamlit as st
 
-
 YF_CACHE_TTL = "6h"
 YF_CACHE_MAX_ENTRIES = 256
 
+YF_RECOVERABLE_ERRORS = (AttributeError, KeyError, TypeError, ValueError, RuntimeError, OSError)
+
 
 def get_sector_keys():
-    """ Get the sector keys """
+    """Get the sector keys"""
     try:
-        return list(
-            yf.const.SECTOR_INDUSTY_MAPPING.keys())  # type: ignore
+        return list(yf.const.SECTOR_INDUSTY_MAPPING.keys())  # type: ignore
 
-    except Exception as err:
+    except YF_RECOVERABLE_ERRORS as err:
         print(f"Error retrieving sector keys: {err}")
         return [
-            'basic-materials',
-            'communication-services',
-            'consumer-cyclical',
-            'consumer-defensive',
-            'energy',
-            'financial-services',
-            'healthcare',
-            'industrials',
-            'real-estate',
-            'technology',
-            'utilities']
+            "basic-materials",
+            "communication-services",
+            "consumer-cyclical",
+            "consumer-defensive",
+            "energy",
+            "financial-services",
+            "healthcare",
+            "industrials",
+            "real-estate",
+            "technology",
+            "utilities",
+        ]
 
 
 YF_SECTOR_KEYS = get_sector_keys()
@@ -42,6 +44,7 @@ YF_SECTOR_KEYS = get_sector_keys()
 @dataclass
 class SectorOverview:
     """Type definition for sector overview"""
+
     companies_count: int
     market_cap: int
     message_board_id: str
@@ -63,6 +66,7 @@ class SectorData(TypedDict):
         - Key: "symbol"
         - Value: "short name"
     """
+
     key: str
     name: str
     overview: dict  # is SectorOverview
@@ -72,7 +76,7 @@ class SectorData(TypedDict):
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def sector_yf(sector_key: str) -> Union[str, SectorData]:
-    """ Fetch the sector data """
+    """Fetch the sector data"""
     try:
         sector = yf.Sector(sector_key)
 
@@ -95,9 +99,10 @@ def sector_yf(sector_key: str) -> Union[str, SectorData]:
             top_etfs=top_etfs,
         )
 
-    except Exception as err:
+    except YF_RECOVERABLE_ERRORS as err:
         error_message = f"Error retrieving sector details for '{sector_key}': {err}"
         return error_message
+
 
 # ^^^^^^^^^ #
 # yf.Sector #
@@ -110,13 +115,14 @@ def sector_yf(sector_key: str) -> Union[str, SectorData]:
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def search_yf(search_input: str):
-    """ Search for a symbol """
+    """Search for a symbol"""
     try:
         search_results = yf.Search(search_input)
         return search_results.all
-    except Exception as err:
+    except YF_RECOVERABLE_ERRORS as err:
         error_message = f"Error retrieving search results for '{search_input}': {err}"
         return error_message
+
 
 # ^^^^^^^^^ #
 # yf.Search #
@@ -129,12 +135,11 @@ def search_yf(search_input: str):
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def yf_ticket_info(symbol: str):
-    """ Fetch the asset info for a given symbol """
+    """Fetch the asset info for a given symbol"""
     try:
         return yf.Ticker(symbol).info
     except Exception as err:
-        raise ValueError(
-            f"Error retrieving ticker details for '{symbol}': {err}") from err
+        raise ValueError(f"Error retrieving ticker details for '{symbol}': {err}") from err
 
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
@@ -144,30 +149,29 @@ def yf_ticket_currency(symbol: str) -> str:
     try:
         ticker = yf.Ticker(symbol)
 
-        fast_info = getattr(ticker, 'fast_info', None)
+        fast_info = getattr(ticker, "fast_info", None)
         if fast_info is not None:
-            currency = fast_info.get('currency')
+            currency = fast_info.get("currency")
             if isinstance(currency, str) and currency.strip():
                 return currency.strip().upper()
 
         info = ticker.info
-        currency = info.get('currency') or info.get('financialCurrency')
+        currency = info.get("currency") or info.get("financialCurrency")
         if isinstance(currency, str) and currency.strip():
             return currency.strip().upper()
 
         raise ValueError("currency not found")
-    except Exception as err:
-        raise ValueError(
-            f"Error retrieving currency for '{symbol}': {err}") from err
+    except YF_RECOVERABLE_ERRORS as err:
+        raise ValueError(f"Error retrieving currency for '{symbol}': {err}") from err
 
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def yf_ticket_history(symbol: str, period='max'):
-    """ Fetch the asset history for a given symbol """
+def yf_ticket_history(symbol: str, period="max"):
+    """Fetch the asset history for a given symbol"""
     try:
         ticker = yf.Ticker(symbol)
-        return ticker.history(period=period, auto_adjust=True)['Close']
-    except Exception as err:
+        return ticker.history(period=period, auto_adjust=True)["Close"]
+    except YF_RECOVERABLE_ERRORS as err:
         return f"Error retrieving ticker details for '{symbol}': {err}"
 
 
@@ -176,7 +180,7 @@ def get_fx_history(base_currency, target_currency):
     """Get the historical data of a currency pair from Yahoo Finance API."""
 
     if base_currency == target_currency:
-        return pd.Series(1, index=pd.date_range(start='1980-01-01', end=pd.Timestamp.today(), freq='D'))
+        return pd.Series(1, index=pd.date_range(start="1980-01-01", end=pd.Timestamp.today(), freq="D"))
 
     fx_symbol = target_currency + base_currency + "=X"
     fx_history = yf_ticket_history(fx_symbol)
@@ -191,8 +195,8 @@ def get_fx_history(base_currency, target_currency):
     if not isinstance(crypto_history, str):
         return crypto_history
 
-    raise ValueError(
-        f"Error retrieving historical data for either '{fx_symbol}' or '{crypto_symbol}'")
+    raise ValueError(f"Error retrieving historical data for either '{fx_symbol}' or '{crypto_symbol}'")
+
 
 # ^^^^^^^^^ #
 # yf.Ticker #
@@ -203,15 +207,17 @@ def get_fx_history(base_currency, target_currency):
 # yf.Market #
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
+
 class MarketData(TypedDict):
     """Type definition for successful market data response"""
+
     summary: dict[str, Any]
     first_summary_symbol: str
 
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
 def market_yf(market: str) -> Union[str, MarketData]:
-    """ Fetch the market info for a given market """
+    """Fetch the market info for a given market"""
     try:
         market_data = yf.Market(market)
 
@@ -228,21 +234,20 @@ def market_yf(market: str) -> Union[str, MarketData]:
         if not isinstance(first_summary, dict):
             return "Error: Market symbol is not a dictionary"
 
-        if not 'symbol' in first_summary:
+        if not "symbol" in first_summary:
             return "Error: Symbol is not in the first summary"
 
-        first_summary_symbol = first_summary['symbol']
+        first_summary_symbol = first_summary["symbol"]
 
         if not isinstance(first_summary_symbol, str):
             return "Error: Market symbol is not a string"
 
-        return {
-            'summary': data_summary,
-            'first_summary_symbol': first_summary_symbol
-        }
-    except Exception as err:
+        return {"summary": data_summary, "first_summary_symbol": first_summary_symbol}
+    except YF_RECOVERABLE_ERRORS as err:
         error_message = f"Error retrieving market details for '{market}': {err}"
         return error_message
+
+
 # ^^^^^^^^^ #
 # yf.Market #
 # ######### #
@@ -254,12 +259,13 @@ def market_yf(market: str) -> Union[str, MarketData]:
 
 class TickersData(TypedDict):
     """Type definition for successful tickers data response"""
+
     history: pd.DataFrame
 
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def tickers_yf(symbols: list[str], period='max') -> TickersData:
-    """ Fetch the tickers data """
+def tickers_yf(symbols: list[str], period="max") -> TickersData:
+    """Fetch the tickers data"""
     try:
         tickers = yf.Tickers(symbols)
         history_data = tickers.history(period=period, auto_adjust=True)
@@ -272,24 +278,24 @@ def tickers_yf(symbols: list[str], period='max') -> TickersData:
             raise ValueError("Error: Close prices is not a DataFrame")
 
         # drop all columns with all NaNs for erroneous symbols
-        close_prices = close_prices.dropna(axis=1, how='all')
+        close_prices = close_prices.dropna(axis=1, how="all")
 
         # drop all rows with any NaNs to have consistent data
-        close_prices = close_prices.dropna(axis=0, how='any')
+        close_prices = close_prices.dropna(axis=0, how="any")
 
         if close_prices.empty:
             raise ValueError("Error: No close prices returned")
 
         if len(close_prices.columns) != len(symbols):
             raise ValueError(
-                f"\nError: Not all symbols have data: {[el for el in symbols if el not in close_prices.columns]}\n")
+                f"\nError: Not all symbols have data: {[el for el in symbols if el not in close_prices.columns]}\n"
+            )
 
-        return {
-            "history": close_prices
-        }
+        return {"history": close_prices}
     except Exception as err:
         error_message = f"Error retrieving tickers details for '{symbols}': {err}"
         raise ValueError(error_message) from err
+
 
 # ^^^^^^^^^ #
 # yf.Tickers #

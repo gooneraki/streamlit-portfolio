@@ -1,5 +1,15 @@
-[FORMAT]
-max-line-length=120
+[MASTER]
+init-hook="import os, sys; sys.path.insert(0, os.getcwd())"
 
-[MESSAGES CONTROL]
-disable=broad-exception-caught
+[FORMAT]
+max-line-length=220
+
+[DESIGN]
+max-args=20
+max-positional-arguments=20
+max-locals=40
+max-returns=10
+max-attributes=20
+
+[MAIN]
+max-module-lines=2000

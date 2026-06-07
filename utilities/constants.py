@@ -1,3 +1,5 @@
+"""Shared constants for Streamlit portfolio pages and default portfolio positions."""
+
 from classes.asset_positions import AssetPosition
 
 

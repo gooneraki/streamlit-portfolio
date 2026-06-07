@@ -20,7 +20,7 @@ if DEV_VERSION != PROD_VERSION:
 
 # Add an introduction
 st.write("""
-This is a **personal finance analysis tool** built with Streamlit. 
+This is a **personal finance analysis tool** built with Streamlit.
 It uses Python's `yfinance` library to fetch historical financial data directly from Yahoo Finance.
 """)
 
@@ -33,7 +33,7 @@ st.write("""
 
 # Disclaimer section
 st.info("""
-**Disclaimer**: While historical data can help forecast future trends, such predictions are inherently uncertain and should be used cautiously.  
+**Disclaimer**: While historical data can help forecast future trends, such predictions are inherently uncertain and should be used cautiously.
 This app is intended for informational purposes only and is not responsible for any financial losses incurred based on its use.
 """)
 

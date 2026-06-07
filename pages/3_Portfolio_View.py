@@ -1,5 +1,6 @@
 # pylint: disable=C0103
 """Get the information of a stock symbol from Yahoo Finance API."""
+
 import datetime
 import json
 import pandas as pd
@@ -9,28 +10,24 @@ from utilities.constants import ASSETS_POSITIONS_DEFAULT, BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart_2, display_multi_asset_metric_trend
 from classes.asset_positions import AssetPosition, Portfolio
 
-
 print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
 
 st.set_page_config(page_title="Portfolio View", layout="wide")
 
 col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
-    username = st.text_input(label="Enter username",
-                             key="username_input", type="password")
+    username = st.text_input(label="Enter username", key="username_input", type="password")
 
     # Display authentication status
     try:
         if username == st.secrets["DB_USERNAME"]:
             st.success("✅ Authenticated - Loading personalized portfolio data")
         else:
-            st.warning(
-                "⚠️ Using default portfolio data. Enter your username to load personalized portfolio data.")
+            st.warning("⚠️ Using default portfolio data. Enter your username to load personalized portfolio data.")
     except KeyError:
         st.warning("⚠️ Using default portfolio data")
 with col2:
-    base_currency = st.selectbox(
-        "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
+    base_currency = st.selectbox("Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
 
 
 def display_portfolio_weights(result, p_assets_snapshot=None):
@@ -38,10 +35,9 @@ def display_portfolio_weights(result, p_assets_snapshot=None):
     portfolio_weights = result.weights
 
     # Create a DataFrame for better display with currency information
-    weights_display_df = pd.DataFrame({
-        'Asset': portfolio_weights.index,
-        'Weight %': (portfolio_weights.values * 100)
-    }).sort_values('Weight %', ascending=False)
+    weights_display_df = pd.DataFrame(
+        {"Asset": portfolio_weights.index, "Weight %": (portfolio_weights.values * 100)}
+    ).sort_values("Weight %", ascending=False)
 
     # Add currency information if available
     if p_assets_snapshot is not None:
@@ -49,14 +45,12 @@ def display_portfolio_weights(result, p_assets_snapshot=None):
         currency_info = {}
         for asset in portfolio_weights.index:
             if asset in p_assets_snapshot.index:
-                currency_info[asset] = p_assets_snapshot.loc[asset, 'currency']
+                currency_info[asset] = p_assets_snapshot.loc[asset, "currency"]
 
-        weights_display_df['Currency'] = weights_display_df['Asset'].map(
-            currency_info.get)
+        weights_display_df["Currency"] = weights_display_df["Asset"].map(currency_info.get)
 
     # Display performance metrics at the top
-    st.markdown(
-        f"##### {result.emoji} {result.name} Performance")
+    st.markdown(f"##### {result.emoji} {result.name} Performance")
 
     metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
     with metric_col1:
@@ -64,40 +58,30 @@ def display_portfolio_weights(result, p_assets_snapshot=None):
     with metric_col2:
         st.metric("Annual Volatility", f"{result.ann_vol:.2%}")
     with metric_col3:
-        st.metric("Sharpe Ratio",
-                  f"{result.ann_arith_sharpe_ratio:.3f}")
+        st.metric("Sharpe Ratio", f"{result.ann_arith_sharpe_ratio:.3f}")
     with metric_col4:
-        st.metric("Herfindahl Index",
-                  f"{result.herfindahl_index:.3f}")
+        st.metric("Herfindahl Index", f"{result.herfindahl_index:.3f}")
 
     st.markdown("**Portfolio Weights**")
     column_config = {
         "Asset": st.column_config.TextColumn("Asset"),
-        "Weight %": st.column_config.NumberColumn(
-            "Weight %", format="%.2f%%"
-        )
+        "Weight %": st.column_config.NumberColumn("Weight %", format="%.2f%%"),
     }
-    if 'Currency' in weights_display_df.columns:
+    if "Currency" in weights_display_df.columns:
         column_config["Currency"] = st.column_config.TextColumn("Currency")
 
-    st.dataframe(
-        weights_display_df,
-        column_config=column_config,
-        hide_index=True,
-        width='stretch'
-    )
+    st.dataframe(weights_display_df, column_config=column_config, hide_index=True, width="stretch")
 
 
 def get_assets_positions():
-    """ Get the assets positions """
+    """Get the assets positions"""
     try:
         if username == st.secrets["DB_USERNAME"]:
             positions_dict = json.loads(st.secrets["ASSETS_POSITIONS_STR"])
             result = [AssetPosition(**position) for position in positions_dict]
             return result
-        else:
-            return ASSETS_POSITIONS_DEFAULT
-    except Exception as err:
+        return ASSETS_POSITIONS_DEFAULT
+    except (KeyError, json.JSONDecodeError, TypeError, ValueError) as err:
         print(f"Error: {err}")
         return ASSETS_POSITIONS_DEFAULT
 
@@ -110,10 +94,8 @@ try:
         portfolio = Portfolio(assets_positions, base_currency)
 except ValueError as err:
     st.error(f"Portfolio data could not be loaded right now: {err}")
-    st.info(
-        "This is usually a temporary Yahoo Finance data issue. "
-        "Please rerun the page in a moment."
-    )
+    message = "This is usually a temporary Yahoo Finance data issue. Please rerun the page in a moment."
+    st.info(message)
     st.stop()
 
 st.title("Portfolio Information")
@@ -129,9 +111,9 @@ st.markdown("#### 📊 Data Sampling Period")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Start Date", period_info.first_date.strftime('%Y-%m-%d'))
+    st.metric("Start Date", period_info.first_date.strftime("%Y-%m-%d"))
 with col2:
-    st.metric("End Date", last_date.strftime('%Y-%m-%d'))
+    st.metric("End Date", last_date.strftime("%Y-%m-%d"))
 with col3:
     st.metric("Sample Period", f"{period_info.number_of_years:.1f} years")
 with col4:
@@ -150,7 +132,7 @@ st.markdown("---")
 assets_snapshot = portfolio.get_assets_snapshot()
 
 
-total_metrics = assets_snapshot.loc['TOTAL']
+total_metrics = assets_snapshot.loc["TOTAL"]
 
 st.markdown("#### 🏆 Portfolio Total Summary")
 
@@ -160,18 +142,15 @@ st.info(
 
 sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
 with sum_col1:
-    st.metric("Rolling 1M Return",
-              f"{total_metrics['rolling_1m_return_pct']:.1f}%")
+    st.metric("Rolling 1M Return", f"{total_metrics['rolling_1m_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1m_return_z_score']:.2f}")
 
 with sum_col2:
-    st.metric("Rolling 1Q Return",
-              f"{total_metrics['rolling_1q_return_pct']:.1f}%")
+    st.metric("Rolling 1Q Return", f"{total_metrics['rolling_1q_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1q_return_z_score']:.2f}")
 
 with sum_col3:
-    st.metric("Rolling 1Y Return",
-              f"{total_metrics['rolling_1y_return_pct']:.1f}%")
+    st.metric("Rolling 1Y Return", f"{total_metrics['rolling_1y_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1y_return_z_score']:.2f}")
 
 with sum_col4:
@@ -180,8 +159,7 @@ with sum_col4:
 
 with sum_col5:
     st.metric("Portfolio Value", f"{total_metrics['translated_values']:,.0f}")
-    st.caption(
-        f"Z-Score: {total_metrics['trend_deviation_z_score']:.2f}")
+    st.caption(f"Z-Score: {total_metrics['trend_deviation_z_score']:.2f}")
 
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 
@@ -191,11 +169,21 @@ st.markdown("#### Current Portfolio Composition")
 
 # Select and reorder columns for better display
 display_columns = [
-    'currency', 'position', 'translated_close', 'translated_values', 'weights_pct',
-
-    'cagr_pct', 'rolling_1y_return_pct', 'rolling_1q_return_pct', 'rolling_1m_return_pct',
-    'cagr_fitted_pct',
-    'trend_deviation_z_score', 'rolling_1y_return_z_score', 'rolling_1q_return_z_score', 'rolling_1m_return_z_score']
+    "currency",
+    "position",
+    "translated_close",
+    "translated_values",
+    "weights_pct",
+    "cagr_pct",
+    "rolling_1y_return_pct",
+    "rolling_1q_return_pct",
+    "rolling_1m_return_pct",
+    "cagr_fitted_pct",
+    "trend_deviation_z_score",
+    "rolling_1y_return_z_score",
+    "rolling_1q_return_z_score",
+    "rolling_1m_return_z_score",
+]
 
 # Get the assets snapshot and select only the columns we want to display
 assets_display = portfolio.get_assets_snapshot().loc[:, display_columns]
@@ -206,63 +194,66 @@ def color_z_scores(val):
     Color z-scores: green for positive, red for negative
     """
     if pd.isna(val):
-        return ''
-    elif val > 0:
+        return ""
+    if val > 0:
         # Light green background
-        return 'background-color: #d4edda; color: #155724; font-weight: bold'
-    elif val < 0:
+        return "background-color: #d4edda; color: #155724; font-weight: bold"
+    if val < 0:
         # Light red background
-        return 'background-color: #f8d7da; color: #721c24; font-weight: bold'
-    else:
-        return 'color: #6c757d; font-weight: bold'  # Gray for zero
+        return "background-color: #f8d7da; color: #721c24; font-weight: bold"
+    return "color: #6c757d; font-weight: bold"  # Gray for zero
 
 
 # Apply styling to z-score columns
-z_score_columns = ['trend_deviation_z_score', 'rolling_1m_return_z_score',
-                   'rolling_1q_return_z_score', 'rolling_1y_return_z_score']
+z_score_columns = [
+    "trend_deviation_z_score",
+    "rolling_1m_return_z_score",
+    "rolling_1q_return_z_score",
+    "rolling_1y_return_z_score",
+]
 
 # Rename columns for better display
-assets_display_renamed = assets_display.rename(columns={
-    'position': 'Position',
-    'weights_pct': 'Weight',
-    'translated_close': 'Close Price',
-    'translated_values': 'Value',
-    'trend_deviation_z_score': 'Value Z',
-    'cagr_pct': 'CAGR',
-    'cagr_fitted_pct': 'CAGR Fitted',
-    'rolling_1m_return_pct': '1M Return',
-    'rolling_1q_return_pct': '1Q Return',
-    'rolling_1y_return_pct': '1Y Return',
-    'rolling_1m_return_z_score': '1M Return Z',
-    'rolling_1q_return_z_score': '1Q Return Z',
-    'rolling_1y_return_z_score': '1Y Return Z',
-    'currency': 'Currency'
-})
+assets_display_renamed = assets_display.rename(
+    columns={
+        "position": "Position",
+        "weights_pct": "Weight",
+        "translated_close": "Close Price",
+        "translated_values": "Value",
+        "trend_deviation_z_score": "Value Z",
+        "cagr_pct": "CAGR",
+        "cagr_fitted_pct": "CAGR Fitted",
+        "rolling_1m_return_pct": "1M Return",
+        "rolling_1q_return_pct": "1Q Return",
+        "rolling_1y_return_pct": "1Y Return",
+        "rolling_1m_return_z_score": "1M Return Z",
+        "rolling_1q_return_z_score": "1Q Return Z",
+        "rolling_1y_return_z_score": "1Y Return Z",
+        "currency": "Currency",
+    }
+)
 
-z_score_columns_renamed = ['Value Z',
-                           '1M Return Z', '1Q Return Z', '1Y Return Z']
+z_score_columns_renamed = ["Value Z", "1M Return Z", "1Q Return Z", "1Y Return Z"]
 
-styled_assets_display = assets_display_renamed.style.format({
-    'Position': '{:,.0f}',
-    'Weight': '{:.1f}%',
-    'Close Price': '{:.2f}',
-    'Value': '{:,.0f}',
-    'CAGR': '{:.1f}%',
-    '1Y Return': '{:.1f}%',
-    '1Q Return': '{:.1f}%',
-    '1M Return': '{:.1f}%',
-    'CAGR Fitted': '{:.1f}%',
-    'Value Z': '{:.2f}',
-    '1Y Return Z': '{:.2f}',
-    '1Q Return Z': '{:.2f}',
-    '1M Return Z': '{:.2f}'
-}).apply(lambda x: [color_z_scores(val) if x.name in z_score_columns_renamed else '' for val in x], axis=0)
+styled_assets_display = assets_display_renamed.style.format(
+    {
+        "Position": "{:,.0f}",
+        "Weight": "{:.1f}%",
+        "Close Price": "{:.2f}",
+        "Value": "{:,.0f}",
+        "CAGR": "{:.1f}%",
+        "1Y Return": "{:.1f}%",
+        "1Q Return": "{:.1f}%",
+        "1M Return": "{:.1f}%",
+        "CAGR Fitted": "{:.1f}%",
+        "Value Z": "{:.2f}",
+        "1Y Return Z": "{:.2f}",
+        "1Q Return Z": "{:.2f}",
+        "1M Return Z": "{:.2f}",
+    }
+).apply(lambda x: [color_z_scores(val) if x.name in z_score_columns_renamed else "" for val in x], axis=0)
 
 # Display the styled dataframe
-st.dataframe(
-    styled_assets_display,
-    width='stretch'
-)
+st.dataframe(styled_assets_display, width="stretch")
 
 st.caption(f"All values as of {last_date.strftime('%Y-%m-%d')}")
 
@@ -271,28 +262,25 @@ st.markdown("---")
 st.markdown("#### 📉 Risk Analysis - Drawdown from ALL-TIME Highs")
 
 # Select drawdown columns for a focused risk view
-risk_columns = ['drawdown_pct', 'max_drawdown_pct', 'drawdown_duration']
+risk_columns = ["drawdown_pct", "max_drawdown_pct", "drawdown_duration"]
 risk_display = portfolio.get_assets_snapshot().loc[:, risk_columns]
 
 # Rename columns for better display
-risk_display_renamed = risk_display.rename(columns={
-    'drawdown_pct': 'Current Drawdown',
-    'max_drawdown_pct': 'Max Drawdown',
-    'drawdown_duration': 'Days Since Peak'
-})
+risk_display_renamed = risk_display.rename(
+    columns={
+        "drawdown_pct": "Current Drawdown",
+        "max_drawdown_pct": "Max Drawdown",
+        "drawdown_duration": "Days Since Peak",
+    }
+)
 
 # Format the risk dataframe
-risk_styled = risk_display_renamed.style.format({
-    'Current Drawdown': '{:.1f}%',
-    'Max Drawdown': '{:.1f}%',
-    'Days Since Peak': '{:.0f}'
-})
+risk_styled = risk_display_renamed.style.format(
+    {"Current Drawdown": "{:.1f}%", "Max Drawdown": "{:.1f}%", "Days Since Peak": "{:.0f}"}
+)
 
 # Display risk metrics
-st.dataframe(
-    risk_styled,
-    width='stretch'
-)
+st.dataframe(risk_styled, width="stretch")
 
 st.caption("All metrics calculated from ALL-TIME highs (not recent peaks) showing complete historical perspective")
 
@@ -300,14 +288,16 @@ st.caption("All metrics calculated from ALL-TIME highs (not recent peaks) showin
 st.markdown("---")
 st.markdown("#### 🎯 Portfolio Optimization Strategies")
 optimisation_results = portfolio.get_optimisation_results()
-current_portfolio_index = [index for index, result in enumerate(
-    optimisation_results) if result.key == 'current_portfolio'][0]
+current_portfolio_index = [
+    index for index, result in enumerate(optimisation_results) if result.key == "current_portfolio"
+][0]
 
 st.caption(
-    "💡 **Note:** Current Portfolio Annual Return (" +
-    f"{optimisation_results[current_portfolio_index].ann_arith_return:.1%})" +
-    " is calculated from individual asset mean log returns with covariance, then annualized. CAGR " +
-    f"({total_metrics['cagr_pct']:.1f}%) is calculated directly from the TOTAL portfolio values over time.")
+    "💡 **Note:** Current Portfolio Annual Return ("
+    + f"{optimisation_results[current_portfolio_index].ann_arith_return:.1%})"
+    + " is calculated from individual asset mean log returns with covariance, then annualized. CAGR "
+    + f"({total_metrics['cagr_pct']:.1f}%) is calculated directly from the TOTAL portfolio values over time."
+)
 
 if optimisation_results:
     # Create tabs dynamically based on available optimization results
@@ -328,20 +318,22 @@ if optimisation_results:
             strategy_weights = optimal_result.weights
 
             # Calculate diversification metrics
-            strategy_herfindahl = (strategy_weights ** 2).sum()
+            strategy_herfindahl = (strategy_weights**2).sum()
 
             strategy_max_weight = strategy_weights.max()
             strategy_min_weight = strategy_weights.min()
 
-            comparison_data.append({
-                'Strategy': f"{optimal_result.emoji} {optimal_result.name}",
-                'Annual Return': f"{optimal_result.ann_arith_return:.1%}",
-                'Annual Volatility': f"{optimal_result.ann_vol:.1%}",
-                'Sharpe Ratio': f"{optimal_result.ann_arith_sharpe_ratio:.3f}",
-                'Min Weight': f"{strategy_min_weight:.1%}",
-                'Max Weight': f"{strategy_max_weight:.1%}",
-                'Herfindahl Index': f"{strategy_herfindahl:.3f}"
-            })
+            comparison_data.append(
+                {
+                    "Strategy": f"{optimal_result.emoji} {optimal_result.name}",
+                    "Annual Return": f"{optimal_result.ann_arith_return:.1%}",
+                    "Annual Volatility": f"{optimal_result.ann_vol:.1%}",
+                    "Sharpe Ratio": f"{optimal_result.ann_arith_sharpe_ratio:.3f}",
+                    "Min Weight": f"{strategy_min_weight:.1%}",
+                    "Max Weight": f"{strategy_max_weight:.1%}",
+                    "Herfindahl Index": f"{strategy_herfindahl:.3f}",
+                }
+            )
 
         if comparison_data:
             comparison_df = pd.DataFrame(comparison_data)
@@ -356,10 +348,10 @@ if optimisation_results:
                     "Max Weight": st.column_config.TextColumn("Max Weight"),
                     "Herfindahl Index": st.column_config.TextColumn("Herfindahl Index"),
                     "Effective N": st.column_config.TextColumn("Effective N"),
-                    "Diversification": st.column_config.TextColumn("Diversification")
+                    "Diversification": st.column_config.TextColumn("Diversification"),
                 },
                 hide_index=True,
-                width='stretch'
+                width="stretch",
             )
 
     # Dynamic strategy tabs - start from index 1 (after comparison tab)
@@ -370,8 +362,7 @@ if optimisation_results:
         tab_index += 1
 
 else:
-    st.info(
-        "Portfolio optimization not available - insufficient data or optimization failed.")
+    st.info("Portfolio optimization not available - insufficient data or optimization failed.")
 
 
 st.markdown("---")
@@ -379,8 +370,7 @@ st.markdown("---")
 st.markdown("#### Portfolio Performance")
 
 # Get available assets from timeseries data
-available_assets = portfolio.timeseries_data.columns.get_level_values(
-    'Ticker').unique().tolist()
+available_assets = portfolio.timeseries_data.columns.get_level_values("Ticker").unique().tolist()
 
 # Create columns for asset selection and time period filter
 asset_col1, asset_col2 = st.columns([1, 1])
@@ -388,10 +378,7 @@ asset_col1, asset_col2 = st.columns([1, 1])
 with asset_col1:
     # Asset selection
     selected_asset = st.selectbox(
-        "Select Asset",
-        available_assets,
-        index=available_assets.index(
-            "TOTAL") if "TOTAL" in available_assets else 0
+        "Select Asset", available_assets, index=available_assets.index("TOTAL") if "TOTAL" in available_assets else 0
     )
 
 with asset_col2:
@@ -413,14 +400,10 @@ with asset_col2:
     # Default to the longest available period
     default_period = year_options[-1] if year_options else "1 Year"
 
-    selected_period = st.selectbox(
-        "Display Period",
-        year_options
-    )
+    selected_period = st.selectbox("Display Period", year_options)
 
 # Get data for selected asset
-asset_data = portfolio.timeseries_data.xs(
-    selected_asset, level='Ticker', axis=1)
+asset_data = portfolio.timeseries_data.xs(selected_asset, level="Ticker", axis=1)
 
 # Filter data based on selected period
 if selected_period == "1 Year":
@@ -436,31 +419,33 @@ elif selected_period == "10 Years":
 # Create the chart
 asset_fig = display_trend_go_chart_2(
     df=asset_data,
-    value_column='translated_values',
-    fitted_column='translated_fitted_values',
-    secondary_column='trend_deviation_z_score',
-    title_name=f"{selected_asset} - Performance Analysis"
+    value_column="translated_values",
+    fitted_column="translated_fitted_values",
+    secondary_column="trend_deviation_z_score",
+    title_name=f"{selected_asset} - Performance Analysis",
 )
 
 if asset_fig is None:
     st.warning("No valid data to plot.")
 else:
-    st.plotly_chart(asset_fig, width='stretch')
+    st.plotly_chart(asset_fig, width="stretch")
 
 # --- Reverse chart: select metric, plot all assets ---
-st.markdown('---')
-st.markdown('#### Compare All Assets by Metric')
+st.markdown("---")
+st.markdown("#### Compare All Assets by Metric")
 
 # Get available metrics (excluding weights, as those are proportions)
-all_metrics = [m for m in portfolio.timeseries_data.columns.get_level_values('Metric').unique()
-               if m not in ['weights']]
+all_metrics = [m for m in portfolio.timeseries_data.columns.get_level_values("Metric").unique() if m not in ["weights"]]
 
 # Create columns for metric selection and time period filter
 metric_select_col1, metric_select_col2 = st.columns([1, 1])
 
 with metric_select_col1:
-    selected_metric = st.selectbox('Select Metric/Column', all_metrics, index=all_metrics.index(
-        'translated_values') if 'translated_values' in all_metrics else 0)
+    selected_metric = st.selectbox(
+        "Select Metric/Column",
+        all_metrics,
+        index=all_metrics.index("translated_values") if "translated_values" in all_metrics else 0,
+    )
 
 with metric_select_col2:
     # Time period filter - reuse the same logic as single asset view
@@ -481,15 +466,10 @@ with metric_select_col2:
     # Default to the longest available period
     default_period = year_options[-1] if year_options else "1 Year"
 
-    selected_period_multi = st.selectbox(
-        "Display Period",
-        year_options,
-        key="multi_asset_period"
-    )
+    selected_period_multi = st.selectbox("Display Period", year_options, key="multi_asset_period")
 
 # Prepare data: exclude TOTAL for asset comparison
-asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values(
-    'Ticker').unique() if a != 'TOTAL']
+asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values("Ticker").unique() if a != "TOTAL"]
 
 # Use the new chart function
 if selected_metric:
@@ -507,6 +487,5 @@ if selected_metric:
     # For "10+ Years (All)", use all data (no filtering)
 
     title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend ({selected_period_multi})"
-    fig = display_multi_asset_metric_trend(
-        filtered_data, asset_names, selected_metric, title=title)
-    st.plotly_chart(fig, width='stretch')
+    fig = display_multi_asset_metric_trend(filtered_data, asset_names, selected_metric, title=title)
+    st.plotly_chart(fig, width="stretch")

@@ -19,6 +19,7 @@ from utilities.app_yfinance import tickers_yf, TickersData
 @dataclass
 class BacktestResults:
     """Container for backtest performance metrics and data"""
+
     benchmark_performance: float
     portfolio_performance: float
     outperformance: float
@@ -63,7 +64,7 @@ def get_central_deviations(close_data: pd.DataFrame) -> pd.DataFrame:
     tickers_history_fitted = close_data.rolling(window=50).mean()
 
     # Calculate deviations from fitted values
-    deviations = (close_data/tickers_history_fitted - 1).dropna()
+    deviations = (close_data / tickers_history_fitted - 1).dropna()
 
     # Center deviations by subtracting mean across tickers for each date
     central_deviations = deviations.sub(deviations.mean(axis=1), axis=0)
@@ -72,10 +73,7 @@ def get_central_deviations(close_data: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_portfolio_weights(
-    benchmark_weights: pd.DataFrame,
-    central_deviations: pd.DataFrame,
-    tilt: float,
-    period: Literal['weekly', 'monthly']
+    benchmark_weights: pd.DataFrame, central_deviations: pd.DataFrame, tilt: float, period: Literal["weekly", "monthly"]
 ) -> pd.DataFrame:
     """
     Calculate portfolio weights based on central deviations and tilt factor.
@@ -93,22 +91,18 @@ def get_portfolio_weights(
         DataFrame with optimized portfolio weights
     """
     # Calculate tilted weights by combining benchmark with deviations
-    portfolio_weights_pre = (benchmark_weights + tilt *
-                             central_deviations).dropna()
+    portfolio_weights_pre = (benchmark_weights + tilt * central_deviations).dropna()
 
     # Resample to specified frequency and take last value of each period
-    freq = 'W' if period == 'weekly' else 'ME'
+    freq = "W" if period == "weekly" else "ME"
     weights_last_period = portfolio_weights_pre.resample(freq).last()
 
     # Forward fill weights to daily frequency
-    weights_reindexed = weights_last_period.reindex(
-        central_deviations.index, method='ffill'
-    ).dropna()
+    weights_reindexed = weights_last_period.reindex(central_deviations.index, method="ffill").dropna()
 
     # Create final portfolio weights by combining with benchmark
     portfolio_weights = benchmark_weights.copy()
-    portfolio_weights.loc[weights_reindexed.index,
-                          weights_reindexed.columns] = weights_reindexed
+    portfolio_weights.loc[weights_reindexed.index, weights_reindexed.columns] = weights_reindexed
 
     return portfolio_weights
 
@@ -179,10 +173,8 @@ class ExpFitBacktester:
 
         # Clean the historical data
         history_data = self.tickers_data["history"]
-        history_data = history_data.dropna(
-            axis=1, how='all')  # Remove empty columns
-        history_data = history_data.dropna(
-            axis=0, how='any')   # Remove rows with missing data
+        history_data = history_data.dropna(axis=1, how="all")  # Remove empty columns
+        history_data = history_data.dropna(axis=0, how="any")  # Remove rows with missing data
 
         # Update tickers data with cleaned history
         self.tickers_data["history"] = history_data
@@ -207,17 +199,15 @@ class ExpFitBacktester:
         close_data = self.tickers_data["history"]
 
         # The below are SERIES with the symbols as index (e.g. [11 symbols, 1 column])
-        initial_weights = pd.Series(
-            1 / len(self.valid_symbols), index=close_data.columns)
+        initial_weights = pd.Series(1 / len(self.valid_symbols), index=close_data.columns)
         initial_prices: pd.Series = close_data.loc[close_data.index[0]]
-        initial_benchmark_positions = (self.initial_capital *
-                                       initial_weights) / initial_prices
+        initial_benchmark_positions = (self.initial_capital * initial_weights) / initial_prices
 
         # The below are DATAFRAMES with the symbols as columns (e.g. [1000 dates, 11 symbols])
         price_df = close_data.copy()
-        b_position_df = pd.DataFrame([initial_benchmark_positions] * len(close_data),
-                                     index=close_data.index,
-                                     columns=close_data.columns)
+        b_position_df = pd.DataFrame(
+            [initial_benchmark_positions] * len(close_data), index=close_data.index, columns=close_data.columns
+        )
 
         b_value_df = price_df * b_position_df
         total_b_value = b_value_df.sum(axis=1)
@@ -227,27 +217,22 @@ class ExpFitBacktester:
         # Add TOTAL column for benchmark
         b_value_df["TOTAL"] = total_b_value
         b_weight_df["TOTAL"] = b_weight_df.sum(axis=1)
-        b_log_returns_df["TOTAL"] = np.log(
-            total_b_value / total_b_value.shift(1))
+        b_log_returns_df["TOTAL"] = np.log(total_b_value / total_b_value.shift(1))
 
         # Stack into MultiIndex DataFrame
-        metrics = ["Price", "B_Position",
-                   "B_Value", "B_Weight", "B_log_returns"]
+        metrics = ["Price", "B_Position", "B_Value", "B_Weight", "B_log_returns"]
 
-        frames = [price_df, b_position_df,
-                  b_value_df, b_weight_df, b_log_returns_df]
+        frames = [price_df, b_position_df, b_value_df, b_weight_df, b_log_returns_df]
         #   mean_reversion_signal, return_spread_signal, return_spread_signal_mean,
         #   volatility_signal, sharpe_signal, relative_strength_signal]
         arrays = []
         for metric, df in zip(metrics, frames):
-            arrays.append(pd.DataFrame(df, columns=df.columns).T.assign(
-                Metric=metric).set_index("Metric", append=True))
+            arrays.append(pd.DataFrame(df, columns=df.columns).T.assign(Metric=metric).set_index("Metric", append=True))
         stacked = pd.concat(arrays)
 
         # Fix MultiIndex reordering
         if isinstance(stacked.index, pd.MultiIndex):
-            stacked.index = stacked.index.reorder_levels(
-                [1, 0])  # Metric, Symbol
+            stacked.index = stacked.index.reorder_levels([1, 0])  # Metric, Symbol
         else:
             # Alternative approach for older pandas versions
             stacked = stacked.swaplevel(0, 1)
@@ -261,7 +246,7 @@ class ExpFitBacktester:
         self._validate_return_calculations(
             self.main_data_multiindex[("B_Value", "TOTAL")],
             self.main_data_multiindex[("B_log_returns", "TOTAL")],
-            prefix="Benchmark (TOTAL)"
+            prefix="Benchmark (TOTAL)",
         )
 
         # In case we want to validate for each symbol
@@ -282,8 +267,7 @@ class ExpFitBacktester:
             Number of data points per month
         """
         if self.main_data_multiindex is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
+            raise ValueError("Data not yet processed. Call _preprocess_data() first.")
 
         first_date = self.main_data_multiindex.index[0]
         last_date = self.main_data_multiindex.index[-1]
@@ -300,45 +284,31 @@ class ExpFitBacktester:
         """
 
         if self.main_data_multiindex is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
+            raise ValueError("Data not yet processed. Call _preprocess_data() first.")
 
         points_per_month = self._get_points_per_month()
 
-        sma_1m = self.main_data_multiindex["Price"].rolling(
-            window=round(points_per_month)).mean()
-        sma_3m = self.main_data_multiindex["Price"].rolling(
-            window=round(points_per_month * 3)).mean()
-        sma_6m = self.main_data_multiindex["Price"].rolling(
-            window=round(points_per_month * 6)).mean()
-        sma_1y = self.main_data_multiindex["Price"].rolling(
-            window=round(points_per_month * 12)).mean()
-        sma_2y = self.main_data_multiindex["Price"].rolling(
-            window=round(points_per_month * 24)).mean()
+        sma_1m = self.main_data_multiindex["Price"].rolling(window=round(points_per_month)).mean()
+        sma_3m = self.main_data_multiindex["Price"].rolling(window=round(points_per_month * 3)).mean()
+        sma_6m = self.main_data_multiindex["Price"].rolling(window=round(points_per_month * 6)).mean()
+        sma_1y = self.main_data_multiindex["Price"].rolling(window=round(points_per_month * 12)).mean()
+        sma_2y = self.main_data_multiindex["Price"].rolling(window=round(points_per_month * 24)).mean()
 
-        sma_3y = self.main_data_multiindex["Price"].rolling(
-            window=round(points_per_month * 36)).mean()
+        sma_3y = self.main_data_multiindex["Price"].rolling(window=round(points_per_month * 36)).mean()
 
         # Collect all SMAs and add them at once
         sma_dataframes = []
-        sma_dataframes.append(
-            self._prepare_sma_for_multiindex(sma_1m, "SMA_1m"))
-        sma_dataframes.append(
-            self._prepare_sma_for_multiindex(sma_3m, "SMA_3m"))
-        sma_dataframes.append(
-            self._prepare_sma_for_multiindex(sma_6m, "SMA_6m"))
-        sma_dataframes.append(
-            self._prepare_sma_for_multiindex(sma_1y, "SMA_1y"))
-        sma_dataframes.append(
-            self._prepare_sma_for_multiindex(sma_2y, "SMA_2y"))
-        sma_dataframes.append(
-            self._prepare_sma_for_multiindex(sma_3y, "SMA_3y"))
+        sma_dataframes.append(self._prepare_sma_for_multiindex(sma_1m, "SMA_1m"))
+        sma_dataframes.append(self._prepare_sma_for_multiindex(sma_3m, "SMA_3m"))
+        sma_dataframes.append(self._prepare_sma_for_multiindex(sma_6m, "SMA_6m"))
+        sma_dataframes.append(self._prepare_sma_for_multiindex(sma_1y, "SMA_1y"))
+        sma_dataframes.append(self._prepare_sma_for_multiindex(sma_2y, "SMA_2y"))
+        sma_dataframes.append(self._prepare_sma_for_multiindex(sma_3y, "SMA_3y"))
 
         # Concatenate all SMAs at once
         if sma_dataframes:
             all_smas = pd.concat(sma_dataframes, axis=1)
-            self.main_data_multiindex = pd.concat(
-                [self.main_data_multiindex, all_smas], axis=1)
+            self.main_data_multiindex = pd.concat([self.main_data_multiindex, all_smas], axis=1)
 
     def _prepare_sma_for_multiindex(self, sma_df: pd.DataFrame, metric_name: str) -> pd.DataFrame:
         """
@@ -352,20 +322,20 @@ class ExpFitBacktester:
             DataFrame ready for multiindex concatenation
         """
         # Convert to multiindex format
-        sma_multiindex = sma_df.T.assign(
-            Metric=metric_name).set_index("Metric", append=True)
+        sma_multiindex = sma_df.T.assign(Metric=metric_name).set_index("Metric", append=True)
 
         # Fix MultiIndex reordering
         if isinstance(sma_multiindex.index, pd.MultiIndex):
-            sma_multiindex.index = sma_multiindex.index.reorder_levels(
-                [1, 0])  # Metric, Symbol
+            sma_multiindex.index = sma_multiindex.index.reorder_levels([1, 0])  # Metric, Symbol
         else:
             # Alternative approach for older pandas versions
             sma_multiindex = sma_multiindex.swaplevel(0, 1)
 
         return sma_multiindex.T
 
-    def get_mean_reversion_signal(self, price_df: pd.DataFrame, total_b_value: pd.Series, window: int = 42) -> pd.DataFrame:
+    def get_mean_reversion_signal(
+        self, price_df: pd.DataFrame, total_b_value: pd.Series, window: int = 42
+    ) -> pd.DataFrame:
         """
         Calculate the mean reversion signal (Z-score) for each symbol using a rolling mean and std.
         For TOTAL, use the portfolio value column instead of NaN.
@@ -375,20 +345,19 @@ class ExpFitBacktester:
         Returns:
             DataFrame of Z-scores (mean reversion signal) for each symbol, and for TOTAL (portfolio value)
         """
-        mean_rolling = price_df[self.valid_symbols].rolling(
-            window=window).mean()
+        mean_rolling = price_df[self.valid_symbols].rolling(window=window).mean()
         std_rolling = price_df[self.valid_symbols].rolling(window=window).std()
-        mean_reversion_signal = (
-            price_df[self.valid_symbols] - mean_rolling) / std_rolling
+        mean_reversion_signal = (price_df[self.valid_symbols] - mean_rolling) / std_rolling
 
         total_series = total_b_value
         total_mean = total_series.rolling(window=window).mean()
         total_std = total_series.rolling(window=window).std()
-        mean_reversion_signal["TOTAL"] = (
-            total_series - total_mean) / total_std
+        mean_reversion_signal["TOTAL"] = (total_series - total_mean) / total_std
         return mean_reversion_signal
 
-    def get_return_spread_signal(self, b_log_returns_df: pd.DataFrame, short_window: int = 21, long_window: int = 126) -> pd.DataFrame:
+    def get_return_spread_signal(
+        self, b_log_returns_df: pd.DataFrame, short_window: int = 21, long_window: int = 126
+    ) -> pd.DataFrame:
         """
         Calculate the Z-score of the difference between short-term and long-term rolling sums of B_log_returns.
         Args:
@@ -398,27 +367,24 @@ class ExpFitBacktester:
         Returns:
             DataFrame of Z-scores (return spread signal) for each symbol and TOTAL
         """
-        short_sum = b_log_returns_df[self.valid_symbols].rolling(
-            window=short_window).sum()
-        long_sum = b_log_returns_df[self.valid_symbols].rolling(
-            window=long_window).sum()
+        short_sum = b_log_returns_df[self.valid_symbols].rolling(window=short_window).sum()
+        long_sum = b_log_returns_df[self.valid_symbols].rolling(window=long_window).sum()
         spread = short_sum - long_sum
         spread_mean = spread.rolling(window=long_window).mean()
         spread_std = spread.rolling(window=long_window).std()
         spread_zscore = (spread - spread_mean) / spread_std
         # For TOTAL
-        short_sum_total = b_log_returns_df["TOTAL"].rolling(
-            window=short_window).sum()
-        long_sum_total = b_log_returns_df["TOTAL"].rolling(
-            window=long_window).sum()
+        short_sum_total = b_log_returns_df["TOTAL"].rolling(window=short_window).sum()
+        long_sum_total = b_log_returns_df["TOTAL"].rolling(window=long_window).sum()
         spread_total = short_sum_total - long_sum_total
         spread_mean_total = spread_total.rolling(window=long_window).mean()
         spread_std_total = spread_total.rolling(window=long_window).std()
-        spread_zscore["TOTAL"] = (
-            spread_total - spread_mean_total) / spread_std_total
+        spread_zscore["TOTAL"] = (spread_total - spread_mean_total) / spread_std_total
         return spread_zscore
 
-    def get_return_spread_signal_mean(self, log_returns_df: pd.DataFrame, short_window: int = 21, long_window: int = 126) -> pd.DataFrame:
+    def get_return_spread_signal_mean(
+        self, log_returns_df: pd.DataFrame, short_window: int = 21, long_window: int = 126
+    ) -> pd.DataFrame:
         """
         Calculate the Z-score of the difference between short-term and long-term rolling MEANS of B_log_returns.
         Args:
@@ -428,24 +394,19 @@ class ExpFitBacktester:
         Returns:
             DataFrame of Z-scores (return spread signal using means) for each symbol and TOTAL
         """
-        short_mean = log_returns_df[self.valid_symbols].rolling(
-            window=short_window).mean()
-        long_mean = log_returns_df[self.valid_symbols].rolling(
-            window=long_window).mean()
+        short_mean = log_returns_df[self.valid_symbols].rolling(window=short_window).mean()
+        long_mean = log_returns_df[self.valid_symbols].rolling(window=long_window).mean()
         spread = short_mean - long_mean
         spread_mean = spread.rolling(window=long_window).mean()
         spread_std = spread.rolling(window=long_window).std()
         spread_zscore = (spread - spread_mean) / spread_std
         # For TOTAL
-        short_mean_total = log_returns_df["TOTAL"].rolling(
-            window=short_window).mean()
-        long_mean_total = log_returns_df["TOTAL"].rolling(
-            window=long_window).mean()
+        short_mean_total = log_returns_df["TOTAL"].rolling(window=short_window).mean()
+        long_mean_total = log_returns_df["TOTAL"].rolling(window=long_window).mean()
         spread_total = short_mean_total - long_mean_total
         spread_mean_total = spread_total.rolling(window=long_window).mean()
         spread_std_total = spread_total.rolling(window=long_window).std()
-        spread_zscore["TOTAL"] = (
-            spread_total - spread_mean_total) / spread_std_total
+        spread_zscore["TOTAL"] = (spread_total - spread_mean_total) / spread_std_total
         return spread_zscore
 
     def get_volatility_signal(self, log_returns_df: pd.DataFrame, window: int = 63) -> pd.DataFrame:
@@ -480,7 +441,9 @@ class ExpFitBacktester:
         sharpe["TOTAL"] = sharpe_total
         return sharpe
 
-    def get_relative_strength_signal(self, price_df: pd.DataFrame, total_b_value: pd.Series, window: int = 63) -> pd.DataFrame:
+    def get_relative_strength_signal(
+        self, price_df: pd.DataFrame, total_b_value: pd.Series, window: int = 63
+    ) -> pd.DataFrame:
         """
         Calculate relative strength: rolling window return of each symbol minus TOTAL.
         Args:
@@ -495,7 +458,9 @@ class ExpFitBacktester:
         rel_strength["TOTAL"] = np.nan
         return rel_strength
 
-    def get_simple_strategy_weights(self, price_df: pd.DataFrame, benchmark_weights: pd.DataFrame, window: int = 21) -> pd.DataFrame:
+    def get_simple_strategy_weights(
+        self, price_df: pd.DataFrame, benchmark_weights: pd.DataFrame, window: int = 21
+    ) -> pd.DataFrame:
         """
         Simple momentum strategy: tilt away from benchmark weights based on recent returns.
 
@@ -512,13 +477,11 @@ class ExpFitBacktester:
         momentum_adjustment = momentum.fillna(0) * 0.3  # 30% tilt factor
 
         # Use current benchmark weights as base
-        portfolio_weights = benchmark_weights[self.valid_symbols] + \
-            momentum_adjustment
+        portfolio_weights = benchmark_weights[self.valid_symbols] + momentum_adjustment
 
         # Ensure weights sum to 1 and are non-negative
         portfolio_weights = portfolio_weights.clip(lower=0)
-        portfolio_weights = portfolio_weights.div(
-            portfolio_weights.sum(axis=1), axis=0)
+        portfolio_weights = portfolio_weights.div(portfolio_weights.sum(axis=1), axis=0)
         return portfolio_weights
 
     def _validate_return_calculations(self, value_series: pd.Series, log_return_series: pd.Series, prefix: str) -> None:
@@ -533,8 +496,7 @@ class ExpFitBacktester:
         """
         first_value = value_series.iloc[0]
         last_value = value_series.iloc[-1]
-        exp_sum_log_returns = np.exp(
-            log_return_series[1:].sum())  # skip first NaN
+        exp_sum_log_returns = np.exp(log_return_series[1:].sum())  # skip first NaN
         test_last_value = first_value * exp_sum_log_returns
 
         # Fix date arithmetic
@@ -542,10 +504,9 @@ class ExpFitBacktester:
         end_date = pd.to_datetime(value_series.index[-1])
         n_years = (end_date - start_date).days / 365.25
 
-        cagr = (last_value / first_value) ** (1 / n_years) - \
-            1 if n_years > 0 else float('nan')
+        cagr = (last_value / first_value) ** (1 / n_years) - 1 if n_years > 0 else float("nan")
         ann_log_return_mean = log_return_series[1:].mean() * 252
-        ann_log_return_std = log_return_series[1:].std() * (252 ** 0.5)
+        ann_log_return_std = log_return_series[1:].std() * (252**0.5)
         print(f"{prefix} validation:")
         print(f"  Sample years: {n_years:.2f}")
         print(f"  First Value: {first_value:.4f}")
@@ -558,8 +519,7 @@ class ExpFitBacktester:
         if not np.isclose(test_last_value, last_value, atol=1e-4):
             print("  WARNING: Validation failed! Values do not match.")
             raise ValueError("Validation failed! Values do not match.")
-        else:
-            print("  Validation successful: Values match.\n")
+        print("  Validation successful: Values match.\n")
 
     def get_main_dataframes(self) -> pd.DataFrame:
         """
@@ -570,8 +530,7 @@ class ExpFitBacktester:
             Contains: Price, B_Position, B_Value, B_Weight, B_log_returns (plus TOTAL column)
         """
         if self.main_data_multiindex is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
+            raise ValueError("Data not yet processed. Call _preprocess_data() first.")
         return self.main_data_multiindex
 
     def get_tickers_history(self) -> pd.DataFrame:
@@ -614,19 +573,18 @@ class ExpFitBacktester:
         Returns:
             Dictionary containing:
             - p_position_df: Portfolio positions
-            - p_value_df: Portfolio values  
+            - p_value_df: Portfolio values
             - p_weight_df: Portfolio weights
             - p_log_returns_df: Portfolio log returns
         """
         if self.main_data_multiindex is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
+            raise ValueError("Data not yet processed. Call _preprocess_data() first.")
 
         return {
-            'p_position_df': self.main_data_multiindex['P_Position'],
-            'p_value_df': self.main_data_multiindex['P_Value'],
-            'p_weight_df': self.main_data_multiindex['P_Weight'],
-            'p_log_returns_df': self.main_data_multiindex['P_log_returns']
+            "p_position_df": self.main_data_multiindex["P_Position"],
+            "p_value_df": self.main_data_multiindex["P_Value"],
+            "p_weight_df": self.main_data_multiindex["P_Weight"],
+            "p_log_returns_df": self.main_data_multiindex["P_log_returns"],
         }
 
     def get_benchmark_dataframes(self) -> Dict[str, pd.DataFrame]:
@@ -636,19 +594,18 @@ class ExpFitBacktester:
         Returns:
             Dictionary containing:
             - b_position_df: Benchmark positions
-            - b_value_df: Benchmark values  
+            - b_value_df: Benchmark values
             - b_weight_df: Benchmark weights
             - b_log_returns_df: Benchmark log returns
         """
         if self.main_data_multiindex is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
+            raise ValueError("Data not yet processed. Call _preprocess_data() first.")
 
         return {
-            'b_position_df': self.main_data_multiindex['B_Position'],
-            'b_value_df': self.main_data_multiindex['B_Value'],
-            'b_weight_df': self.main_data_multiindex['B_Weight'],
-            'b_log_returns_df': self.main_data_multiindex['B_log_returns']
+            "b_position_df": self.main_data_multiindex["B_Position"],
+            "b_value_df": self.main_data_multiindex["B_Value"],
+            "b_weight_df": self.main_data_multiindex["B_Weight"],
+            "b_log_returns_df": self.main_data_multiindex["B_log_returns"],
         }
 
     def compare_performance(self) -> Dict[str, float]:
@@ -664,32 +621,27 @@ class ExpFitBacktester:
             - portfolio_annualized: Annualized portfolio return
         """
         if self.main_data_multiindex is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
+            raise ValueError("Data not yet processed. Call _preprocess_data() first.")
 
         # Get cumulative returns
-        benchmark_cumulative = self.main_data_multiindex[(
-            "B_log_returns", "TOTAL")].sum()
-        portfolio_cumulative = self.main_data_multiindex[(
-            "P_log_returns", "TOTAL")].sum()
+        benchmark_cumulative = self.main_data_multiindex[("B_log_returns", "TOTAL")].sum()
+        portfolio_cumulative = self.main_data_multiindex[("P_log_returns", "TOTAL")].sum()
 
         # Calculate time period
         dates = self.main_data_multiindex.index
         n_years = (dates[-1] - dates[0]).days / 365.25
 
         # Annualize returns
-        benchmark_annualized = np.exp(
-            benchmark_cumulative / n_years) - 1 if n_years > 0 else 0
-        portfolio_annualized = np.exp(
-            portfolio_cumulative / n_years) - 1 if n_years > 0 else 0
+        benchmark_annualized = np.exp(benchmark_cumulative / n_years) - 1 if n_years > 0 else 0
+        portfolio_annualized = np.exp(portfolio_cumulative / n_years) - 1 if n_years > 0 else 0
 
         return {
-            'benchmark_total_return': np.exp(benchmark_cumulative) - 1,
-            'portfolio_total_return': np.exp(portfolio_cumulative) - 1,
-            'outperformance': np.exp(portfolio_cumulative) - np.exp(benchmark_cumulative),
-            'benchmark_annualized': benchmark_annualized,
-            'portfolio_annualized': portfolio_annualized,
-            'period_years': n_years
+            "benchmark_total_return": np.exp(benchmark_cumulative) - 1,
+            "portfolio_total_return": np.exp(portfolio_cumulative) - 1,
+            "outperformance": np.exp(portfolio_cumulative) - np.exp(benchmark_cumulative),
+            "benchmark_annualized": benchmark_annualized,
+            "portfolio_annualized": portfolio_annualized,
+            "period_years": n_years,
         }
 
     def get_backtest_results(self) -> BacktestResults:
@@ -700,14 +652,11 @@ class ExpFitBacktester:
             BacktestResults object containing all performance metrics and data
         """
         if self.main_data_multiindex is None:
-            raise ValueError(
-                "Data not yet processed. Call _preprocess_data() first.")
+            raise ValueError("Data not yet processed. Call _preprocess_data() first.")
 
         # Get benchmark and portfolio performance from TOTAL columns
-        benchmark_perf = self.main_data_multiindex[(
-            "B_log_returns", "TOTAL")].sum()
-        portfolio_perf = self.main_data_multiindex[(
-            "P_log_returns", "TOTAL")].sum()
+        benchmark_perf = self.main_data_multiindex[("B_log_returns", "TOTAL")].sum()
+        portfolio_perf = self.main_data_multiindex[("P_log_returns", "TOTAL")].sum()
         outperformance = portfolio_perf - benchmark_perf
 
         return BacktestResults(
@@ -717,5 +666,5 @@ class ExpFitBacktester:
             consolidated_data=pd.DataFrame(),
             main_data_multiindex=self.main_data_multiindex,
             tickers_history=self.get_tickers_history(),
-            tickers_news=self.get_tickers_news()
+            tickers_news=self.get_tickers_news(),
         )

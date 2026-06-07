@@ -9,10 +9,7 @@ import streamlit as st
 
 from utilities.app_yfinance import market_yf
 
-from utilities.utilities import MultiAsset, fetch_multiple_sectors_data, \
-    fully_analyze_symbol, metrics, retrieve_sector_data
-from utilities.go_charts import display_trend_go_chart_2, display_efficient_frontier_chart
-
+from utilities.utilities import MultiAsset, fetch_multiple_sectors_data, metrics
 
 print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
 # if st.button("Refresh cache"):
@@ -22,6 +19,8 @@ st.set_page_config(page_title="US Market Overview", layout="wide")
 
 DEBUG = True
 DYNAMIC_MARKET = True
+
+RECOVERABLE_ERRORS = (ValueError, TypeError, KeyError, RuntimeError, OSError)
 
 # User contants
 home_currency = "EUR"
@@ -38,8 +37,8 @@ if DYNAMIC_MARKET:
             st.info("📊 Falling back to static market data (S&P 500)")
             market_symbol = "^GSPC"
         else:
-            market_symbol = market_data['first_summary_symbol']
-    except Exception as e:
+            market_symbol = market_data["first_summary_symbol"]
+    except RECOVERABLE_ERRORS as e:
         st.warning(f"⚠️ Network connectivity issue: {str(e)}")
         st.info("📊 Using static market data (S&P 500) for demonstration")
         market_symbol = "^GSPC"
@@ -57,40 +56,35 @@ if DYNAMIC_MARKET:
         if sector_errors:
             st.warning(f"⚠️ Some sector data could not be retrieved: {sector_errors}")
             st.info("📊 Using static sector data for demonstration")
-            sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
-                              "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
-            sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 
-                              0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
+            sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+            sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
         else:
             sector_symbols = [
-                list(sector_data[sector_id]['top_etfs'].keys())[0] for sector_id in range(len(sector_data))]
+                list(sector_data[sector_id]["top_etfs"].keys())[0] for sector_id in range(len(sector_data))
+            ]
             sector_weights = [
-                sector_data[sector_id]['overview']['market_weight'] for sector_id in range(len(sector_data))]
-    except Exception as e:
+                sector_data[sector_id]["overview"]["market_weight"] for sector_id in range(len(sector_data))
+            ]
+    except RECOVERABLE_ERRORS as e:
         st.warning(f"⚠️ Network connectivity issue: {str(e)}")
         st.info("📊 Using static sector data for demonstration")
-        sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
-                          "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
-        sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 
-                          0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
+        sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+        sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
 else:
-    sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
-                      "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
-    sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 
-                      0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
+    sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+    sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
 
 
 try:
-    multi_asset = MultiAsset(
-        sector_symbols,
-        period='10y',
-        weights=sector_weights)
+    multi_asset = MultiAsset(sector_symbols, period="10y", weights=sector_weights)
     symbol_metrics, timeseries_data = multi_asset.get_data()
-except Exception as e:
+except RECOVERABLE_ERRORS as e:
     st.error(f"⚠️ Unable to fetch financial data: {str(e)}")
     st.info("📊 The Sectors page requires internet connectivity to fetch live financial data from Yahoo Finance.")
-    st.info("💡 Please check your internet connection and try again, or use the application in an environment with internet access.")
-    
+    st.info(
+        "💡 Please check your internet connection and try again, or use the application in an environment with internet access."
+    )
+
     # Create a simple demonstration message
     st.subheader("Sectors Page - Demo Mode")
     st.write("""
@@ -99,36 +93,34 @@ except Exception as e:
     - **Interactive Charts**: Time series analysis with technical indicators
     - **Key Metrics**: CAGR, volatility, and risk-adjusted returns
     - **Data Sample Information**: Period coverage and data quality metrics
-    
+
     **Sector ETFs that would be analyzed:**
     """)
-    
+
     # Display the sector symbols we would analyze
     sector_names = {
         "XLC": "Communication Services",
-        "XLY": "Consumer Discretionary", 
+        "XLY": "Consumer Discretionary",
         "XLP": "Consumer Staples",
         "XLE": "Energy",
         "XLF": "Financial Services",
         "XLV": "Health Care",
-        "XLI": "Industrials", 
+        "XLI": "Industrials",
         "XLK": "Technology",
         "XLB": "Materials",
         "XLRE": "Real Estate",
-        "XLU": "Utilities"
+        "XLU": "Utilities",
     }
-    
+
     demo_data = []
     for symbol, weight in zip(sector_symbols, sector_weights):
-        demo_data.append({
-            'ETF Symbol': symbol,
-            'Sector': sector_names.get(symbol, 'Unknown'),
-            'Weight': f"{weight:.1%}"
-        })
-    
+        demo_data.append(
+            {"ETF Symbol": symbol, "Sector": sector_names.get(symbol, "Unknown"), "Weight": f"{weight:.1%}"}
+        )
+
     demo_df = pd.DataFrame(demo_data)
     st.dataframe(demo_df, width="stretch", hide_index=True)
-    
+
     st.stop()  # Stop execution here in offline mode
 
 # # UI
@@ -137,7 +129,7 @@ selected_currency = st.selectbox("Select currency", options=["EUR", "USD"])
 
 with st.expander("Raw data", expanded=False):
     st.write("Symbol metrics")
-    st.dataframe(symbol_metrics.drop(columns=['long_business_summaries']))
+    st.dataframe(symbol_metrics.drop(columns=["long_business_summaries"]))
     st.write("Timeseries data")
     st.dataframe(timeseries_data)
 
@@ -149,57 +141,54 @@ period_info = multi_asset.get_period_info()
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Start Date", period_info['first_date'].strftime('%Y-%m-%d'))
+    st.metric("Start Date", period_info["first_date"].strftime("%Y-%m-%d"))
 with col2:
-    st.metric("End Date", period_info['last_date'].strftime('%Y-%m-%d'))
+    st.metric("End Date", period_info["last_date"].strftime("%Y-%m-%d"))
 with col3:
     st.metric("Sample Period", f"{period_info['sample_years']:.1f} years")
 with col4:
     st.metric("Data Points", f"{period_info['data_points']:,}")
 
 st.info(
-    f"📊 **Analysis Coverage:** {period_info['total_days']:,} days ({period_info['sample_years']:.1f} years) with {period_info['data_points']:,} data points (avg {period_info['frequency']:.0f} points/year)")
+    f"📊 **Analysis Coverage:** {period_info['total_days']:,} days ({period_info['sample_years']:.1f} years) with {period_info['data_points']:,} data points (avg {period_info['frequency']:.0f} points/year)"
+)
 
 # Assets Overview
 st.subheader("Assets Overview")
 
 # Get available assets from timeseries data
-available_assets = timeseries_data.columns.get_level_values(
-    1).unique().tolist()
+available_assets = timeseries_data.columns.get_level_values(1).unique().tolist()
 
 # Create assets summary table
 assets_info = []
 total_weight = 0
 
 for symbol in available_assets:
-    if symbol == 'TOTAL':
+    if symbol == "TOTAL":
         continue  # Skip TOTAL as it's a calculated aggregate
 
     if symbol in symbol_metrics.index:
         metrics = symbol_metrics.loc[symbol]
-        weight = metrics.get('weights', 0)
-        cagr = metrics.get('cagr', 0)
+        weight = metrics.get("weights", 0)
+        cagr = metrics.get("cagr", 0)
         total_weight += weight
 
-        assets_info.append({
-            'Asset': symbol,
-            'Sector Weight': f"{weight:.1%}",
-            'CAGR': f"{cagr:.1%}",
-            'Annualized Return': f"{metrics.get('mean_log_yearly_returns', 0):.1%}",
-            'Annualized Risk': f"{metrics.get('std_log_yearly_returns', 0):.1%}"
-        })
+        assets_info.append(
+            {
+                "Asset": symbol,
+                "Sector Weight": f"{weight:.1%}",
+                "CAGR": f"{cagr:.1%}",
+                "Annualized Return": f"{metrics.get('mean_log_yearly_returns', 0):.1%}",
+                "Annualized Risk": f"{metrics.get('std_log_yearly_returns', 0):.1%}",
+            }
+        )
 
 if assets_info:
     assets_df = pd.DataFrame(assets_info)
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.dataframe(
-            assets_df,
-            width='stretch',
-            hide_index=True,
-            height=min(400, len(assets_df) * 35 + 40)
-        )
+        st.dataframe(assets_df, width="stretch", hide_index=True, height=min(400, len(assets_df) * 35 + 40))
 
     with col2:
         st.metric("Total Assets", len(assets_df))
@@ -218,14 +207,13 @@ st.divider()
 # Asset Selection and Chart Visualization
 st.subheader("Asset Analysis")
 
-default_asset = 'TOTAL' if 'TOTAL' in available_assets else available_assets[0]
+default_asset = "TOTAL" if "TOTAL" in available_assets else available_assets[0]
 
 # Asset selector
 selected_asset = st.selectbox(
     "Select Asset:",
     options=available_assets,
-    index=available_assets.index(
-        default_asset) if default_asset in available_assets else 0
+    index=available_assets.index(default_asset) if default_asset in available_assets else 0,
 )
 
 # Create dual-axis chart using MultiAsset method
