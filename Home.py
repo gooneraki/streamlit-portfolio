@@ -3,7 +3,7 @@
 import sys
 import streamlit as st
 
-DEV_VERSION = "3.14.5"
+DEV_VERSION = "3.14.6"
 PROD_VERSION = sys.version.split()[0]
 
 # Set the page title and layout
@@ -39,3 +39,4 @@ This app is intended for informational purposes only and is not responsible for 
 
 # Footer or additional details
 st.write("Explore the pages in the sidebar to start your analysis!")
+

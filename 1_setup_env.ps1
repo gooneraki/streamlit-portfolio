@@ -3,6 +3,7 @@ Write-Host "Checking Python and virtual environment..." -ForegroundColor Cyan
 
 $venvPath = Join-Path $PSScriptRoot "venv"
 $venvPythonPath = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
+$homePyPath = Join-Path $PSScriptRoot "Home.py"
 
 if (Test-Path -Path $venvPythonPath) {
     Write-Host "Virtual environment already exists. Activating..." -ForegroundColor Yellow
@@ -32,20 +33,44 @@ if (-Not (Get-Command "deactivate" -ErrorAction SilentlyContinue)) {
 
 $activePythonVersion = python --version 2>&1
 $activePythonPath = python -c "import sys; print(sys.executable)" 2>&1
+$activePythonVersionNumber = ($activePythonVersion -replace '^Python\s+', '').Trim()
 Write-Host "Active Python version: $activePythonVersion" -ForegroundColor Green
 Write-Host "Active Python path: $activePythonPath" -ForegroundColor Green
 
 # Step 3: Upgrade pip
 Write-Host "Upgrading pip..." -ForegroundColor Cyan
 python -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to upgrade pip." -ForegroundColor Red
+    exit 1
+}
 
 # Step 4: Install dependencies
 Write-Host "Installing dependencies from custom_requirements.txt..." -ForegroundColor Cyan
 pip install -r custom_requirements.txt
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to install dependencies." -ForegroundColor Red
+    exit 1
+}
 
 # Step 5: Freeze dependencies
 Write-Host "Freezing dependencies in requirements.txt..." -ForegroundColor Cyan
 pip freeze > requirements.txt
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to freeze dependencies." -ForegroundColor Red
+    exit 1
+}
+
+# Step 5.1: Sync Home.py development version to the active venv version
+Write-Host "Updating DEV_VERSION in Home.py..." -ForegroundColor Cyan
+$homePyContent = Get-Content -Path $homePyPath -Raw
+$updatedHomePyContent = $homePyContent -replace 'DEV_VERSION = "[^"]+"', "DEV_VERSION = `"$activePythonVersionNumber`""
+if ($updatedHomePyContent -eq $homePyContent) {
+    Write-Host "Failed to find DEV_VERSION in Home.py." -ForegroundColor Red
+    exit 1
+}
+Set-Content -Path $homePyPath -Value $updatedHomePyContent
+Write-Host "DEV_VERSION updated to $activePythonVersionNumber" -ForegroundColor Green
 
 # Step 6: Deactivate virtual environment
 Write-Host "Deactivating virtual environment..." -ForegroundColor Cyan
