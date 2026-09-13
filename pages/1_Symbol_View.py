@@ -4,7 +4,6 @@
 from typing import List
 import datetime
 import streamlit as st
-import streamlit.components.v1 as components
 from utilities.utilities import AssetDetails,  create_asset_info_df, \
     generate_asset_base_value, append_fitted_data, get_trend_info, \
     get_annual_returns_trend_info, get_quotes_by_symbol, get_history_options, \
@@ -13,7 +12,7 @@ from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart, display_daily_annual_returns_chart
 from utilities.app_yfinance import sector_yf,   yf_ticket_info
 
-print(f"\n--- Now: {datetime.datetime.now()} ---\n")
+print(f"\n--- Symbol View: {datetime.datetime.now()} ---\n")
 
 
 def reset_query_params(p_search_input: str):
@@ -52,7 +51,7 @@ st.write("##### Search results")
 
 if result_quotes_df is not None:
 
-    st.dataframe(result_quotes_df, use_container_width=True)
+    st.dataframe(result_quotes_df, width="stretch")
 else:
     if search_input is None:
         st.info("Please enter a symbol to search.")
@@ -75,7 +74,7 @@ with tab1:
 
     st.subheader(f"Symbol: {symbol_name}")
 
-    components.html(
+    st.iframe(
         """
         <style>
             #copy-btn {
