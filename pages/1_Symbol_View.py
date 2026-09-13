@@ -33,7 +33,7 @@ with st.form(key="search_form"):
                                  value=st.query_params.get("symbol"),
                                  max_chars=20,
                                  key="search_input",
-                                 placeholder="E.g. VUSA, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
+                                 placeholder="E.g. VUSA, VWCE, CSPX, EQQQ, VWRL, AGGH, VFEM, VHYL")
 
     search_button = st.form_submit_button("Search")
 
@@ -52,7 +52,7 @@ st.write("##### Search results")
 
 if result_quotes_df is not None:
 
-    st.dataframe(result_quotes_df)
+    st.dataframe(result_quotes_df, use_container_width=True)
 else:
     if search_input is None:
         st.info("Please enter a symbol to search.")

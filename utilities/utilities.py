@@ -1,5 +1,7 @@
 """This module contains utility functions for the portfolio app"""
 
+import datetime
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypedDict
@@ -73,20 +75,96 @@ class ExpandedAssetDetails(AssetDetails):
     history: pd.DataFrame
 
 
+def _calculate_years_in_existence(ts_seconds: Any) -> float | None:
+    """Calculate years in existence from epoch timestamp in seconds."""
+    if ts_seconds is None:
+        return None
+    try:
+        start_date = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc) + datetime.timedelta(
+            seconds=float(ts_seconds)
+        )
+        now = datetime.datetime.now(datetime.timezone.utc)
+        days = (now - start_date).days
+        if days < 0:
+            return None
+        return round(days / 365.25, 1)
+    except (ValueError, TypeError, OverflowError, OSError):
+        return None
+
+
+def _enrich_quote(q: dict) -> dict:
+    """Extract applicable quote fields with clean column names."""
+    sym = q.get("symbol")
+    data = {
+        "Symbol": sym,
+        "Exchange": q.get("exchange") + " - " + q.get("exchDisp"),
+        "Name": q.get("longname") or q.get("shortname"),
+        "Currency": None,
+        "Type": q.get("typeDisp") or q.get("quoteType"),
+        "Years Exist": None,
+    }
+    if sym:
+        try:
+            info = yf_ticket_info(sym)
+
+            if isinstance(info, dict):
+                clean_name = (
+                    q.get("longname")
+                    or info.get("longName")
+                    or info.get("displayName")
+                    or q.get("shortname")
+                    or info.get("shortName")
+                )
+                if clean_name:
+                    data["Name"] = clean_name
+
+                data["Currency"] = info.get("currency")
+
+                ft_ms = info.get("firstTradeDateMilliseconds")
+                f_inc = info.get("fundInceptionDate")
+                ts = (ft_ms / 1000.0) if ft_ms is not None else f_inc
+
+                data["Years Exist"] = _calculate_years_in_existence(ts)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
+    return data
+
+
 def get_quotes_by_symbol(search_input: str):
-    """Search for a symbol"""
+    """Search for a symbol and return quotes with applicable fields, filtering out results without years."""
+    if not search_input or not search_input.strip():
+        return None
+
     search_results = search_yf(search_input)
 
     if isinstance(search_results, dict):
         quotes = search_results.get("quotes", None)
-        if quotes:
-            result_quotes_df = (
-                pd.DataFrame(quotes).set_index("symbol")
-                if search_results is not None and quotes is not None and len(quotes) > 0
-                else None
-            )
+        if quotes and len(quotes) > 0:
+            max_workers = min(10, len(quotes))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                enriched_quotes = list(executor.map(_enrich_quote, quotes))
 
-            return result_quotes_df
+            df = pd.DataFrame(enriched_quotes)
+
+            target_cols = [
+                "Symbol",
+                "Exchange",
+                "Name",
+                "Currency",
+                "Type",
+                "Years Exist",
+            ]
+            applicable_cols = [c for c in target_cols if c in df.columns]
+            df = df[applicable_cols]
+
+            # Drop results without years in existence
+            if "Years Exist" in df.columns:
+                df = df.dropna(subset=["Years Exist"])
+
+            if not df.empty and "Symbol" in df.columns:
+                df = df.set_index("Symbol")
+                return df
 
     return None
 
