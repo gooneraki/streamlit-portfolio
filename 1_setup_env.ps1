@@ -64,11 +64,18 @@ if ($LASTEXITCODE -ne 0) {
 # Step 5.1: Sync Home.py development version to the active venv version
 Write-Host "Updating DEV_VERSION in Home.py..." -ForegroundColor Cyan
 $homePyContent = Get-Content -Path $homePyPath -Raw
-$updatedHomePyContent = $homePyContent -replace 'DEV_VERSION = "[^"]+"', "DEV_VERSION = `"$activePythonVersionNumber`""
-if ($updatedHomePyContent -eq $homePyContent) {
+$versionPattern = '(?m)^(\s*DEV_VERSION\s*=\s*)["'']([^"'']+)["'']'
+$versionMatch = [regex]::Match($homePyContent, $versionPattern)
+if (-not $versionMatch.Success) {
     Write-Host "Failed to find DEV_VERSION in Home.py." -ForegroundColor Red
     exit 1
 }
+$updatedHomePyContent = [regex]::Replace(
+    $homePyContent,
+    $versionPattern,
+    { param($match) "$($match.Groups[1].Value)`"$activePythonVersionNumber`"" },
+    1
+)
 Set-Content -Path $homePyPath -Value $updatedHomePyContent
 Write-Host "DEV_VERSION updated to $activePythonVersionNumber" -ForegroundColor Green
 
