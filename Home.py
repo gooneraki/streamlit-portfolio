@@ -1,7 +1,18 @@
 # pylint: disable=C0103
 """ Streamlit application for the Home page of the Portfolio Historical Data Analysis app. """
+import logging
 import sys
 import streamlit as st
+
+env = st.secrets.get("ENV", "prod").lower()
+log_level = logging.INFO if env == "dev" else logging.WARNING
+
+
+logging.basicConfig(
+    level=log_level,
+    format="[%(asctime)s] %(message)s",
+    datefmt="%H:%M:%S"
+)
 
 DEV_VERSION = "3.14.7"
 PROD_VERSION = sys.version.split()[0]

@@ -3,6 +3,7 @@
 
 import datetime
 import json
+import logging
 import pandas as pd
 import streamlit as st
 
@@ -10,7 +11,8 @@ from utilities.constants import ASSETS_POSITIONS_DEFAULT, BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart_2, display_multi_asset_metric_trend
 from classes.asset_positions import AssetPosition, Portfolio
 
-print(f"\n--- Portfolio view: {datetime.datetime.now()} ---\n")
+logger = logging.getLogger(__name__)
+logger.debug("Portfolio view loaded")
 
 st.set_page_config(page_title="Portfolio View", layout="wide")
 
@@ -82,7 +84,7 @@ def get_assets_positions():
             return result
         return ASSETS_POSITIONS_DEFAULT
     except (KeyError, json.JSONDecodeError, TypeError, ValueError) as err:
-        print(f"Error: {err}")
+        logger.error("Error: %s", err)
         return ASSETS_POSITIONS_DEFAULT
 
 

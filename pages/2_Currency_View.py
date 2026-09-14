@@ -4,13 +4,13 @@
 # Streamlit multipage apps commonly use numeric filename prefixes for ordering.
 # pylint: disable=invalid-name
 
-import datetime
+import logging
 import streamlit as st
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.utilities import get_fx_history_2
 
-
-print(f"\n--- Currency view {datetime.datetime.now()} ---\n")
+logger = logging.getLogger(__name__)
+logger.debug("Currency view loaded")
 st.title("Currency and Cyptocurrency Information")
 
 col1, col2 = st.columns(2)

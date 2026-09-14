@@ -1,10 +1,13 @@
 """Yfinance utilities for Streamlit app"""
 
 from dataclasses import dataclass
+import logging
 from typing import Union, TypedDict, Any
 import pandas as pd
 import yfinance as yf
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 YF_CACHE_TTL = "6h"
 YF_CACHE_MAX_ENTRIES = 256
@@ -13,12 +16,13 @@ YF_RECOVERABLE_ERRORS = (AttributeError, KeyError, TypeError, ValueError, Runtim
 
 
 def get_sector_keys():
-    """Get the sector keys"""
+    """Get the sector keys formatted for yf.Sector API"""
     try:
-        return list(yf.const.SECTOR_INDUSTY_MAPPING.keys())  # type: ignore
+        raw_keys = list(yf.const.SECTOR_INDUSTY_MAPPING.keys())  # type: ignore
+        return [k.lower().replace(" ", "-") for k in raw_keys]
 
     except YF_RECOVERABLE_ERRORS as err:
-        print(f"Error retrieving sector keys: {err}")
+        logger.warning("Error retrieving sector keys: %s", err)
         return [
             "basic-materials",
             "communication-services",

@@ -3,6 +3,7 @@
 This page is used to fetch the data for the US market
 """
 
+import logging
 import time
 
 import numpy as np
@@ -13,7 +14,8 @@ import streamlit as st
 from classes.exp_fit_backtester import ExpFitBacktester
 from utilities.app_yfinance import tickers_yf
 
-print(f"\n--- US Market Page loaded at {time.strftime('%H:%M:%S')} ---\n")
+logger = logging.getLogger(__name__)
+logger.debug("US Market view loaded")
 
 st.set_page_config(page_title="US Market", page_icon=":bar_chart:", layout="wide")
 

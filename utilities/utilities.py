@@ -1,6 +1,7 @@
 """This module contains utility functions for the portfolio app"""
 
 import datetime
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
@@ -8,6 +9,8 @@ from typing import Any, TypedDict
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # import streamlit as st
 # import altair as alt
@@ -682,7 +685,7 @@ def fetch_multiple_sectors_data():
     # check sum of sector weights
     sum_of_weights = sum(sector["overview"]["market_weight"] for sector in sector_data)
     if round(sum_of_weights, 2) != 1:
-        print(f"\nError: Sum of sector weights is not 1: {sum_of_weights}\n")
+        logger.warning("Sum of sector weights is not 1: %s", sum_of_weights)
 
     return sector_data, sector_errors
 

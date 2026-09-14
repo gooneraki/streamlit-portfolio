@@ -2,7 +2,7 @@
 """Get the information of a stock symbol from Yahoo Finance API."""
 
 from typing import List
-import datetime
+import logging
 import streamlit as st
 from utilities.utilities import AssetDetails,  create_asset_info_df, \
     generate_asset_base_value, append_fitted_data, get_trend_info, \
@@ -12,7 +12,8 @@ from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart, display_daily_annual_returns_chart
 from utilities.app_yfinance import sector_yf,   yf_ticket_info
 
-print(f"\n--- Symbol View: {datetime.datetime.now()} ---\n")
+logger = logging.getLogger(__name__)
+logger.debug("Symbol View loaded")
 
 
 def reset_query_params(p_search_input: str):

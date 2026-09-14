@@ -3,6 +3,7 @@
 # pylint: disable=C0103
 
 import datetime
+import logging
 import pandas as pd
 import streamlit as st
 
@@ -11,7 +12,8 @@ from utilities.app_yfinance import market_yf
 
 from utilities.utilities import MultiAsset, fetch_multiple_sectors_data, metrics
 
-print(f"\n--- Sectors view: {datetime.datetime.now()} ---\n")
+logger = logging.getLogger(__name__)
+logger.debug("Sectors view loaded")
 # if st.button("Refresh cache"):
 #     st.cache_data.clear()
 
