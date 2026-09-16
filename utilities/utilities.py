@@ -2,7 +2,6 @@
 
 import datetime
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypedDict
@@ -11,8 +10,6 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-logger = logging.getLogger(__name__)
 
 from utilities.app_yfinance import (
     YF_SECTOR_KEYS,
@@ -23,6 +20,9 @@ from utilities.app_yfinance import (
     yf_ticket_history,
     yf_ticket_info,
 )
+from utilities.result import Result
+
+logger = logging.getLogger(__name__)
 
 
 class FormatType(Enum):
@@ -104,29 +104,27 @@ def _enrich_quote(q: dict) -> dict:
         "Years Exist": None,
     }
     if sym:
-        try:
-            info = yf_ticket_info(sym)
+        info_result = yf_ticket_info(sym)
 
-            if isinstance(info, dict):
-                clean_name = (
-                    q.get("longname")
-                    or info.get("longName")
-                    or info.get("displayName")
-                    or q.get("shortname")
-                    or info.get("shortName")
-                )
-                if clean_name:
-                    data["Name"] = clean_name
+        if info_result.error is None and isinstance(info_result.data, dict):
+            info = info_result.data
+            clean_name = (
+                q.get("longname")
+                or info.get("longName")
+                or info.get("displayName")
+                or q.get("shortname")
+                or info.get("shortName")
+            )
+            if clean_name:
+                data["Name"] = clean_name
 
-                data["Currency"] = info.get("currency")
+            data["Currency"] = info.get("currency")
 
-                ft_ms = info.get("firstTradeDateMilliseconds")
-                f_inc = info.get("fundInceptionDate")
-                ts = (ft_ms / 1000.0) if ft_ms is not None else f_inc
+            ft_ms = info.get("firstTradeDateMilliseconds")
+            f_inc = info.get("fundInceptionDate")
+            ts = (ft_ms / 1000.0) if ft_ms is not None else f_inc
 
-                data["Years Exist"] = _calculate_years_in_existence(ts)
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
+            data["Years Exist"] = _calculate_years_in_existence(ts)
 
     return data
 
@@ -136,14 +134,12 @@ def get_quotes_by_symbol(search_input: str):
     if not search_input or not search_input.strip():
         return None
 
-    search_results = search_yf(search_input)
+    search_result = search_yf(search_input)
 
-    if isinstance(search_results, dict):
-        quotes = search_results.get("quotes", None)
+    if search_result.error is None and isinstance(search_result.data, dict):
+        quotes = search_result.data.get("quotes", None)
         if quotes and len(quotes) > 0:
-            max_workers = min(10, len(quotes))
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                enriched_quotes = list(executor.map(_enrich_quote, quotes))
+            enriched_quotes = [_enrich_quote(q) for q in quotes]
 
             df = pd.DataFrame(enriched_quotes)
 
@@ -200,11 +196,13 @@ def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series
 
     asset_history["fx_history"] = fx_history
 
-    asset_history["base_value"] = asset_history["value"] * asset_history["fx_history"]
+    asset_history["base_value"] = asset_history["value"] * \
+        asset_history["fx_history"]
 
     asset_history.dropna(subset=["base_value"], inplace=True)
 
-    asset_history["annual_base_return"] = asset_history["base_value"].pct_change(365)
+    asset_history["annual_base_return"] = asset_history["base_value"].pct_change(
+        365)
 
     return asset_history
 
@@ -261,7 +259,8 @@ def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_
 
     period_history_data = history_data.copy().tail(selected_period)
 
-    period_history_data["fitted"] = get_exp_fitted_data(period_history_data[col_to_fit].values)
+    period_history_data["fitted"] = get_exp_fitted_data(
+        period_history_data[col_to_fit].values)
 
     days = period_history_data.shape[0]
 
@@ -273,7 +272,8 @@ def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_
     ) - 1
 
     base_over_under = (
-        period_history_data[col_to_fit].iloc[-1] - period_history_data["fitted"].iloc[-1]
+        period_history_data[col_to_fit].iloc[-1] -
+        period_history_data["fitted"].iloc[-1]
     ) / period_history_data["fitted"].iloc[-1]
 
     period_history_data["Date"] = period_history_data.index
@@ -310,7 +310,8 @@ def get_trend_stats(periodic_asset_history_with_fit: pd.DataFrame, base_column="
     oldest_fitted_value = periodic_asset_history_with_fit["fitted"].iloc[0]
 
     cagr = (latest_base_value / oldest_base_value) ** (1 / (days / 365.25)) - 1
-    cagr_fitted = (latest_fitted_value / oldest_fitted_value) ** (1 / (days / 365.25)) - 1
+    cagr_fitted = (latest_fitted_value /
+                   oldest_fitted_value) ** (1 / (days / 365.25)) - 1
 
     base_over_under = latest_base_value / latest_fitted_value - 1
 
@@ -327,7 +328,8 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column="b
     oldest_fitted_value = periodic_asset_history_with_fit["fitted"].iloc[0]
 
     cagr = (latest_base_value / oldest_base_value) ** (1 / (days / 365.25)) - 1
-    cagr_fitted = (latest_fitted_value / oldest_fitted_value) ** (1 / (days / 365.25)) - 1
+    cagr_fitted = (latest_fitted_value /
+                   oldest_fitted_value) ** (1 / (days / 365.25)) - 1
 
     base_over_under = latest_base_value / latest_fitted_value - 1
 
@@ -342,13 +344,17 @@ def get_trend_info(periodic_asset_history_with_fit: pd.DataFrame, base_column="b
         data=[
             ["Sample Years", f"{days / 365.25:.1f}"],
             ["CAGR Base-fx", f"{(cagr-cagr_value):.1%}"],
-            ["CAGR Base-inv", f"{(cagr_value):.1%}"] if cagr_value is not None else [],
+            ["CAGR Base-inv",
+                f"{(cagr_value):.1%}"] if cagr_value is not None else [],
             ["CAGR Base", f"{cagr:.1%}"],
             ["CAGR Fitted", f"{cagr_fitted:.1%}"],
             ["", ""],
-            ["Date", periodic_asset_history_with_fit["Date"].iloc[-1].strftime("%Y-%m-%d")],
-            ["Base Value", f"{periodic_asset_history_with_fit[base_column].iloc[-1]:,.2f}"],
-            ["Fitted Value", f"{periodic_asset_history_with_fit['fitted'].iloc[-1]:,.2f}"],
+            ["Date",
+                periodic_asset_history_with_fit["Date"].iloc[-1].strftime("%Y-%m-%d")],
+            ["Base Value",
+                f"{periodic_asset_history_with_fit[base_column].iloc[-1]:,.2f}"],
+            ["Fitted Value",
+                f"{periodic_asset_history_with_fit['fitted'].iloc[-1]:,.2f}"],
             ["Base Over/Under", f"{base_over_under:.1%}"],
         ],
         columns=pd.Index(["Label", "Value"]),
@@ -403,7 +409,8 @@ def get_annual_returns_trend_info(periodic_asset_history_with_fit: pd.DataFrame)
         ["Mean Annual Return", f"{mean:.1%}"],
         ["", ""],
         ["Date", clean_df["Date"].iloc[-1].strftime("%Y-%m-%d")],
-        ["Current Annual Return", f"{clean_df['annual_base_return'].iloc[-1]:,.1%}"],
+        ["Current Annual Return",
+            f"{clean_df['annual_base_return'].iloc[-1]:,.1%}"],
     ]
 
     return pd.DataFrame(data_rows, columns=pd.Index(["Label", "Value"])), mean
@@ -414,8 +421,8 @@ def get_fx_history_2(base_currency, target_currency):
     currency_symbol = target_currency + base_currency + "=X"
     crypto_symbol = target_currency + "-" + base_currency
 
-    currency_rate_history = yf_ticket_history(currency_symbol)
-    crypto_rate_history = yf_ticket_history(crypto_symbol)
+    currency_rate_history = yf_ticket_history(currency_symbol).data
+    crypto_rate_history = yf_ticket_history(crypto_symbol).data
 
     if isinstance(currency_rate_history, pd.Series) and not currency_rate_history.empty:
         return currency_rate_history, currency_symbol
@@ -432,12 +439,12 @@ def fetch_fx_rate_history(asset_currency: str, base_currency: str):
 
     currency_ticker_name = asset_currency + base_currency + "=X"
 
-    fx_history = yf_ticket_history(currency_ticker_name)
+    fx_result = yf_ticket_history(currency_ticker_name)
 
-    if isinstance(fx_history, str):
-        return fx_history
+    if fx_result.error is not None:
+        return fx_result.error
 
-    fx_history = fx_history.resample("D").ffill()
+    fx_history = fx_result.data.resample("D").ffill()
     fx_history.index = pd.DatetimeIndex(fx_history.index).tz_localize(None)
 
     return fx_history
@@ -445,15 +452,18 @@ def fetch_fx_rate_history(asset_currency: str, base_currency: str):
 
 def ticker_yf_history(symbol: str):
     """Fetch the asset info for a given symbol"""
-    ticker_history = yf_ticket_history(symbol)
+    ticker_result = yf_ticket_history(symbol)
 
-    if isinstance(ticker_history, str):
+    if ticker_result.error is not None:
         return None
+
+    ticker_history = ticker_result.data
 
     if ticker_history.shape[0] == 0:
         return None
 
-    ticker_history.index = pd.DatetimeIndex(ticker_history.index).tz_localize(None)
+    ticker_history.index = pd.DatetimeIndex(
+        ticker_history.index).tz_localize(None)
 
     ticker_history = ticker_history.resample("D").ffill()
 
@@ -466,13 +476,11 @@ def ticker_yf_history(symbol: str):
 
 def localize_and_fill(ticker_history: pd.DataFrame | pd.Series):
     """Localize and fill the ticker history"""
-    if isinstance(ticker_history, str):
-        return None
-
     if ticker_history.shape[0] == 0:
         return None
 
-    ticker_history.index = pd.DatetimeIndex(ticker_history.index).tz_localize(None)
+    ticker_history.index = pd.DatetimeIndex(
+        ticker_history.index).tz_localize(None)
     ticker_history = ticker_history.resample("D").ffill()
 
     return ticker_history
@@ -486,15 +494,19 @@ def calculate_financial_metrics(df: pd.DataFrame, value_col: str, fitted_col: st
     actual_years_duration = actual_days_duration / 365.25
     avg_points_per_year = df.shape[0] / actual_years_duration
 
-    cagr = (df[value_col].iloc[-1] / df[value_col].iloc[0]) ** (1 / actual_years_duration) - 1
-    cagr_fitted = (df[fitted_col].iloc[-1] / df[fitted_col].iloc[0]) ** (1 / actual_years_duration) - 1
+    cagr = (df[value_col].iloc[-1] / df[value_col].iloc[0]
+            ) ** (1 / actual_years_duration) - 1
+    cagr_fitted = (df[fitted_col].iloc[-1] /
+                   df[fitted_col].iloc[0]) ** (1 / actual_years_duration) - 1
 
-    over_under = (df[value_col].iloc[-1] - df[fitted_col].iloc[-1]) / df[fitted_col].iloc[-1]
+    over_under = (df[value_col].iloc[-1] -
+                  df[fitted_col].iloc[-1]) / df[fitted_col].iloc[-1]
 
     daily_returns_mean = df[return_col].mean()
     daily_return_std = df[return_col].std()
 
-    annualized_returns_to_risk_ratio = (daily_returns_mean / daily_return_std) * np.sqrt(avg_points_per_year)
+    annualized_returns_to_risk_ratio = (
+        daily_returns_mean / daily_return_std) * np.sqrt(avg_points_per_year)
 
     annualized_return = (1 + daily_returns_mean) ** avg_points_per_year - 1
     annualized_risk = daily_return_std * np.sqrt(avg_points_per_year)
@@ -512,38 +524,43 @@ def calculate_financial_metrics(df: pd.DataFrame, value_col: str, fitted_col: st
     }
 
 
-def fully_analyze_symbol(symbol: str, base_currency: str, years: int):
+def fully_analyze_symbol(symbol: str, base_currency: str, years: int) -> Result[tuple]:
     """Fetch the asset info for a given symbol"""
 
     ###############################
     # Fetch from Yahoo Finance API
 
     # Get asset info to get the currency
-    ticker_info = yf_ticket_info(symbol)
-    if isinstance(ticker_info, str):
-        return ticker_info
+    ticker_info_result = yf_ticket_info(symbol)
+    if ticker_info_result.error is not None:
+        return Result(data=None, error=ticker_info_result.error)
 
-    asset_currency = ticker_info.get("currency")
+    asset_currency = ticker_info_result.data.get("currency")
     if not asset_currency:
-        return f"Asset currency for {symbol} is not defined in the ticker info"
+        return Result(data=None, error=f"Asset currency for {symbol} is not defined in the ticker info")
 
     # Get asset history
-    ticker_history = yf_ticket_history(symbol)
-    if isinstance(ticker_history, str):
-        return ticker_history
+    ticker_history_result = yf_ticket_history(symbol)
+    if ticker_history_result.error is not None:
+        return Result(data=None, error=ticker_history_result.error)
+    ticker_history = ticker_history_result.data
     if ticker_history.shape[0] == 0:
-        return f"Retrieved ticker history is empty for {symbol}"
+        return Result(data=None, error=f"Retrieved ticker history is empty for {symbol}")
 
     # Get the fx rate history
-    fx_history = get_fx_history(base_currency, asset_currency)
-    if isinstance(fx_history, str):
-        return fx_history
+    fx_history_result = get_fx_history(base_currency, asset_currency)
+    if fx_history_result.error is not None:
+        return Result(data=None, error=fx_history_result.error)
+    fx_history = fx_history_result.data
     if fx_history.shape[0] == 0:
-        return f"Retrieved fx history is empty for {base_currency} and {asset_currency}"
+        return Result(
+            data=None, error=f"Retrieved fx history is empty for {base_currency} and {asset_currency}"
+        )
 
     ###############################
     # Localize and Filter data window
-    ticker_history.index = pd.DatetimeIndex(ticker_history.index).tz_localize(None)
+    ticker_history.index = pd.DatetimeIndex(
+        ticker_history.index).tz_localize(None)
     fx_history.index = pd.DatetimeIndex(fx_history.index).tz_localize(None)
 
     start_date = ticker_history.index[-1] - pd.DateOffset(years=years)
@@ -561,9 +578,11 @@ def fully_analyze_symbol(symbol: str, base_currency: str, years: int):
     else:
         ticker_series = pd.Series(ticker_history)
 
-    trade_df = pd.DataFrame(ticker_series.values, index=ticker_series.index, columns=pd.Index([trade_value_col]))
+    trade_df = pd.DataFrame(
+        ticker_series.values, index=ticker_series.index, columns=pd.Index([trade_value_col]))
     trade_df[trade_value_return_col] = trade_df[trade_value_col].pct_change()
-    trade_df[trade_value_fitted_col] = get_exp_fitted_data(trade_df[trade_value_col].values)
+    trade_df[trade_value_fitted_col] = get_exp_fitted_data(
+        trade_df[trade_value_col].values)
 
     # Home value - TODO: if the same then just copy the trade_df
     fx_col = "FX Rate"
@@ -575,11 +594,13 @@ def fully_analyze_symbol(symbol: str, base_currency: str, years: int):
     fx_history_renamed = fx_history.copy()
     fx_history_renamed.name = fx_col
 
-    home_df = pd.concat([trade_df[trade_value_col], fx_history_renamed], axis=1, join="inner")
+    home_df = pd.concat(
+        [trade_df[trade_value_col], fx_history_renamed], axis=1, join="inner")
 
     home_df[home_value_col] = home_df[trade_value_col] * home_df[fx_col]
     home_df[home_value_return_col] = home_df[home_value_col].pct_change()
-    home_df[home_value_fitted_col] = get_exp_fitted_data(home_df[home_value_col].values)
+    home_df[home_value_fitted_col] = get_exp_fitted_data(
+        home_df[home_value_col].values)
 
     home_df.drop(columns=[trade_value_col], inplace=True)
 
@@ -587,16 +608,18 @@ def fully_analyze_symbol(symbol: str, base_currency: str, years: int):
         trade_df, trade_value_col, trade_value_fitted_col, trade_value_return_col
     )
 
-    home_metrics = calculate_financial_metrics(home_df, home_value_col, home_value_fitted_col, home_value_return_col)
+    home_metrics = calculate_financial_metrics(
+        home_df, home_value_col, home_value_fitted_col, home_value_return_col)
 
-    return trade_df, trade_metrics, home_df, home_metrics
+    return Result(data=(trade_df, trade_metrics, home_df, home_metrics), error=None)
 
 
 def retrieve_sector_data(home_currency: str, data_years: int):
     """Retrieve the sector data"""
     sectors_data = list(
         sorted(
-            [sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS],
+            [r.data if r.error is None else r.error for r in (
+                sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS)],
             key=lambda x: (
                 x["overview"]["market_weight"]
                 if isinstance(x, dict) and "overview" in x and "market_weight" in x["overview"]
@@ -617,8 +640,15 @@ def retrieve_sector_data(home_currency: str, data_years: int):
         if top_etfs is not None and isinstance(top_etfs, dict) and len(list(top_etfs.keys())) > 0:
 
             first_etf = list(top_etfs.keys())[0]
-            info = yf_ticket_info(first_etf)
-            _, etf_trade_metrics, _, etf_home_metrics = fully_analyze_symbol(first_etf, home_currency, data_years)
+            info = yf_ticket_info(first_etf).data
+            etf_result = fully_analyze_symbol(
+                first_etf, home_currency, data_years)
+
+            if etf_result.error is not None:
+                processed_sectors.append(sector)
+                continue
+
+            _, etf_trade_metrics, _, etf_home_metrics = etf_result.data
 
             etf_metrics = {
                 "top_etf": first_etf,
@@ -664,10 +694,10 @@ def retrieve_sector_data(home_currency: str, data_years: int):
 
 def fetch_multiple_sectors_data():
     """Fetch the sector data for the given keys"""
-    sector_data_raw = [sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS]
+    sector_results = [sector_yf(sectorInfo) for sectorInfo in YF_SECTOR_KEYS]
 
-    sector_errors = [data for data in sector_data_raw if isinstance(data, str)]
-    sector_data = [data for data in sector_data_raw if isinstance(data, dict)]
+    sector_errors = [r.error for r in sector_results if r.error is not None]
+    sector_data = [r.data for r in sector_results if r.error is None]
 
     sector_data = sorted(
         sector_data,
@@ -680,7 +710,8 @@ def fetch_multiple_sectors_data():
     )
 
     # check sum of sector weights
-    sum_of_weights = sum(sector["overview"]["market_weight"] for sector in sector_data)
+    sum_of_weights = sum(sector["overview"]["market_weight"]
+                         for sector in sector_data)
     if round(sum_of_weights, 2) != 1:
         logger.warning("Sum of sector weights is not 1: %s", sum_of_weights)
 
@@ -742,12 +773,14 @@ def get_history_exp_fit(history: pd.DataFrame):
     if not isinstance(trend_deviation, pd.DataFrame):
         raise ValueError("CAGR error is not a DataFrame")
 
-    first_value, last_value, first_fitted_value, last_fitted_value = get_first_last_values(history, fitted_history)
+    first_value, last_value, first_fitted_value, last_fitted_value = get_first_last_values(
+        history, fitted_history)
 
     _, _, number_of_years, _, _ = get_period_info(history)
 
     cagr = (last_value / first_value) ** (1 / number_of_years) - 1
-    cagr_fitted = (last_fitted_value / first_fitted_value) ** (1 / number_of_years) - 1
+    cagr_fitted = (last_fitted_value /
+                   first_fitted_value) ** (1 / number_of_years) - 1
     over_under = (last_value - last_fitted_value) / last_fitted_value
 
     if not isinstance(cagr, pd.Series):
@@ -764,7 +797,8 @@ def get_history_exp_fit(history: pd.DataFrame):
     if not isinstance(trend_deviation_rmse, pd.Series):
         raise ValueError("Error: CAGR error RMSE is not a Series")
 
-    trend_deviation_z_score = (trend_deviation - trend_deviation.mean()) / trend_deviation.std()
+    trend_deviation_z_score = (
+        trend_deviation - trend_deviation.mean()) / trend_deviation.std()
 
     return fitted_history, trend_deviation, cagr, cagr_fitted, over_under, trend_deviation_rmse, trend_deviation_z_score
 
@@ -786,9 +820,12 @@ def get_log_returns(p_history: pd.DataFrame):
     points_per_year = number_of_points / number_of_years
     points_per_month = points_per_year / 12
 
-    daily_log_returns: pd.DataFrame = np.log(p_history / p_history.shift(1)).dropna()
-    monthly_log_returns: pd.DataFrame = np.log(p_history / p_history.shift(round(points_per_month))).dropna()
-    yearly_log_returns: pd.DataFrame = np.log(p_history / p_history.shift(round(points_per_year))).dropna()
+    daily_log_returns: pd.DataFrame = np.log(
+        p_history / p_history.shift(1)).dropna()
+    monthly_log_returns: pd.DataFrame = np.log(
+        p_history / p_history.shift(round(points_per_month))).dropna()
+    yearly_log_returns: pd.DataFrame = np.log(
+        p_history / p_history.shift(round(points_per_year))).dropna()
     cumulative_log_returns: pd.DataFrame = daily_log_returns.cumsum()
 
     if not isinstance(cumulative_log_returns, pd.DataFrame):
@@ -842,20 +879,25 @@ class MultiAsset:
         self.debug = debug
 
         # Fetch data from Yahoo Finance
-        tickers_data = tickers_yf(symbols, period)
-        if isinstance(tickers_data, str):
-            raise ValueError(tickers_data)
+        tickers_result = tickers_yf(symbols, period)
+        if tickers_result.error is not None:
+            raise ValueError(tickers_result.error)
+
+        tickers_data = tickers_result.data
+        if not isinstance(tickers_data, dict):
+            raise ValueError("Tickers data is not a dictionary")
 
         history = tickers_data["history"]
         if not isinstance(history, pd.DataFrame):
             raise ValueError("History is not a DataFrame")
 
         # Fetch info for each symbol
-        info_list = [yf_ticket_info(symbol) for symbol in history.columns]
-        error_list = [info for info in info_list if isinstance(info, str)]
+        info_results = [yf_ticket_info(symbol) for symbol in history.columns]
+        error_list = [r.error for r in info_results if r.error is not None]
         if error_list:
-            raise ValueError(f"Error: Failed to retrieve ticker info for some symbols: {error_list}")
-        clean_info_list = [info for info in info_list if isinstance(info, dict)]
+            raise ValueError(
+                f"Error: Failed to retrieve ticker info for some symbols: {error_list}")
+        clean_info_list = [r.data for r in info_results if r.error is None]
 
         currencies = pd.Series(
             data=[info.get("currency", "") for info in clean_info_list],
@@ -873,7 +915,8 @@ class MultiAsset:
         )
 
         long_business_summaries = pd.Series(
-            data=[info.get("longBusinessSummary", "") for info in clean_info_list],
+            data=[info.get("longBusinessSummary", "")
+                  for info in clean_info_list],
             index=[info.get("symbol", "") for info in clean_info_list],
         )
 
@@ -882,11 +925,13 @@ class MultiAsset:
             weights = [1 / len(history.columns)] * len(history.columns)
 
         if len(weights) != len(history.columns):
-            raise ValueError("Error: Sector weights length does not match symbols length")
+            raise ValueError(
+                "Error: Sector weights length does not match symbols length")
 
         # Make sure the weights sum to 1
         weights_sum = sum(weights)
-        self.weights = [w / weights_sum for w in weights] if weights_sum > 0 else weights
+        self.weights = [
+            w / weights_sum for w in weights] if weights_sum > 0 else weights
 
         # Create weighted total
         history["TOTAL"] = history.mul(self.weights, axis=1).sum(axis=1)
@@ -939,7 +984,8 @@ class MultiAsset:
             )
 
         # Create symbol metrics DataFrame
-        weights_series = pd.Series(self.weights + [1], index=history.columns)  # add 1 for TOTAL
+        weights_series = pd.Series(
+            self.weights + [1], index=history.columns)  # add 1 for TOTAL
 
         self.symbol_metrics = pd.concat(
             [
@@ -1038,14 +1084,19 @@ class MultiAsset:
     def create_asset_analysis_chart(self, selected_asset: str) -> go.Figure:
         """Create dual-axis chart for selected asset with history, fitted history, and z-score"""
         # Validate asset exists
-        available_assets = self.timeseries_data.columns.get_level_values(1).unique().tolist()
+        available_assets = self.timeseries_data.columns.get_level_values(
+            1).unique().tolist()
         if selected_asset not in available_assets:
-            raise ValueError(f"Asset '{selected_asset}' not found. Available assets: {available_assets}")
+            raise ValueError(
+                f"Asset '{selected_asset}' not found. Available assets: {available_assets}")
 
         # Prepare data for selected asset
-        history_data = self.timeseries_data[("history", selected_asset)].dropna()
-        fitted_data = self.timeseries_data[("fitted_history", selected_asset)].dropna()
-        z_score_data = self.timeseries_data[("trend_deviation_z_score", selected_asset)].dropna()
+        history_data = self.timeseries_data[(
+            "history", selected_asset)].dropna()
+        fitted_data = self.timeseries_data[(
+            "fitted_history", selected_asset)].dropna()
+        z_score_data = self.timeseries_data[(
+            "trend_deviation_z_score", selected_asset)].dropna()
 
         # Create subplot with secondary y-axis
         fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -1092,7 +1143,8 @@ class MultiAsset:
             title=f"Asset Analysis: {selected_asset}",
             xaxis_title="Date",
             hovermode="x unified",
-            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
+            legend={"orientation": "h", "yanchor": "bottom",
+                    "y": 1.02, "xanchor": "right", "x": 1},
         )
 
         # Set y-axes titles
@@ -1100,7 +1152,8 @@ class MultiAsset:
         fig.update_yaxes(title_text="Z-Score", secondary_y=True)
 
         # Add horizontal line at z-score = 0
-        fig.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.5, secondary_y=True)
+        fig.add_hline(y=0, line_dash="dot", line_color="gray",
+                      opacity=0.5, secondary_y=True)
 
         return fig
 

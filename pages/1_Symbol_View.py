@@ -1,4 +1,4 @@
-# pylint: disable=C0103
+
 """Get the information of a stock symbol from Yahoo Finance API."""
 
 from typing import List
@@ -67,9 +67,12 @@ st.divider()
 
 tab1, tab2 = st.tabs(["Symbol Information", "Industry Information"])
 
-asset_info = yf_ticket_info(symbol_name)
+asset_info_result = yf_ticket_info(symbol_name)
+if asset_info_result.error is not None:
+    st.error(f"Unable to fetch symbol information: {asset_info_result.error}")
+    st.stop()
 
-combo_asset_info = {**first_result, **asset_info}
+combo_asset_info = {**first_result, **asset_info_result.data}
 
 with tab1:
 
@@ -146,7 +149,7 @@ with tab1:
 
     # Fetch the fx rate history for the asset currency
     full_fx_rate_history = fetch_fx_rate_history(
-        asset_info['currency'], base_currency)
+        asset_info_result.data['currency'], base_currency)
 
     # Add the fx rate history to the asset history
     full_asset_base_history = generate_asset_base_value(
@@ -222,23 +225,30 @@ with tab2:
         symbol_sector_key = combo_asset_info.get(
             "sectorKey", None)
 
-        sector_data = sector_yf(
+        sector_data_result = sector_yf(
             symbol_sector_key)
 
-        if sector_data.get('overview') is None:
-            st.warning(f"No sector overview found. '{symbol_sector_key}'")
+        if sector_data_result.error is not None:
+            st.warning(
+                f"⚠️ Unable to fetch sector data: {sector_data_result.error}")
         else:
-            st.write("#### Sector Overview")
-            st.write(sector_data.get('overview'))
+            sector_data = sector_data_result.data
 
-            if sector_data.get('top_companies') is None:
-                st.warning(f"No top companies found. '{symbol_sector_key}'")
+            if sector_data.get('overview') is None:
+                st.warning(f"No sector overview found. '{symbol_sector_key}'")
             else:
-                st.write("#### Top Companies")
-                st.dataframe(sector_data.get('top_companies'))
+                st.write("#### Sector Overview")
+                st.write(sector_data.get('overview'))
 
-            if sector_data.get('top_etfs') is None:
-                st.warning(f"No top ETFs found. '{symbol_sector_key}'")
-            else:
-                st.write("#### Top ETFs")
-                st.dataframe(sector_data.get('top_etfs'))
+                if sector_data.get('top_companies') is None:
+                    st.warning(
+                        f"No top companies found. '{symbol_sector_key}'")
+                else:
+                    st.write("#### Top Companies")
+                    st.dataframe(sector_data.get('top_companies'))
+
+                if sector_data.get('top_etfs') is None:
+                    st.warning(f"No top ETFs found. '{symbol_sector_key}'")
+                else:
+                    st.write("#### Top ETFs")
+                    st.dataframe(sector_data.get('top_etfs'))

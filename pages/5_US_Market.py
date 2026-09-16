@@ -4,7 +4,6 @@ This page is used to fetch the data for the US market
 """
 
 import logging
-import time
 
 import numpy as np
 import pandas as pd
@@ -17,7 +16,8 @@ from utilities.app_yfinance import tickers_yf
 logger = logging.getLogger(__name__)
 logger.debug("US Market view loaded")
 
-st.set_page_config(page_title="US Market", page_icon=":bar_chart:", layout="wide")
+st.set_page_config(page_title="US Market",
+                   page_icon=":bar_chart:", layout="wide")
 
 
 BENCHMARK_SYMBOL = "SPY"
@@ -52,11 +52,11 @@ def validate_symbols(symbols_to_validate):
     for ticker_symbol in symbols_to_validate:
         try:
             result = tickers_yf([ticker_symbol])
-            if isinstance(result, dict) and not result["history"].empty:
+            if result.error is None and not result.data["history"].empty:
                 valid_list.append(ticker_symbol)
             else:
                 invalid_list.append(ticker_symbol)
-                validation_errors[ticker_symbol] = "No data returned"
+                validation_errors[ticker_symbol] = result.error or "No data returned"
         except RECOVERABLE_ERRORS as e:
             invalid_list.append(ticker_symbol)
             validation_errors[ticker_symbol] = str(e)
@@ -67,14 +67,16 @@ def validate_symbols(symbols_to_validate):
 # Validate symbols before creating ExpFitBacktester
 st.write("**Validating market symbols...**")
 with st.spinner("Testing symbol data availability..."):
-    valid_symbols, invalid_symbols, error_details = validate_symbols(SECTOR_SYMBOLS)
+    valid_symbols, invalid_symbols, error_details = validate_symbols(
+        SECTOR_SYMBOLS)
 
 first_level_columns = []
 second_level_columns = []
 
 # Show validation results
 if invalid_symbols:
-    st.warning(f"⚠️ Some symbols are unavailable and will be excluded: {invalid_symbols}")
+    st.warning(
+        f"⚠️ Some symbols are unavailable and will be excluded: {invalid_symbols}")
     with st.expander("View error details"):
         for symbol, error in error_details.items():
             st.write(f"**{symbol}**: {error}")
@@ -89,8 +91,10 @@ if valid_symbols:
         main_dataframes = exp_fit_backtester.get_main_dataframes()
 
         # Continue with the rest of the page
-        first_level_columns = [*set(main_dataframes.columns.get_level_values(0))]
-        second_level_columns = sorted([*set(main_dataframes.columns.get_level_values(1))])
+        first_level_columns = [
+            *set(main_dataframes.columns.get_level_values(0))]
+        second_level_columns = sorted(
+            [*set(main_dataframes.columns.get_level_values(1))])
 
     except RECOVERABLE_ERRORS as e:
         # Even with valid symbols, we might have other issues
@@ -108,7 +112,8 @@ if not valid_symbols:
     )
 
     # Add demo mode toggle
-    use_demo_mode = st.checkbox("Enable Demo Mode (with mock data)", value=False)
+    use_demo_mode = st.checkbox(
+        "Enable Demo Mode (with mock data)", value=False)
 
     if use_demo_mode:
         st.warning("Using demo mode with mock data for testing purposes.")
@@ -135,7 +140,8 @@ if not valid_symbols:
 
         # Create mock tickers_history
         tickers_history = pd.DataFrame(mock_prices, index=dates)
-        tickers_history = tickers_history.drop("TOTAL", axis=1)  # Remove TOTAL for now
+        tickers_history = tickers_history.drop(
+            "TOTAL", axis=1)  # Remove TOTAL for now
 
         # Create mock main_dataframes structure similar to ExpFitBacktester output
         price_data = tickers_history.copy()
@@ -146,9 +152,11 @@ if not valid_symbols:
         # Create benchmark positions (equal weight)
         n_symbols = len(price_data.columns)
         initial_capital = 1000
-        equal_weight = 1.0 / (n_symbols - 1)  # Exclude TOTAL from weight calculation
+        # Exclude TOTAL from weight calculation
+        equal_weight = 1.0 / (n_symbols - 1)
 
-        b_position_data = pd.DataFrame(index=price_data.index, columns=price_data.columns)
+        b_position_data = pd.DataFrame(
+            index=price_data.index, columns=price_data.columns)
         for symbol in price_data.columns:
             if symbol != "TOTAL":
                 initial_price = price_data[symbol].iloc[0]
@@ -165,7 +173,8 @@ if not valid_symbols:
 
         # Calculate log returns
         b_log_returns_data = np.log(price_data / price_data.shift(1))
-        b_log_returns_data["TOTAL"] = np.log(b_value_data["TOTAL"] / b_value_data["TOTAL"].shift(1))
+        b_log_returns_data["TOTAL"] = np.log(
+            b_value_data["TOTAL"] / b_value_data["TOTAL"].shift(1))
 
         # Create SMAs for demonstration
         sma_1m = price_data.rolling(window=30).mean()
@@ -173,13 +182,17 @@ if not valid_symbols:
 
         # Build the multi-index structure
         frames = []
-        metrics = ["Price", "B_Position", "B_Value", "B_Weight", "B_log_returns", "SMA_1m", "SMA_3m"]
-        data_frames = [price_data, b_position_data, b_value_data, b_weight_data, b_log_returns_data, sma_1m, sma_3m]
+        metrics = ["Price", "B_Position", "B_Value",
+                   "B_Weight", "B_log_returns", "SMA_1m", "SMA_3m"]
+        data_frames = [price_data, b_position_data, b_value_data,
+                       b_weight_data, b_log_returns_data, sma_1m, sma_3m]
 
         for metric, df in zip(metrics, data_frames):
             # Stack the DataFrame and add metric level
-            stacked = df.T.assign(Metric=metric).set_index("Metric", append=True)
-            stacked.index = stacked.index.reorder_levels([1, 0])  # Metric, Symbol
+            stacked = df.T.assign(Metric=metric).set_index(
+                "Metric", append=True)
+            stacked.index = stacked.index.reorder_levels(
+                [1, 0])  # Metric, Symbol
             frames.append(stacked)
 
         # Combine all metrics
@@ -187,10 +200,13 @@ if not valid_symbols:
         main_dataframes = combined.T  # Transpose back to have dates as rows
 
         # Set up the column selectors
-        first_level_columns = [*set(main_dataframes.columns.get_level_values(0))]
-        second_level_columns = sorted([*set(main_dataframes.columns.get_level_values(1))])
+        first_level_columns = [
+            *set(main_dataframes.columns.get_level_values(0))]
+        second_level_columns = sorted(
+            [*set(main_dataframes.columns.get_level_values(1))])
 
-        st.success("Demo mode enabled! You can now explore the functionality with mock data.")
+        st.success(
+            "Demo mode enabled! You can now explore the functionality with mock data.")
     else:
         st.stop()
 else:
@@ -257,7 +273,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
     st.subheader("Individual Symbol Analysis")
 
     # Get available symbols for price analysis
-    price_columns = [col[1] for col in main_dataframes.columns if col[0] == "Price" and col[1] != "TOTAL"]
+    price_columns = [col[1] for col in main_dataframes.columns if col[0]
+                     == "Price" and col[1] != "TOTAL"]
 
     selected_symbol = st.selectbox(
         "Select a Symbol for Analysis", options=price_columns, index=0 if price_columns else None
@@ -298,7 +315,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
                         y=sma_data.values,
                         mode="lines",
                         name=sma_col[0],
-                        line={"color": colors[i % len(colors)], "dash": "dash"},
+                        line={"color": colors[i %
+                                              len(colors)], "dash": "dash"},
                     )
                 )
 
@@ -316,7 +334,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
             # Calculate some basic statistics
             current_price = price_data.iloc[-1]
             first_price = price_data.iloc[0]
-            price_change = (current_price / first_price) ** (1 / years_duration) - 1
+            price_change = (
+                current_price / first_price) ** (1 / years_duration) - 1
 
             st.metric("Current Price", f"${current_price:.2f}")
             st.metric("First Price", f"${first_price:.2f}")
@@ -350,7 +369,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
             )
         )
 
-        fig.update_layout(title="Portfolio Total Value", xaxis_title="Date", yaxis_title="Value ($)", height=400)
+        fig.update_layout(title="Portfolio Total Value",
+                          xaxis_title="Date", yaxis_title="Value ($)", height=400)
         st.plotly_chart(fig, width="stretch")
 
     with col2:
@@ -360,7 +380,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
         initial_value = portfolio_value.iloc[0]
         current_value = portfolio_value.iloc[-1]
         total_return = (current_value / initial_value) - 1
-        annualized_return = (current_value / initial_value) ** (1 / years_duration) - 1
+        annualized_return = (
+            current_value / initial_value) ** (1 / years_duration) - 1
 
         # Calculate volatility from log returns
         portfolio_returns_clean = portfolio_returns.dropna()
@@ -383,7 +404,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
     st.subheader("Asset Performance Comparison")
 
     # Get all asset values and calculate returns
-    asset_symbols = [col[1] for col in main_dataframes.columns if col[0] == "B_Value" and col[1] != "TOTAL"]
+    asset_symbols = [col[1] for col in main_dataframes.columns if col[0]
+                     == "B_Value" and col[1] != "TOTAL"]
 
     if asset_symbols:
         performance_data = []
@@ -395,7 +417,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
                 current_val = asset_value.iloc[-1]
                 if initial_val > 0:
                     total_ret = (current_val / initial_val) - 1
-                    annual_ret = (current_val / initial_val) ** (1 / years_duration) - 1
+                    annual_ret = (
+                        current_val / initial_val) ** (1 / years_duration) - 1
                     performance_data.append(
                         {
                             "Symbol": asset_symbol,
@@ -411,10 +434,14 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
 
             # Format the DataFrame for display
             perf_df_display = perf_df.copy()
-            perf_df_display["Initial Value"] = perf_df_display["Initial Value"].apply(lambda x: f"${x:.2f}")
-            perf_df_display["Current Value"] = perf_df_display["Current Value"].apply(lambda x: f"${x:.2f}")
-            perf_df_display["Total Return"] = perf_df_display["Total Return"].apply(lambda x: f"{x:.2%}")
-            perf_df_display["Annualized Return"] = perf_df_display["Annualized Return"].apply(lambda x: f"{x:.2%}")
+            perf_df_display["Initial Value"] = perf_df_display["Initial Value"].apply(
+                lambda x: f"${x:.2f}")
+            perf_df_display["Current Value"] = perf_df_display["Current Value"].apply(
+                lambda x: f"${x:.2f}")
+            perf_df_display["Total Return"] = perf_df_display["Total Return"].apply(
+                lambda x: f"{x:.2%}")
+            perf_df_display["Annualized Return"] = perf_df_display["Annualized Return"].apply(
+                lambda x: f"{x:.2%}")
 
             st.dataframe(perf_df_display, width="stretch", hide_index=True)
 
@@ -440,7 +467,8 @@ if valid_symbols or (not valid_symbols and use_demo_mode):
             st.plotly_chart(fig, width="stretch")
 
 else:
-    st.error("No data available to display. Please check your internet connection or try again later.")
+    st.error(
+        "No data available to display. Please check your internet connection or try again later.")
 
 
 # CURRENCY_SYMBOLS = [

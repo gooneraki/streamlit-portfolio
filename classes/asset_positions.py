@@ -82,12 +82,13 @@ class Portfolio:
         reference_currency = reference_currency.upper()
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.symbols_info_list = [
-            {"symbol": symbol, "currency": yf_ticket_currency(symbol)} for symbol in asset_symbols
+            {"symbol": symbol, "currency": yf_ticket_currency(symbol).data} for symbol in asset_symbols
         ]
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         currencies_series = pd.Series(
-            data=[info["currency"] for info in self.symbols_info_list] + [reference_currency],
+            data=[info["currency"]
+                  for info in self.symbols_info_list] + [reference_currency],
             index=[ass_pos.symbol for ass_pos in asset_positions] + ["TOTAL"],
         )
 
@@ -98,7 +99,11 @@ class Portfolio:
         ]
 
         # >>>
-        self.tickers_data = tickers_yf(asset_symbols + currency_symbols, period="max")
+        tickers_result = tickers_yf(
+            asset_symbols + currency_symbols, period="max")
+        if tickers_result.error is not None:
+            raise ValueError(tickers_result.error)
+        self.tickers_data = tickers_result.data
         # <<<
 
         translated_close, translated_values = self._calculate_currency_translated_history(
@@ -108,7 +113,8 @@ class Portfolio:
         weights = translated_values.div(translated_values.sum(axis=1), axis=0)
 
         position_df = pd.DataFrame(
-            data=[positions_series.reindex(translated_values.columns)] * len(translated_values),
+            data=[positions_series.reindex(
+                translated_values.columns)] * len(translated_values),
             index=translated_values.index,
             columns=translated_values.columns,
         )
@@ -117,7 +123,8 @@ class Portfolio:
         translated_values["TOTAL"] = translated_values.sum(axis=1)
         weights["TOTAL"] = weights.sum(axis=1)
 
-        log_returns = np.log(translated_values / translated_values.shift(1)).dropna()
+        log_returns = np.log(translated_values /
+                             translated_values.shift(1)).dropna()
 
         if not isinstance(log_returns, pd.DataFrame):
             raise ValueError("Log returns is not a DataFrame")
@@ -131,7 +138,8 @@ class Portfolio:
         )
 
         # Calculate drawdown metrics
-        drawdown, max_drawdown, drawdown_duration = self._calculate_drawdown_metrics(translated_values)
+        drawdown, max_drawdown, drawdown_duration = self._calculate_drawdown_metrics(
+            translated_values)
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.timeseries_data = pd.concat(
@@ -187,23 +195,35 @@ class Portfolio:
         self.timeseries_data.columns.names = ["Metric", "Ticker"]
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        self.optimisation_results = self._calculate_portfolio_optimisation(log_returns)
+        self.optimisation_results = self._calculate_portfolio_optimisation(
+            log_returns)
 
-        self.assets_snapshot: pd.DataFrame = self.timeseries_data.iloc[-1].unstack(level="Metric")
+        self.assets_snapshot: pd.DataFrame = self.timeseries_data.iloc[-1].unstack(
+            level="Metric")
 
         # Add additional metrics
         self.assets_snapshot["currency"] = currencies_series
 
-        self.assets_snapshot["cagr_pct"] = self.assets_snapshot["cagr"].mul(100)
-        self.assets_snapshot["cagr_fitted_pct"] = self.assets_snapshot["cagr_fitted"].mul(100)
-        self.assets_snapshot["weights_pct"] = self.assets_snapshot["weights"].mul(100)
-        self.assets_snapshot["trend_deviation_pct"] = self.assets_snapshot["trend_deviation"].mul(100)
-        self.assets_snapshot["drawdown_pct"] = self.assets_snapshot["drawdown"].mul(100)
-        self.assets_snapshot["max_drawdown_pct"] = self.assets_snapshot["max_drawdown"].mul(100)
-        self.assets_snapshot["rolling_1m_return_pct"] = self.assets_snapshot["rolling_1m_return"].mul(100)
-        self.assets_snapshot["rolling_1q_return_pct"] = self.assets_snapshot["rolling_1q_return"].mul(100)
-        self.assets_snapshot["rolling_1y_return_pct"] = self.assets_snapshot["rolling_1y_return"].mul(100)
-        self.assets_snapshot["rolling_3y_return_pct"] = self.assets_snapshot["rolling_3y_return"].mul(100)
+        self.assets_snapshot["cagr_pct"] = self.assets_snapshot["cagr"].mul(
+            100)
+        self.assets_snapshot["cagr_fitted_pct"] = self.assets_snapshot["cagr_fitted"].mul(
+            100)
+        self.assets_snapshot["weights_pct"] = self.assets_snapshot["weights"].mul(
+            100)
+        self.assets_snapshot["trend_deviation_pct"] = self.assets_snapshot["trend_deviation"].mul(
+            100)
+        self.assets_snapshot["drawdown_pct"] = self.assets_snapshot["drawdown"].mul(
+            100)
+        self.assets_snapshot["max_drawdown_pct"] = self.assets_snapshot["max_drawdown"].mul(
+            100)
+        self.assets_snapshot["rolling_1m_return_pct"] = self.assets_snapshot["rolling_1m_return"].mul(
+            100)
+        self.assets_snapshot["rolling_1q_return_pct"] = self.assets_snapshot["rolling_1q_return"].mul(
+            100)
+        self.assets_snapshot["rolling_1y_return_pct"] = self.assets_snapshot["rolling_1y_return"].mul(
+            100)
+        self.assets_snapshot["rolling_3y_return_pct"] = self.assets_snapshot["rolling_3y_return"].mul(
+            100)
 
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -258,13 +278,17 @@ class Portfolio:
 
         period_info = self.get_period_info()
 
-        rolling_stats_1m = self._calculate_rolling_statistics(log_returns, period_info.points_per_month)
+        rolling_stats_1m = self._calculate_rolling_statistics(
+            log_returns, period_info.points_per_month)
 
-        rolling_stats_1q = self._calculate_rolling_statistics(log_returns, period_info.points_per_year / 4)
+        rolling_stats_1q = self._calculate_rolling_statistics(
+            log_returns, period_info.points_per_year / 4)
 
-        rolling_stats_1y = self._calculate_rolling_statistics(log_returns, period_info.points_per_year)
+        rolling_stats_1y = self._calculate_rolling_statistics(
+            log_returns, period_info.points_per_year)
 
-        rolling_stats_3y = self._calculate_rolling_statistics(log_returns, period_info.points_per_year * 3)
+        rolling_stats_3y = self._calculate_rolling_statistics(
+            log_returns, period_info.points_per_year * 3)
 
         return rolling_stats_1m, rolling_stats_1q, rolling_stats_1y, rolling_stats_3y
 
@@ -284,7 +308,8 @@ class Portfolio:
 
         rolling_return = np.exp(rolling_sum) - 1
 
-        rolling_annualised_return = np.exp(rolling_sum * period_info.points_per_year / window) - 1
+        rolling_annualised_return = np.exp(
+            rolling_sum * period_info.points_per_year / window) - 1
 
         if not isinstance(rolling_mean, pd.DataFrame):
             raise ValueError("Rolling mean is not a DataFrame")
@@ -295,13 +320,17 @@ class Portfolio:
         if not isinstance(rolling_return, pd.DataFrame):
             raise ValueError("Rolling return is not a DataFrame")
 
-        rolling_mean_z_score = (rolling_mean - rolling_mean.mean()) / rolling_mean.std()
+        rolling_mean_z_score = (
+            rolling_mean - rolling_mean.mean()) / rolling_mean.std()
 
-        rolling_std_z_score = (rolling_std - rolling_std.mean()) / rolling_std.std()
+        rolling_std_z_score = (
+            rolling_std - rolling_std.mean()) / rolling_std.std()
 
-        rolling_sum_z_score = (rolling_sum - rolling_sum.mean()) / rolling_sum.std()
+        rolling_sum_z_score = (
+            rolling_sum - rolling_sum.mean()) / rolling_sum.std()
 
-        rolling_return_z_score = (rolling_return - rolling_return.mean()) / rolling_return.std()
+        rolling_return_z_score = (
+            rolling_return - rolling_return.mean()) / rolling_return.std()
 
         rolling_annualised_return_z_score = (
             rolling_annualised_return - rolling_annualised_return.mean()
@@ -336,7 +365,8 @@ class Portfolio:
 
         trend_deviation = (translated_values / fitted_values) - 1
 
-        trend_deviation_z_score = (trend_deviation - trend_deviation.mean()) / trend_deviation.std()
+        trend_deviation_z_score = (
+            trend_deviation - trend_deviation.mean()) / trend_deviation.std()
 
         time_indices = np.arange(len(translated_values))
         time_matrix = pd.DataFrame(
@@ -346,12 +376,14 @@ class Portfolio:
         )
 
         cagr = (
-            translated_values.div(translated_values.iloc[0]).pow(self.get_period_info().points_per_year / time_matrix)
+            translated_values.div(translated_values.iloc[0]).pow(
+                self.get_period_info().points_per_year / time_matrix)
             - 1
         )
 
         cagr_fitted = (
-            fitted_values.div(fitted_values.iloc[0]).pow(self.get_period_info().points_per_year / time_matrix) - 1
+            fitted_values.div(fitted_values.iloc[0]).pow(
+                self.get_period_info().points_per_year / time_matrix) - 1
         )
 
         return fitted_values, trend_deviation, trend_deviation_z_score, cagr, cagr_fitted
@@ -360,7 +392,8 @@ class Portfolio:
         self, asset_positions: list[AssetPosition], reference_currency: str, currency_symbols: list[str]
     ):
 
-        assets_history = self.tickers_data["history"].drop(columns=currency_symbols)
+        assets_history = self.tickers_data["history"].drop(
+            columns=currency_symbols)
         currency_history = self.tickers_data["history"][currency_symbols]
 
         if not isinstance(currency_history, pd.DataFrame):
@@ -370,18 +403,22 @@ class Portfolio:
         translated_close = assets_history.copy()
 
         # Create a dictionary to map asset_symbols to positions for quick lookup
-        positions_dict = {ass_pos.symbol: ass_pos.position for ass_pos in asset_positions}
+        positions_dict = {
+            ass_pos.symbol: ass_pos.position for ass_pos in asset_positions}
 
         for symbol, info in zip(assets_history.columns, self.symbols_info_list):
             position_value = positions_dict[symbol]
 
-            translated_values[symbol] = translated_values[symbol] * position_value
+            translated_values[symbol] = translated_values[symbol] * \
+                position_value
 
             if info["currency"] != reference_currency:
                 currency_column = info["currency"] + reference_currency + "=X"
-                translated_values[symbol] = translated_values[symbol] * currency_history[currency_column]
+                translated_values[symbol] = translated_values[symbol] * \
+                    currency_history[currency_column]
 
-                translated_close[symbol] = translated_close[symbol] * currency_history[currency_column]
+                translated_close[symbol] = translated_close[symbol] * \
+                    currency_history[currency_column]
 
         return translated_close, translated_values
 
@@ -439,15 +476,19 @@ class Portfolio:
         # Helper function to calculate portfolio metrics
         def calculate_portfolio_metrics(weights, key, name, emoji):
             port_log_return = np.sum(weights * mean_log_returns)
-            port_log_vol = np.sqrt(np.dot(weights.T, np.dot(cov_log_matrix, weights)))
-            port_log_sharpe_ratio = (port_log_return - risk_free_rate) / port_log_vol if port_log_vol > 0 else 0
+            port_log_vol = np.sqrt(
+                np.dot(weights.T, np.dot(cov_log_matrix, weights)))
+            port_log_sharpe_ratio = (
+                port_log_return - risk_free_rate) / port_log_vol if port_log_vol > 0 else 0
 
             ann_log_return = port_log_return * points_per_year
             ann_vol = port_log_vol * np.sqrt(points_per_year)
-            ann_log_sharpe_ratio = (ann_log_return - risk_free_rate) / ann_vol if ann_vol > 0 else 0
+            ann_log_sharpe_ratio = (
+                ann_log_return - risk_free_rate) / ann_vol if ann_vol > 0 else 0
 
             ann_arith_return = np.exp(ann_log_return) - 1
-            ann_arith_sharpe_ratio = (ann_arith_return - risk_free_rate) / ann_vol if ann_vol > 0 else 0
+            ann_arith_sharpe_ratio = (
+                ann_arith_return - risk_free_rate) / ann_vol if ann_vol > 0 else 0
 
             herfindahl_index = np.sum(weights**2)
 
@@ -474,7 +515,8 @@ class Portfolio:
         # Initialize with current portfolio
         optimal_weights: list[PortfolioOptimizationResult] = [
             calculate_portfolio_metrics(
-                self.timeseries_data.xs("weights", level="Metric", axis=1).iloc[-1].drop("TOTAL", errors="ignore"),
+                self.timeseries_data.xs(
+                    "weights", level="Metric", axis=1).iloc[-1].drop("TOTAL", errors="ignore"),
                 "current_portfolio",
                 "Current Portfolio",
                 "💼",
@@ -524,20 +566,24 @@ class Portfolio:
             if result.success:
                 weights = pd.Series(result.x, index=mean_log_returns.index)
                 optimal_weights.append(
-                    calculate_portfolio_metrics(weights, strategy["key"], strategy["name"], strategy["emoji"])
+                    calculate_portfolio_metrics(
+                        weights, strategy["key"], strategy["name"], strategy["emoji"])
                 )
 
             else:
-                print(f"❌ {strategy['name']} optimization failed: {result.message}")
+                print(
+                    f"❌ {strategy['name']} optimization failed: {result.message}")
 
         # Sort by ann_vol ascending
         optimal_weights.sort(key=lambda x: x.ann_vol)
 
         # Validations - exclude current portfolio from min volatility validation
-        min_volatility_results = [r for r in optimal_weights if r.key == "min_volatility"]
+        min_volatility_results = [
+            r for r in optimal_weights if r.key == "min_volatility"]
         if min_volatility_results:
             min_volatility_result = min_volatility_results[0]
-            other_results = [r for r in optimal_weights if r.key not in ["min_volatility", "current_portfolio"]]
+            other_results = [r for r in optimal_weights if r.key not in [
+                "min_volatility", "current_portfolio"]]
 
             for other_result in other_results:
                 if min_volatility_result.ann_vol > other_result.ann_vol:
@@ -561,7 +607,8 @@ class Portfolio:
         max_drawdown = drawdown.expanding().min()
 
         # Calculate drawdown duration (days since last ALL-TIME peak)
-        drawdown_duration = pd.DataFrame(index=translated_values.index, columns=translated_values.columns)
+        drawdown_duration = pd.DataFrame(
+            index=translated_values.index, columns=translated_values.columns)
 
         for column in translated_values.columns:
             duration = 0

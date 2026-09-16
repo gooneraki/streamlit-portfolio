@@ -1,8 +1,5 @@
 """Streamlit app to display sector and industry information"""
 
-# pylint: disable=C0103
-
-import datetime
 import logging
 import pandas as pd
 import streamlit as st
@@ -25,21 +22,22 @@ DYNAMIC_MARKET = True
 RECOVERABLE_ERRORS = (ValueError, TypeError, KeyError, RuntimeError, OSError)
 
 # User contants
-home_currency = "EUR"
-data_years = 10
-country = "US"
+HOME_CURRENCY = "EUR"
+DATA_YEARS = 10
+COUNTRY = "US"
 
 market_symbol: str = ""
 if DYNAMIC_MARKET:
     try:
-        market_data = market_yf(country)
+        market_result = market_yf(COUNTRY)
 
-        if isinstance(market_data, str):
-            st.warning(f"⚠️ Unable to fetch live market data: {market_data}")
+        if market_result.error is not None:
+            st.warning(
+                f"⚠️ Unable to fetch live market data: {market_result.error}")
             st.info("📊 Falling back to static market data (S&P 500)")
             market_symbol = "^GSPC"
         else:
-            market_symbol = market_data["first_summary_symbol"]
+            market_symbol = market_result.data["first_summary_symbol"]
     except RECOVERABLE_ERRORS as e:
         st.warning(f"⚠️ Network connectivity issue: {str(e)}")
         st.info("📊 Using static market data (S&P 500) for demonstration")
@@ -56,10 +54,13 @@ if DYNAMIC_MARKET:
         sector_data, sector_errors = fetch_multiple_sectors_data()
 
         if sector_errors:
-            st.warning(f"⚠️ Some sector data could not be retrieved: {sector_errors}")
+            st.warning(
+                f"⚠️ Some sector data could not be retrieved: {sector_errors}")
             st.info("📊 Using static sector data for demonstration")
-            sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
-            sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
+            sector_symbols = ["XLC", "XLY", "XLP", "XLE",
+                              "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+            sector_weights = [0.09, 0.10, 0.07, 0.04,
+                              0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
         else:
             sector_symbols = [
                 list(sector_data[sector_id]["top_etfs"].keys())[0] for sector_id in range(len(sector_data))
@@ -70,15 +71,20 @@ if DYNAMIC_MARKET:
     except RECOVERABLE_ERRORS as e:
         st.warning(f"⚠️ Network connectivity issue: {str(e)}")
         st.info("📊 Using static sector data for demonstration")
-        sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
-        sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
+        sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
+                          "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+        sector_weights = [0.09, 0.10, 0.07, 0.04,
+                          0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
 else:
-    sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF", "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
-    sector_weights = [0.09, 0.10, 0.07, 0.04, 0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
+    sector_symbols = ["XLC", "XLY", "XLP", "XLE", "XLF",
+                      "XLV", "XLI", "XLK", "XLB", "XLRE", "XLU"]
+    sector_weights = [0.09, 0.10, 0.07, 0.04,
+                      0.13, 0.13, 0.08, 0.28, 0.03, 0.03, 0.02]
 
 
 try:
-    multi_asset = MultiAsset(sector_symbols, period="10y", weights=sector_weights)
+    multi_asset = MultiAsset(
+        sector_symbols, period="10y", weights=sector_weights)
     symbol_metrics, timeseries_data = multi_asset.get_data()
 except RECOVERABLE_ERRORS as e:
     st.error(f"⚠️ Unable to fetch financial data: {str(e)}")
@@ -117,7 +123,8 @@ except RECOVERABLE_ERRORS as e:
     demo_data = []
     for symbol, weight in zip(sector_symbols, sector_weights):
         demo_data.append(
-            {"ETF Symbol": symbol, "Sector": sector_names.get(symbol, "Unknown"), "Weight": f"{weight:.1%}"}
+            {"ETF Symbol": symbol, "Sector": sector_names.get(
+                symbol, "Unknown"), "Weight": f"{weight:.1%}"}
         )
 
     demo_df = pd.DataFrame(demo_data)
@@ -159,7 +166,8 @@ st.info(
 st.subheader("Assets Overview")
 
 # Get available assets from timeseries data
-available_assets = timeseries_data.columns.get_level_values(1).unique().tolist()
+available_assets = timeseries_data.columns.get_level_values(
+    1).unique().tolist()
 
 # Create assets summary table
 assets_info = []
@@ -190,7 +198,8 @@ if assets_info:
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.dataframe(assets_df, width="stretch", hide_index=True, height=min(400, len(assets_df) * 35 + 40))
+        st.dataframe(assets_df, width="stretch", hide_index=True,
+                     height=min(400, len(assets_df) * 35 + 40))
 
     with col2:
         st.metric("Total Assets", len(assets_df))
@@ -215,7 +224,8 @@ default_asset = "TOTAL" if "TOTAL" in available_assets else available_assets[0]
 selected_asset = st.selectbox(
     "Select Asset:",
     options=available_assets,
-    index=available_assets.index(default_asset) if default_asset in available_assets else 0,
+    index=available_assets.index(
+        default_asset) if default_asset in available_assets else 0,
 )
 
 # Create dual-axis chart using MultiAsset method

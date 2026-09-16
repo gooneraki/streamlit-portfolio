@@ -1,15 +1,17 @@
-# pylint: disable=C0103
+
 """ Streamlit application for the Home page of the Portfolio Historical Data Analysis app. """
+# Streamlit entry point filename is capitalized by convention; not a real module name issue.
+# pylint: disable=invalid-name
 import logging
 import sys
 import streamlit as st
 
 env = st.secrets.get("ENV", "prod").lower()
-log_level = logging.INFO if env == "dev" else logging.WARNING
+LOG_LEVEL = logging.INFO if env == "dev" else logging.WARNING
 
 
 logging.basicConfig(
-    level=log_level,
+    level=LOG_LEVEL,
     format="[%(asctime)s] %(message)s",
     datefmt="%H:%M:%S"
 )
@@ -27,7 +29,8 @@ st.title("Welcome to Portfolio Historical Data Analysis")
 # print python version
 st.write(f"Python version: {sys.version}")
 if DEV_VERSION != PROD_VERSION:
-    st.warning(f"Development version ({DEV_VERSION}) does not match production version ({PROD_VERSION}).")
+    st.warning(
+        f"Development version ({DEV_VERSION}) does not match production version ({PROD_VERSION}).")
 
 # Add an introduction
 st.write("""
@@ -50,5 +53,3 @@ This app is intended for informational purposes only and is not responsible for 
 
 # Footer or additional details
 st.write("Explore the pages in the sidebar to start your analysis!")
-
-

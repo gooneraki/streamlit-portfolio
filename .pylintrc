@@ -1,6 +1,13 @@
 [MASTER]
 init-hook="import os, sys; sys.path.insert(0, os.getcwd())"
 
+[MESSAGES CONTROL]
+disable=broad-exception-caught
+
+[BASIC]
+# Allow Streamlit's numeric-prefixed page filenames (e.g. 4_Sectors.py)
+module-rgx=[0-9]*_?[a-z_][a-zA-Z0-9_]*$
+
 [FORMAT]
 max-line-length=220
 

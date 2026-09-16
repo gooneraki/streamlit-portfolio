@@ -1,7 +1,6 @@
-# pylint: disable=C0103
+
 """Get the information of a stock symbol from Yahoo Finance API."""
 
-import datetime
 import json
 import logging
 import pandas as pd
@@ -18,18 +17,21 @@ st.set_page_config(page_title="Portfolio View", layout="wide")
 
 col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
-    username = st.text_input(label="Enter username", key="username_input", type="password")
+    username = st.text_input(label="Enter username",
+                             key="username_input", type="password")
 
     # Display authentication status
     try:
         if username == st.secrets["DB_USERNAME"]:
             st.success("✅ Authenticated - Loading personalized portfolio data")
         else:
-            st.warning("⚠️ Using default portfolio data. Enter your username to load personalized portfolio data.")
+            st.warning(
+                "⚠️ Using default portfolio data. Enter your username to load personalized portfolio data.")
     except KeyError:
         st.warning("⚠️ Using default portfolio data")
 with col2:
-    base_currency = st.selectbox("Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
+    base_currency = st.selectbox(
+        "Select base currency", BASE_CURRENCY_OPTIONS, key="base_currency_input")
 
 
 def display_portfolio_weights(result, p_assets_snapshot=None):
@@ -38,7 +40,8 @@ def display_portfolio_weights(result, p_assets_snapshot=None):
 
     # Create a DataFrame for better display with currency information
     weights_display_df = pd.DataFrame(
-        {"Asset": portfolio_weights.index, "Weight %": (portfolio_weights.values * 100)}
+        {"Asset": portfolio_weights.index, "Weight %": (
+            portfolio_weights.values * 100)}
     ).sort_values("Weight %", ascending=False)
 
     # Add currency information if available
@@ -49,7 +52,8 @@ def display_portfolio_weights(result, p_assets_snapshot=None):
             if asset in p_assets_snapshot.index:
                 currency_info[asset] = p_assets_snapshot.loc[asset, "currency"]
 
-        weights_display_df["Currency"] = weights_display_df["Asset"].map(currency_info.get)
+        weights_display_df["Currency"] = weights_display_df["Asset"].map(
+            currency_info.get)
 
     # Display performance metrics at the top
     st.markdown(f"##### {result.emoji} {result.name} Performance")
@@ -72,7 +76,8 @@ def display_portfolio_weights(result, p_assets_snapshot=None):
     if "Currency" in weights_display_df.columns:
         column_config["Currency"] = st.column_config.TextColumn("Currency")
 
-    st.dataframe(weights_display_df, column_config=column_config, hide_index=True, width="stretch")
+    st.dataframe(weights_display_df, column_config=column_config,
+                 hide_index=True, width="stretch")
 
 
 def get_assets_positions():
@@ -96,8 +101,7 @@ try:
         portfolio = Portfolio(assets_positions, base_currency)
 except ValueError as err:
     st.error(f"Portfolio data could not be loaded right now: {err}")
-    message = "This is usually a temporary Yahoo Finance data issue. Please rerun the page in a moment."
-    st.info(message)
+    st.info("This is usually a temporary Yahoo Finance data issue. Please rerun the page in a moment.")
     st.stop()
 
 st.title("Portfolio Information")
@@ -144,15 +148,18 @@ st.info(
 
 sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
 with sum_col1:
-    st.metric("Rolling 1M Return", f"{total_metrics['rolling_1m_return_pct']:.1f}%")
+    st.metric("Rolling 1M Return",
+              f"{total_metrics['rolling_1m_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1m_return_z_score']:.2f}")
 
 with sum_col2:
-    st.metric("Rolling 1Q Return", f"{total_metrics['rolling_1q_return_pct']:.1f}%")
+    st.metric("Rolling 1Q Return",
+              f"{total_metrics['rolling_1q_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1q_return_z_score']:.2f}")
 
 with sum_col3:
-    st.metric("Rolling 1Y Return", f"{total_metrics['rolling_1y_return_pct']:.1f}%")
+    st.metric("Rolling 1Y Return",
+              f"{total_metrics['rolling_1y_return_pct']:.1f}%")
     st.caption(f"Z-Score: {total_metrics['rolling_1y_return_z_score']:.2f}")
 
 with sum_col4:
@@ -234,7 +241,8 @@ assets_display_renamed = assets_display.rename(
     }
 )
 
-z_score_columns_renamed = ["Value Z", "1M Return Z", "1Q Return Z", "1Y Return Z"]
+z_score_columns_renamed = ["Value Z",
+                           "1M Return Z", "1Q Return Z", "1Y Return Z"]
 
 styled_assets_display = assets_display_renamed.style.format(
     {
@@ -278,7 +286,8 @@ risk_display_renamed = risk_display.rename(
 
 # Format the risk dataframe
 risk_styled = risk_display_renamed.style.format(
-    {"Current Drawdown": "{:.1f}%", "Max Drawdown": "{:.1f}%", "Days Since Peak": "{:.0f}"}
+    {"Current Drawdown": "{:.1f}%", "Max Drawdown": "{:.1f}%",
+        "Days Since Peak": "{:.0f}"}
 )
 
 # Display risk metrics
@@ -364,7 +373,8 @@ if optimisation_results:
         tab_index += 1
 
 else:
-    st.info("Portfolio optimization not available - insufficient data or optimization failed.")
+    st.info(
+        "Portfolio optimization not available - insufficient data or optimization failed.")
 
 
 st.markdown("---")
@@ -372,7 +382,8 @@ st.markdown("---")
 st.markdown("#### Portfolio Performance")
 
 # Get available assets from timeseries data
-available_assets = portfolio.timeseries_data.columns.get_level_values("Ticker").unique().tolist()
+available_assets = portfolio.timeseries_data.columns.get_level_values(
+    "Ticker").unique().tolist()
 
 # Create columns for asset selection and time period filter
 asset_col1, asset_col2 = st.columns([1, 1])
@@ -405,7 +416,8 @@ with asset_col2:
     selected_period = st.selectbox("Display Period", year_options)
 
 # Get data for selected asset
-asset_data = portfolio.timeseries_data.xs(selected_asset, level="Ticker", axis=1)
+asset_data = portfolio.timeseries_data.xs(
+    selected_asset, level="Ticker", axis=1)
 
 # Filter data based on selected period
 if selected_period == "1 Year":
@@ -437,7 +449,8 @@ st.markdown("---")
 st.markdown("#### Compare All Assets by Metric")
 
 # Get available metrics (excluding weights, as those are proportions)
-all_metrics = [m for m in portfolio.timeseries_data.columns.get_level_values("Metric").unique() if m not in ["weights"]]
+all_metrics = [m for m in portfolio.timeseries_data.columns.get_level_values(
+    "Metric").unique() if m not in ["weights"]]
 
 # Create columns for metric selection and time period filter
 metric_select_col1, metric_select_col2 = st.columns([1, 1])
@@ -446,7 +459,8 @@ with metric_select_col1:
     selected_metric = st.selectbox(
         "Select Metric/Column",
         all_metrics,
-        index=all_metrics.index("translated_values") if "translated_values" in all_metrics else 0,
+        index=all_metrics.index(
+            "translated_values") if "translated_values" in all_metrics else 0,
     )
 
 with metric_select_col2:
@@ -468,10 +482,12 @@ with metric_select_col2:
     # Default to the longest available period
     default_period = year_options[-1] if year_options else "1 Year"
 
-    selected_period_multi = st.selectbox("Display Period", year_options, key="multi_asset_period")
+    selected_period_multi = st.selectbox(
+        "Display Period", year_options, key="multi_asset_period")
 
 # Prepare data: exclude TOTAL for asset comparison
-asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values("Ticker").unique() if a != "TOTAL"]
+asset_names = [a for a in portfolio.timeseries_data.columns.get_level_values(
+    "Ticker").unique() if a != "TOTAL"]
 
 # Use the new chart function
 if selected_metric:
@@ -488,6 +504,10 @@ if selected_metric:
         filtered_data = filtered_data.tail(round(points_per_year * 10))
     # For "10+ Years (All)", use all data (no filtering)
 
-    title = f"All Assets - {selected_metric.replace('_', ' ').title()} Trend ({selected_period_multi})"
-    fig = display_multi_asset_metric_trend(filtered_data, asset_names, selected_metric, title=title)
+    fig = display_multi_asset_metric_trend(
+        filtered_data,
+        asset_names,
+        selected_metric,
+        title=f"All Assets - {selected_metric.replace('_', ' ').title()} Trend ({selected_period_multi})",
+    )
     st.plotly_chart(fig, width="stretch")
