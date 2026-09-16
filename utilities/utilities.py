@@ -9,13 +9,10 @@ from typing import Any, TypedDict
 
 import numpy as np
 import pandas as pd
-
-logger = logging.getLogger(__name__)
-
-# import streamlit as st
-# import altair as alt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+logger = logging.getLogger(__name__)
 
 from utilities.app_yfinance import (
     YF_SECTOR_KEYS,

@@ -78,9 +78,8 @@ class SectorData(TypedDict):
     top_etfs: dict[str, str]
 
 
-@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def sector_yf(sector_key: str) -> Union[str, SectorData]:
-    """Fetch the sector data"""
+def get_raw_sector_data(sector_key: str) -> Union[str, SectorData]:
+    """Fetch sector data without Streamlit cache (safe for worker threads)."""
     try:
         sector = yf.Sector(sector_key)
 
@@ -108,6 +107,12 @@ def sector_yf(sector_key: str) -> Union[str, SectorData]:
         return error_message
 
 
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
+def sector_yf(sector_key: str) -> Union[str, SectorData]:
+    """Fetch the sector data (cached for main thread use)."""
+    return get_raw_sector_data(sector_key)
+
+
 # ^^^^^^^^^ #
 # yf.Sector #
 # ######### #
@@ -117,15 +122,20 @@ def sector_yf(sector_key: str) -> Union[str, SectorData]:
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
 
-@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def search_yf(search_input: str):
-    """Search for a symbol"""
+def get_raw_search(search_input: str):
+    """Search for a symbol without Streamlit cache (safe for worker threads)."""
     try:
         search_results = yf.Search(search_input)
         return search_results.all
     except YF_RECOVERABLE_ERRORS as err:
         error_message = f"Error retrieving search results for '{search_input}': {err}"
         return error_message
+
+
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
+def search_yf(search_input: str):
+    """Search for a symbol (cached for main thread use)."""
+    return get_raw_search(search_input)
 
 
 # ^^^^^^^^^ #
@@ -137,9 +147,8 @@ def search_yf(search_input: str):
 # ⌄⌄⌄⌄⌄⌄⌄⌄⌄ #
 
 
-@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def yf_ticket_info(symbol: str):
-    """Fetch the asset info for a given symbol"""
+def get_raw_ticker_info(symbol: str) -> dict:
+    """Fetch raw ticker info without Streamlit cache (safe for worker threads)."""
     try:
         return yf.Ticker(symbol).info
     except Exception as err:
@@ -147,9 +156,13 @@ def yf_ticket_info(symbol: str):
 
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def yf_ticket_currency(symbol: str) -> str:
-    """Fetch the trading currency for a symbol without relying on full .info."""
+def yf_ticket_info(symbol: str):
+    """Fetch the asset info for a given symbol (cached for main thread use)."""
+    return get_raw_ticker_info(symbol)
 
+
+def get_raw_ticker_currency(symbol: str) -> str:
+    """Fetch the trading currency for a symbol without Streamlit cache."""
     try:
         ticker = yf.Ticker(symbol)
 
@@ -170,8 +183,13 @@ def yf_ticket_currency(symbol: str) -> str:
 
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def yf_ticket_history(symbol: str, period="max"):
-    """Fetch the asset history for a given symbol"""
+def yf_ticket_currency(symbol: str) -> str:
+    """Fetch the trading currency for a symbol without relying on full .info."""
+    return get_raw_ticker_currency(symbol)
+
+
+def get_raw_ticker_history(symbol: str, period: str = "max"):
+    """Fetch the asset history for a given symbol without Streamlit cache."""
     try:
         ticker = yf.Ticker(symbol)
         return ticker.history(period=period, auto_adjust=True)["Close"]
@@ -180,26 +198,36 @@ def yf_ticket_history(symbol: str, period="max"):
 
 
 @st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def get_fx_history(base_currency, target_currency):
-    """Get the historical data of a currency pair from Yahoo Finance API."""
+def yf_ticket_history(symbol: str, period="max"):
+    """Fetch the asset history for a given symbol (cached for main thread use)."""
+    return get_raw_ticker_history(symbol, period=period)
 
+
+def get_raw_fx_history(base_currency: str, target_currency: str):
+    """Get the historical data of a currency pair without Streamlit cache."""
     if base_currency == target_currency:
         return pd.Series(1, index=pd.date_range(start="1980-01-01", end=pd.Timestamp.today(), freq="D"))
 
     fx_symbol = target_currency + base_currency + "=X"
-    fx_history = yf_ticket_history(fx_symbol)
+    fx_history = get_raw_ticker_history(fx_symbol)
 
     if not isinstance(fx_history, str):
         return fx_history
 
     crypto_symbol = target_currency + "-" + base_currency
 
-    crypto_history = yf_ticket_history(crypto_symbol)
+    crypto_history = get_raw_ticker_history(crypto_symbol)
 
     if not isinstance(crypto_history, str):
         return crypto_history
 
     raise ValueError(f"Error retrieving historical data for either '{fx_symbol}' or '{crypto_symbol}'")
+
+
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
+def get_fx_history(base_currency, target_currency):
+    """Get the historical data of a currency pair from Yahoo Finance API."""
+    return get_raw_fx_history(base_currency, target_currency)
 
 
 # ^^^^^^^^^ #
@@ -219,9 +247,8 @@ class MarketData(TypedDict):
     first_summary_symbol: str
 
 
-@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def market_yf(market: str) -> Union[str, MarketData]:
-    """Fetch the market info for a given market"""
+def get_raw_market_data(market: str) -> Union[str, MarketData]:
+    """Fetch market info for a given market without Streamlit cache."""
     try:
         market_data = yf.Market(market)
 
@@ -252,6 +279,12 @@ def market_yf(market: str) -> Union[str, MarketData]:
         return error_message
 
 
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
+def market_yf(market: str) -> Union[str, MarketData]:
+    """Fetch the market info for a given market (cached for main thread use)."""
+    return get_raw_market_data(market)
+
+
 # ^^^^^^^^^ #
 # yf.Market #
 # ######### #
@@ -267,9 +300,8 @@ class TickersData(TypedDict):
     history: pd.DataFrame
 
 
-@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
-def tickers_yf(symbols: list[str], period="max") -> TickersData:
-    """Fetch the tickers data"""
+def get_raw_tickers_data(symbols: list[str], period: str = "max") -> TickersData:
+    """Fetch tickers data without Streamlit cache."""
     try:
         tickers = yf.Tickers(symbols)
         history_data = tickers.history(period=period, auto_adjust=True)
@@ -299,6 +331,12 @@ def tickers_yf(symbols: list[str], period="max") -> TickersData:
     except Exception as err:
         error_message = f"Error retrieving tickers details for '{symbols}': {err}"
         raise ValueError(error_message) from err
+
+
+@st.cache_data(ttl=YF_CACHE_TTL, max_entries=YF_CACHE_MAX_ENTRIES)
+def tickers_yf(symbols: list[str], period="max") -> TickersData:
+    """Fetch the tickers data"""
+    return get_raw_tickers_data(symbols, period=period)
 
 
 # ^^^^^^^^^ #
