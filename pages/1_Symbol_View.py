@@ -15,6 +15,8 @@ from utilities.app_yfinance import sector_yf,   yf_ticket_info
 logger = logging.getLogger(__name__)
 logger.debug("Symbol View loaded")
 
+st.set_page_config(page_title="Symbol View", layout="wide")
+
 
 def reset_query_params(p_search_input: str):
     """Reset the query parameters."""

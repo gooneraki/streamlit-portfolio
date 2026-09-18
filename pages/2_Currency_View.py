@@ -11,6 +11,8 @@ from utilities.utilities import get_fx_history_2
 
 logger = logging.getLogger(__name__)
 logger.debug("Currency view loaded")
+
+st.set_page_config(page_title="Currency View", layout="wide")
 st.title("Currency and Cyptocurrency Information")
 
 col1, col2 = st.columns(2)
