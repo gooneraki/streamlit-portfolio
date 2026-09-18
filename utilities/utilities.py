@@ -282,23 +282,105 @@ def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_
 
 
 def create_asset_info_df(asset_info: dict) -> list[list[str]]:
-    """Get the asset info DataFrame"""
-    keys_to_display = [
+    """Return the applicable identity and profile fields for an asset."""
+    common_fields = [
         {"key": "longName", "label": "Name"},
-        {"key": "legalType", "label": "Type"},
         {"key": "quoteType", "label": "Quote Type"},
+        {"key": "regularMarketPrice", "label": "Current Price"},
         {"key": "currency", "label": "Currency"},
-        {"key": "fundFamily", "label": "Fund Family"},
         {"key": "exchange", "label": "Exchange"},
+        {"key": "website", "label": "Website"},
+    ]
+    equity_fields = [
         {"key": "sector", "label": "Sector"},
         {"key": "industry", "label": "Industry"},
         {"key": "country", "label": "Country"},
+        {"key": "marketCap", "label": "Market Cap"},
+        {"key": "revenueGrowth", "label": "Revenue Growth (YoY)"},
+        {"key": "earningsGrowth", "label": "Earnings Growth (YoY)"},
+        {"key": "profitMargins", "label": "Profit Margin"},
+        {"key": "forwardPE", "label": "Forward P/E"},
+        {"key": "dividendYield", "label": "Dividend Yield"},
+        {"key": "52WeekChange", "label": "Price Growth (1 Year)"},
+        {"key": "fiftyTwoWeekRange", "label": "52-Week Range"},
+        {"key": "firstTradeDateMilliseconds", "label": "Years Since First Trade"},
         {"key": "longBusinessSummary", "label": "Business Summary"},
     ]
-
-    return [
-        [item["label"], str(asset_info.get(item["key"], ""))] for item in keys_to_display if item["key"] in asset_info
+    etf_fields = [
+        {"key": "fundFamily", "label": "Fund Family"},
+        {"key": "fundInceptionDate", "label": "Fund Inception Date"},
+        {"key": "totalAssets", "label": "Fund Assets"},
+        {"key": "fiftyTwoWeekChangePercent", "label": "Price Growth (1 Year)"},
+        {"key": "fiftyTwoWeekRange", "label": "52-Week Range"},
+        {"key": "averageVolume", "label": "Average Daily Volume"},
     ]
+
+    quote_type = str(asset_info.get("quoteType", "")).upper()
+    keys_to_display = common_fields
+    if quote_type == "EQUITY":
+        keys_to_display += equity_fields
+    elif quote_type == "ETF":
+        keys_to_display += etf_fields
+
+    def format_value(key: str, value: Any) -> str:
+        if key == "fundInceptionDate":
+            return datetime.datetime.fromtimestamp(
+                value, tz=datetime.timezone.utc).strftime("%Y-%m-%d")
+        if key == "regularMarketPrice" and isinstance(value, (int, float)):
+            currency = asset_info.get("currency", "")
+            return f"{value:,.2f} {currency}".rstrip()
+        if key in {"marketCap", "totalAssets"} and isinstance(value, (int, float)):
+            for divisor, suffix in ((1_000_000_000_000, "T"), (1_000_000_000, "B"), (1_000_000, "M")):
+                if abs(value) >= divisor:
+                    currency = (
+                        asset_info.get("financialCurrency")
+                        if key == "marketCap"
+                        else asset_info.get("currency")
+                    ) or ""
+                    return f"{value / divisor:.2f}{suffix} {currency}".rstrip()
+            return f"{value:,.0f}"
+        if key in {"revenueGrowth", "earningsGrowth", "profitMargins", "52WeekChange"}:
+            return f"{value:.1%}"
+        if key == "fiftyTwoWeekChangePercent":
+            return f"{value:.1f}%"
+        if key == "dividendYield":
+            return f"{value:.2f}%"
+        if key == "forwardPE":
+            return f"{value:.1f}"
+        if key == "averageVolume":
+            return f"{value:,.0f}"
+        if key == "firstTradeDateMilliseconds":
+            years = _calculate_years_in_existence(value / 1000)
+            return f"{years:.1f} years" if years is not None else ""
+        return str(value)
+
+    asset_info_rows = [
+        [item["label"], format_value(item["key"], asset_info[item["key"]])]
+        for item in keys_to_display
+        if asset_info.get(item["key"]) not in (None, "")
+    ]
+
+    current_price = asset_info.get("regularMarketPrice")
+    if current_price is None:
+        current_price = asset_info.get("currentPrice")
+    range_low = asset_info.get("fiftyTwoWeekLow")
+    range_high = asset_info.get("fiftyTwoWeekHigh")
+    two_hundred_day_average = asset_info.get("twoHundredDayAverage")
+
+    if all(isinstance(value, (int, float)) for value in (current_price, range_low, range_high)) and range_high > range_low:
+        range_width = (range_high - range_low) / ((range_high + range_low) / 2)
+        range_position = (current_price - range_low) / (range_high - range_low)
+        asset_info_rows.extend([
+            ["52-Week Range Position", f"{range_position:.1%}"],
+            ["52-Week Range Width", f"{range_width:.1%}"],
+        ])
+
+    if isinstance(current_price, (int, float)) and isinstance(two_hundred_day_average, (int, float)) and two_hundred_day_average:
+        price_vs_two_hundred_day_average = current_price / two_hundred_day_average - 1
+        asset_info_rows.append(
+            ["Price vs 200-Day Average", f"{price_vs_two_hundred_day_average:.1%}"])
+
+    return asset_info_rows
 
 
 def get_trend_stats(periodic_asset_history_with_fit: pd.DataFrame, base_column="base_value"):

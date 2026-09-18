@@ -67,7 +67,8 @@ if symbol_name is None:
 st.divider()
 
 
-tab1, tab2 = st.tabs(["Symbol Information", "Industry Information"])
+tab1, tab2, tab3 = st.tabs(
+    ["Metrics", "Symbol Information", "Industry Information"])
 
 asset_info_result = yf_ticket_info(symbol_name)
 if asset_info_result.error is not None:
@@ -76,7 +77,7 @@ if asset_info_result.error is not None:
 
 combo_asset_info = {**first_result, **asset_info_result.data}
 
-with tab1:
+with tab2:
 
     st.subheader(f"Symbol: {symbol_name}")
 
@@ -125,11 +126,64 @@ with tab1:
     with st.expander("Raw asset info (JSON)"):
         st.json(combo_asset_info)
 
-    # st.dataframe(create_asset_info_df(combo_asset_info),
-    #              hide_index=True,
-    #              use_container_width=True)
-    for label, value in create_asset_info_df(combo_asset_info):
-        st.markdown(f"**{label}**: {value}")
+    asset_info_rows = create_asset_info_df(combo_asset_info)
+    key_statistic_labels = {
+        "Current Price",
+        "Market Cap",
+        "Revenue Growth (YoY)",
+        "Earnings Growth (YoY)",
+        "Profit Margin",
+        "Forward P/E",
+        "Dividend Yield",
+        "Price Growth (1 Year)",
+        "52-Week Range",
+        "52-Week Range Position",
+        "52-Week Range Width",
+        "Price vs 200-Day Average",
+        "Years Since First Trade",
+        "Fund Assets",
+        "Average Daily Volume",
+    }
+    business_summary = next(
+        (value for label, value in asset_info_rows if label == "Business Summary"), None)
+
+    overview_rows = [
+        [label, value]
+        for label, value in asset_info_rows
+        if label not in key_statistic_labels | {"Business Summary"}
+    ]
+    key_statistic_rows = [
+        [label, value]
+        for label, value in asset_info_rows
+        if label in key_statistic_labels
+    ]
+
+    overview_column, statistics_column = st.columns(2)
+    with overview_column:
+        if overview_rows:
+            st.markdown("#### Overview")
+            st.table(
+                [{"Label": label, "Value": value}
+                    for label, value in overview_rows],
+                hide_index=True,
+                width="content",
+            )
+
+    with statistics_column:
+        if key_statistic_rows:
+            st.markdown("#### Key Statistics")
+            st.table(
+                [{"Label": label, "Value": value}
+                    for label, value in key_statistic_rows],
+                hide_index=True,
+                width="content",
+            )
+
+    if business_summary:
+        st.markdown("#### Business Summary")
+        st.write(business_summary)
+
+with tab1:
 
     full_asset_history = ticker_yf_history(symbol_name)
 
@@ -216,7 +270,7 @@ with tab1:
             st.plotly_chart(annual_returns_fig, width='stretch', config={
                             "displayModeBar": False})
 
-with tab2:
+with tab3:
 
     symbol_sector = combo_asset_info.get("sector", None)
     if symbol_sector is None:
