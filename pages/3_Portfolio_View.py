@@ -18,7 +18,7 @@ st.set_page_config(page_title="Portfolio View", layout="wide")
 col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
     username = st.text_input(label="Enter username",
-                             key="username_input", type="password")
+                             key="username_input")
 
     # Display authentication status
     try:
