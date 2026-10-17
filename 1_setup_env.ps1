@@ -1,45 +1,68 @@
-# Step 0-2: Resolve Python source, create venv if needed, activate, then display active version/path
+param(
+    [string]$PythonPath = (Join-Path $env:USERPROFILE "scoop\apps\python314\current\python.exe")
+)
+
+$ErrorActionPreference = "Stop"
+
 Write-Host "Checking Python and virtual environment..." -ForegroundColor Cyan
 
 $venvPath = Join-Path $PSScriptRoot "venv"
 $venvPythonPath = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
 $homePyPath = Join-Path $PSScriptRoot "Home.py"
 
-if (Test-Path -Path $venvPythonPath) {
-    Write-Host "Virtual environment already exists. Activating..." -ForegroundColor Yellow
+if (-not (Test-Path -Path $PythonPath -PathType Leaf)) {
+    throw "Scoop Python not found at '$PythonPath'. Install python314 or pass -PythonPath."
+}
+
+$pythonInfoCode = "import json, os, sys; print(json.dumps({'base': os.path.realpath(sys._base_executable), 'version': sys.version, 'is_venv': sys.prefix != sys.base_prefix}))"
+$sourceInfoJson = & $PythonPath -c $pythonInfoCode
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to run the requested Python at '$PythonPath'."
+}
+$sourceInfo = $sourceInfoJson | ConvertFrom-Json
+if ($sourceInfo.is_venv) {
+    throw "PythonPath must point to a base Python installation, not another virtual environment."
+}
+
+if (Test-Path -Path $venvPath) {
+    $recoveryMessage = "Close processes using venv, rename '$venvPath' as a backup, then rerun setup to create a fresh environment."
+    if (-not (Test-Path -Path $venvPythonPath -PathType Leaf)) {
+        throw "The existing virtual environment is incomplete. $recoveryMessage"
+    }
+
+    $venvInfoJson = & $venvPythonPath -c $pythonInfoCode
+    if ($LASTEXITCODE -ne 0) {
+        throw "The existing virtual environment cannot run. $recoveryMessage"
+    }
+    $venvInfo = $venvInfoJson | ConvertFrom-Json
+    if (-not $venvInfo.is_venv -or $venvInfo.base -ine $sourceInfo.base -or $venvInfo.version -cne $sourceInfo.version) {
+        throw "The existing virtual environment does not match '$PythonPath' (current base: $($venvInfo.base)). $recoveryMessage"
+    }
+
+    Write-Host "Reusing matching virtual environment: $venvPath" -ForegroundColor Green
 } else {
-    Write-Host "Virtual environment not found. Checking global Python..." -ForegroundColor Cyan
-    $globalPythonPath = python -c "import sys; print(sys.executable)" 2>&1
+    Write-Host "Creating virtual environment from: $PythonPath" -ForegroundColor Cyan
+    & $PythonPath -m venv $venvPath
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "No virtual environment found and Python is not installed or not found in PATH." -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "Global Python path: $globalPythonPath" -ForegroundColor Green
-    Write-Host "Creating virtual environment..." -ForegroundColor Cyan
-    python -m venv $venvPath
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Failed to create virtual environment." -ForegroundColor Red
-        exit 1
+        throw "Failed to create virtual environment at '$venvPath'."
     }
 }
 
-Write-Host "Activating virtual environment..." -ForegroundColor Cyan
-& .\venv\Scripts\Activate.ps1
-if (-Not (Get-Command "deactivate" -ErrorAction SilentlyContinue)) {
-    Write-Host "Failed to activate the virtual environment." -ForegroundColor Red
-    exit 1
+$activePythonVersion = & $venvPythonPath --version
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to read the virtual environment's Python version."
 }
-
-$activePythonVersion = python --version 2>&1
-$activePythonPath = python -c "import sys; print(sys.executable)" 2>&1
+$activePythonPath = & $venvPythonPath -c "import sys; print(sys.executable)"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to run the virtual environment's Python."
+}
 $activePythonVersionNumber = ($activePythonVersion -replace '^Python\s+', '').Trim()
 Write-Host "Active Python version: $activePythonVersion" -ForegroundColor Green
 Write-Host "Active Python path: $activePythonPath" -ForegroundColor Green
 
 # Step 3: Upgrade pip
 Write-Host "Upgrading pip..." -ForegroundColor Cyan
-python -m pip install --upgrade pip
+& $venvPythonPath -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to upgrade pip." -ForegroundColor Red
     exit 1
@@ -47,7 +70,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 4: Install dependencies
 Write-Host "Installing dependencies from custom_requirements.txt..." -ForegroundColor Cyan
-pip install -r custom_requirements.txt
+& $venvPythonPath -m pip install -r (Join-Path $PSScriptRoot "custom_requirements.txt")
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to install dependencies." -ForegroundColor Red
     exit 1
@@ -55,7 +78,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 5: Freeze dependencies
 Write-Host "Freezing dependencies in requirements.txt..." -ForegroundColor Cyan
-pip freeze > requirements.txt
+& $venvPythonPath -m pip freeze > (Join-Path $PSScriptRoot "requirements.txt")
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to freeze dependencies." -ForegroundColor Red
     exit 1
@@ -76,11 +99,7 @@ $updatedHomePyContent = [regex]::Replace(
     { param($match) "$($match.Groups[1].Value)`"$activePythonVersionNumber`"" },
     1
 )
-Set-Content -Path $homePyPath -Value $updatedHomePyContent
+Set-Content -Path $homePyPath -Value $updatedHomePyContent -NoNewline
 Write-Host "DEV_VERSION updated to $activePythonVersionNumber" -ForegroundColor Green
-
-# Step 6: Deactivate virtual environment
-Write-Host "Deactivating virtual environment..." -ForegroundColor Cyan
-deactivate
 
 Write-Host "Setup complete." -ForegroundColor Green

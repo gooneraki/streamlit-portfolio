@@ -42,10 +42,29 @@ utilities/
    cd streamlit-portfolio
    ```
 
-2. Set up the virtual environment and install dependencies:
+2. Install Scoop's `python314`, then set up the virtual environment and install dependencies:
    ```powershell
    .\1_setup_env.ps1
    ```
+
+   Setup uses `%USERPROFILE%\scoop\apps\python314\current\python.exe`, not
+   `python` from Windows PATH. It creates `venv` only when missing and reuses an
+   existing environment when its base interpreter and Python version match.
+   It does not overwrite an existing environment's launcher. If the environment
+   is broken or uses a different Python, setup stops with recovery instructions
+   instead of modifying it. To use another installation:
+
+   ```powershell
+   .\1_setup_env.ps1 -PythonPath 'C:\path\to\python.exe'
+   ```
+
+   When setup reports a mismatch (including after a Python upgrade), close
+   processes using `venv`, rename the folder as a backup, then rerun setup.
+   Dependencies will be installed into a fresh environment; setup never deletes
+   the old one for you.
+
+   Setup also syncs `DEV_VERSION` in `Home.py` to the active Python version
+   without adding trailing newlines.
 
 3. Run the application:
    ```powershell
@@ -53,6 +72,25 @@ utilities/
    ```
 
 4. Open the app in your browser at `http://localhost:8501`.
+
+### VS Code interpreter (this workspace only)
+
+The workspace settings default to `venv\Scripts\python.exe` and enable terminal
+environment activation. This environment is based on Scoop's `python314`; your
+Windows default Python is unchanged.
+
+If VS Code already remembers a different interpreter, run **Python: Select
+Interpreter** from the Command Palette, choose **Enter interpreter path**, and
+select `${workspaceFolder}\venv\Scripts\python.exe` (using the actual project
+folder in the file picker). VS Code remembers that selection for this workspace;
+`python.defaultInterpreterPath` only supplies the initial default.
+Close existing terminals and open a new one after selecting the interpreter.
+
+All three PowerShell scripts use the project's Python executable explicitly and
+resolve project files relative to the script, so they do not rely on activation,
+Windows PATH, or your terminal's working directory. Use `3_update_env.ps1` after
+changing `custom_requirements.txt` to install dependencies and refresh
+`requirements.txt`.
 
 ## Dependencies
 
