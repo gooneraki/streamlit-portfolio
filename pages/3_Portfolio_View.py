@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from utilities.constants import ASSETS_POSITIONS_DEFAULT, BASE_CURRENCY_OPTIONS
+from utilities.masked_input import masked_text_input
 from utilities.go_charts import display_trend_go_chart_2, display_multi_asset_metric_trend
 from classes.asset_positions import AssetPosition, Portfolio
 
@@ -17,8 +18,10 @@ st.set_page_config(page_title="Portfolio View", layout="wide")
 
 col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
-    username = st.text_input(label="Enter username",
-                             key="username_input")
+    username = masked_text_input(
+        label="Enter username",
+        key="portfolio_username",
+    )
 
     # Display authentication status
     try:

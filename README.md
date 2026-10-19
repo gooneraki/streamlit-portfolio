@@ -8,6 +8,10 @@ This repository contains a Streamlit-based application for analyzing historical 
 - **Portfolio Analysis**: Evaluate the historical performance of an entire portfolio, with comprehensive stats and visualizations.
 - **Currency and Cryptocurrency Information**: Fetch historical data for currency pairs and cryptocurrencies.
 
+The Portfolio View username field conceals text with CSS and provides an eye
+toggle, without using an HTML password input. Press Enter or leave the field to
+apply the username. Masking is visual only; the value remains ordinary text.
+
 ## Project Structure
 
 ```
