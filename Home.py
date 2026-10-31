@@ -16,7 +16,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 
-DEV_VERSION = "3.14.8"
+DEV_VERSION = "3.14.10"
 PROD_VERSION = sys.version.split()[0]
 
 # Set the page title and layout
