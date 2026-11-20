@@ -8,6 +8,23 @@ This repository contains a Streamlit-based application for analyzing historical 
 - **Portfolio Analysis**: Evaluate the historical performance of an entire portfolio, with comprehensive stats and visualizations.
 - **Currency and Cryptocurrency Information**: Fetch historical data for currency pairs and cryptocurrencies.
 
+The Symbol Information Metrics tab calculates annualized growth and rolling
+returns using all available history in the selected currency. The period selector
+only changes the chart dates. Dates without both an asset price and an exchange
+rate are excluded. Latest and historical-average returns use consecutive
+observations for 1D and approximate 1W, 1M, 1Q and 1Y windows based on the
+history's average observation frequency. Returns are simple price changes and
+their historical averages and population standard deviations use all overlapping
+periods in the full history. Z-scores compare the latest return with its historical
+average in population standard deviations and are unavailable when the standard
+deviation is zero. Return descriptions use z-score thresholds from the central
+50%, 90% and 99% of a normal distribution (approximately 0.674, 1.645 and 2.576).
+These are reference bands, not probabilities for actual returns, which may not
+be normally distributed. Colours show the comparison with the average, not
+whether the return is positive.
+The long-term trend is an exponential
+fit to log prices. Growth and prices use adjusted closes in the selected currency.
+
 The Portfolio View username field conceals text with CSS and provides an eye
 toggle, without using an HTML password input. Press Enter or leave the field to
 apply the username. Masking is visual only; the value remains ordinary text.

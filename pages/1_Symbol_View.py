@@ -1,12 +1,14 @@
 
 """Get the information of a stock symbol from Yahoo Finance API."""
 
-from typing import List
 import logging
+from statistics import NormalDist
+
+import pandas as pd
 import streamlit as st
-from utilities.utilities import AssetDetails,  create_asset_info_df, \
-    generate_asset_base_value, append_fitted_data, get_trend_info, \
-    get_annual_returns_trend_info, get_quotes_by_symbol, get_history_options, \
+from utilities.utilities import create_asset_info_df, \
+    generate_asset_base_value, append_fitted_data, get_period_returns, \
+    get_quotes_by_symbol, get_history_options, get_period_info, \
     fetch_fx_rate_history, ticker_yf_history
 from utilities.constants import BASE_CURRENCY_OPTIONS
 from utilities.go_charts import display_trend_go_chart, display_daily_annual_returns_chart
@@ -14,6 +16,8 @@ from utilities.app_yfinance import sector_yf,   yf_ticket_info
 
 logger = logging.getLogger(__name__)
 logger.debug("Symbol View loaded")
+
+NORMAL_Z_BANDS = tuple(NormalDist().inv_cdf(p) for p in (0.75, 0.95, 0.995))
 
 st.set_page_config(page_title="Symbol View", layout="wide")
 
@@ -24,6 +28,26 @@ def reset_query_params(p_search_input: str):
         st.query_params.pop("symbol", None)
     else:
         st.query_params.update({"symbol": p_search_input.strip().upper()})
+
+
+def describe_return_z_score(z_score: float) -> str:
+    """Describe a return relative to its historical average."""
+    typical_limit, very_limit, exceptional_limit = NORMAL_Z_BANDS
+    if pd.isna(z_score):
+        return "N/A"
+    if z_score <= -exceptional_limit:
+        return "Exceptionally low"
+    if z_score <= -very_limit:
+        return "Very low"
+    if z_score <= -typical_limit:
+        return "Low"
+    if z_score < typical_limit:
+        return "Typical"
+    if z_score < very_limit:
+        return "High"
+    if z_score < exceptional_limit:
+        return "Very high"
+    return "Exceptionally high"
 
 
 st.title("Symbol Information")
@@ -185,90 +209,166 @@ with tab2:
 
 with tab1:
 
+    asset_name = asset_info_result.data.get(
+        "longName") or asset_info_result.data.get("shortName")
+    st.subheader(
+        f"{asset_name} ({symbol_name})" if asset_name else str(symbol_name))
+
     full_asset_history = ticker_yf_history(symbol_name)
 
     if full_asset_history is None:
         st.error(f"No historical data found for {symbol_name}.")
         st.stop()
 
-    st.markdown("#### Trend Analysis")
+    currency_col, _ = st.columns(2)
 
-    col1, col2 = st.columns(2)
-
-    with col1:
+    with currency_col:
         base_currency = st.selectbox(
             "Select currency", BASE_CURRENCY_OPTIONS, key="currency_input")
-
-    # In this case we have one asset with a position of 1.0
-    assets_positions: List[AssetDetails] = [
-        {"symbol": symbol_name, "position": 1.0}]
 
     # Fetch the fx rate history for the asset currency
     full_fx_rate_history = fetch_fx_rate_history(
         asset_info_result.data['currency'], base_currency)
+    if not isinstance(full_fx_rate_history, pd.Series):
+        st.error(f"Unable to fetch currency history: {full_fx_rate_history}")
+        st.stop()
 
     # Add the fx rate history to the asset history
     full_asset_base_history = generate_asset_base_value(
         full_asset_history, full_fx_rate_history)
 
-    # Fetch the historical data for the asset and info
+    if len(full_asset_base_history) < 2:
+        st.warning(
+            "At least two days of price and currency history are needed for metrics.")
+        st.stop()
+    if (full_asset_base_history["base_value"] <= 0).any():
+        st.error("Historical values must be positive to calculate the growth trend.")
+        st.stop()
 
+    number_of_points, number_of_days, number_of_years, points_per_year, _ = get_period_info(
+        full_asset_base_history)
+    full_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
+        full_asset_base_history, len(full_asset_base_history))
+    period_returns = get_period_returns(
+        full_history_with_fit["base_value"], points_per_year)
+    full_history_with_fit["annual_base_return"] = period_returns["1Y"]
+    latest_date = full_history_with_fit.index[-1]
+
+    sample_years = (latest_date - full_history_with_fit.index[0]).days / 365.25
+    st.markdown("#### Long-term growth")
+    st.caption(
+        f"Full available history in {base_currency}: "
+        f"{full_history_with_fit.index[0]:%Y-%m-%d} to {latest_date:%Y-%m-%d}. "
+        f"{number_of_points:,} observations over {number_of_days:,} days "
+        f"({points_per_year:.0f} observations per year). "
+        "Prices are adjusted closes converted to the selected currency."
+    )
+    growth_col1, growth_col2, growth_col3 = st.columns(3)
+    growth_col1.metric("Sample years", f"{sample_years:.1f}")
+    growth_col2.metric(
+        "Actual CAGR", f"{cagr:.1%}",
+        help="Compound annual growth rate between the first and latest actual prices.")
+    growth_col3.metric(
+        "Trend CAGR", f"{cagr_fitted:.1%}",
+        help="Compound annual growth rate between the first and latest prices on the full-history exponential trend.")
+    price_col1, price_col2, price_col3 = st.columns(3)
+    price_col1.metric("Latest actual price",
+                      f"{full_history_with_fit['base_value'].iloc[-1]:,.2f} {base_currency}")
+    price_col2.metric("Latest trend price",
+                      f"{full_history_with_fit['fitted'].iloc[-1]:,.2f} {base_currency}")
+    price_col3.metric(
+        "Above/below trend", f"{base_over_under:+.1%}",
+        help="The latest actual price relative to the latest fitted trend price.")
+
+    st.markdown("#### Rolling returns")
+    st.caption(
+        f"Simple price returns as of {latest_date:%Y-%m-%d} compared with the average "
+        "of all overlapping periods in the full history. 1D compares consecutive observations; "
+        "longer windows use the average observation frequency and are approximate. "
+        "Z-score measures how many population standard deviations the latest return is above or below "
+        "its historical average. Dates without both a price and an exchange rate are excluded. "
+        "N/A means insufficient history or zero standard deviation."
+    )
+    historical_average = period_returns.mean()
+    historical_std = period_returns.std(ddof=0)
+    latest_z_scores = (period_returns.iloc[-1] - historical_average).div(
+        historical_std.where(
+            (historical_std > 0) & (period_returns.max() != period_returns.min())))
+    period_labels = {
+        "1D": "1 Day", "1W": "1 Week", "1M": "1 Month",
+        "1Q": "1 Quarter", "1Y": "1 Year",
+    }
+    returns_summary = pd.DataFrame({
+        "Period": [period_labels[period] for period in period_returns.columns],
+        "Vs. average": [describe_return_z_score(value)
+                        for value in latest_z_scores],
+        "Current return": [
+            f"{value:.{1 if period == '1D' else 1}%}" if pd.notna(
+                value) else "N/A"
+            for period, value in period_returns.iloc[-1].items()
+        ],
+        "Historical average": [
+            f"{value:.{1 if period == '1D' else 1}%}" if pd.notna(
+                value) else "N/A"
+            for period, value in historical_average.items()
+        ],
+        "Z-score": [f"{value:+.2f}" if pd.notna(value) else "N/A"
+                    for value in latest_z_scores],
+    })
+    comparison_styles = {
+        "Exceptionally low": "background-color: #ef9a9a; color: #4a1010",
+        "Very low": "background-color: #ffcdd2; color: #4a1010",
+        "Low": "background-color: #ffebee; color: #4a1010",
+        "Typical": "background-color: #e5e7eb; color: #1f2937",
+        "High": "background-color: #e8f5e9; color: #103c1c",
+        "Very high": "background-color: #c8e6c9; color: #103c1c",
+        "Exceptionally high": "background-color: #a5d6a7; color: #103c1c",
+        "N/A": "",
+    }
+    styled_returns = returns_summary.style.map(
+        lambda value: comparison_styles[value], subset=["Vs. average"])
+    st.dataframe(styled_returns, hide_index=True, width="stretch",
+                 alt="Current returns compared with historical averages")
+    st.caption(
+        f"Vs. average: typical below |Z| approximately {NORMAL_Z_BANDS[0]:.3f}; "
+        f"low/high from {NORMAL_Z_BANDS[0]:.3f}; very low/high from {NORMAL_Z_BANDS[1]:.3f}; "
+        f"exceptionally low/high from {NORMAL_Z_BANDS[2]:.3f}. "
+        "These are normal-distribution reference bands for the central 50%, 90% and 99%; "
+        "real returns may not follow that distribution. Labels use unrounded z-scores; "
+        "colours compare to average, not whether returns are positive."
+    )
+
+    st.markdown("#### Price and trend")
     history_options = get_history_options(
-        full_asset_base_history['base_value'].shape[0])
-
-    history_options_keys = list(history_options.keys())
-
-    with col2:
+        number_of_points, number_of_years, points_per_year)
+    history_options_keys = list(history_options)
+    period_col, _ = st.columns(2)
+    with period_col:
         selected_period_key = st.selectbox(
-            "Select period", history_options_keys, index=history_options_keys.index("10 Years") if
-            "10 Years" in history_options_keys else 0)
+            "Display Period", history_options_keys,
+            index=history_options_keys.index("1 Year") if "1 Year" in history_options_keys else 0)
+    displayed_history = full_history_with_fit.tail(
+        history_options[selected_period_key])
+    value_fig = display_trend_go_chart(
+        displayed_history, title_name=f"{symbol_name} - {base_currency} - {selected_period_key}")
+    if value_fig is None:
+        st.warning("No valid data to plot.")
+    else:
+        st.plotly_chart(value_fig, config={"displayModeBar": False}, width="stretch",
+                        alt="Actual value and full-history growth trend")
 
-    selected_period_value = history_options[selected_period_key]
-
-    # Generate the data for the selected period
-    periodic_asset_history_with_fit, cagr, cagr_fitted, base_over_under = append_fitted_data(
-        full_asset_base_history, selected_period_value)
-
-    # Display the CAGR and CAGR for the fitted data
-
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        trend_info_df = get_trend_info(periodic_asset_history_with_fit)
-        st.dataframe(trend_info_df, hide_index=True)
-        st.write("*CAGR: Compound Annual Growth Rate*")
-
-    # Create the line chart
-    with col2:
-        value_fig = display_trend_go_chart(
-            periodic_asset_history_with_fit,  title_name=f"{symbol_name} - {base_currency} - {selected_period_key}")
-        if value_fig is None:
-            st.warning("No valid data to plot.")
-        else:
-            st.plotly_chart(value_fig, config={
-                            "displayModeBar": False}, width='stretch')
-
-    st.markdown("#### Daily Annual Returns")
-
-    annual_returns_info, mean = get_annual_returns_trend_info(
-        periodic_asset_history_with_fit)
-
-    annual_col1, annual_col2 = st.columns([1, 2])
-
-    with annual_col1:
-        st.dataframe(annual_returns_info, hide_index=True)
-
-    with annual_col2:
-        annual_returns_fig = display_daily_annual_returns_chart(
-            df=periodic_asset_history_with_fit,
-            annual_column='annual_base_return',
-            mean_value=mean
-        )
-        if annual_returns_fig is None:
-            st.warning("No valid data to plot.")
-        else:
-            st.plotly_chart(annual_returns_fig, width='stretch', config={
-                            "displayModeBar": False})
+    st.markdown("#### 1-year return history")
+    st.caption("The dashed line is the full-history average.")
+    annual_returns_fig = display_daily_annual_returns_chart(
+        df=displayed_history,
+        annual_column="annual_base_return",
+        average_value=historical_average["1Y"]
+    )
+    if annual_returns_fig is None:
+        st.warning("Not enough history to display 1-year returns.")
+    else:
+        st.plotly_chart(annual_returns_fig, width="stretch", config={"displayModeBar": False},
+                        alt="Rolling one-year returns and full-history average")
 
 with tab3:
 

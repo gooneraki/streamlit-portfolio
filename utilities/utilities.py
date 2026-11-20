@@ -165,30 +165,23 @@ def get_quotes_by_symbol(search_input: str):
     return None
 
 
-def get_history_options(history_length: int):
+def get_history_options(history_length: int, number_of_years: float, points_per_year: float):
     """Get the history options"""
 
     year_check = [
         i
-        for i in ([10 * j for j in range(int(history_length / 10 / 365.25), 0, -1)] + [5, 3, 1])
-        if round(i * 365.25) < history_length
+        for i in ([10 * j for j in range(int(number_of_years / 10), 0, -1)] + [5, 3, 1])
+        if 0 < round(i * points_per_year) < history_length
     ]
 
-    days_list = [history_length] + [round(i * 365.25) for i in year_check]
-
-    days_names = [
-        str(
-            round(days / 365.25, 1)
-            if (abs(round(days / 365.25, 1) - round(days / 365.25, 0)) > 0.05)
-            else int(round(days / 365.25, 1))
-        )
-        + (" Year" if days < 366 else " Years")
-        + (" (max)" if i == 0 else "")
-        for i, days in enumerate(days_list)
-        if days > 0
-    ]
-
-    return dict(zip(days_names, days_list))
+    max_years = round(number_of_years, 1)
+    if max_years.is_integer():
+        max_years = int(max_years)
+    max_label = f"{max_years} {'Year' if max_years == 1 else 'Years'} (max)"
+    return {max_label: history_length, **{
+        f"{years} {'Year' if years == 1 else 'Years'}": round(years * points_per_year)
+        for years in year_check
+    }}
 
 
 def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series):
@@ -200,9 +193,6 @@ def generate_asset_base_value(asset_history: pd.DataFrame, fx_history: pd.Series
         asset_history["fx_history"]
 
     asset_history.dropna(subset=["base_value"], inplace=True)
-
-    asset_history["annual_base_return"] = asset_history["base_value"].pct_change(
-        365)
 
     return asset_history
 
@@ -262,7 +252,7 @@ def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_
     period_history_data["fitted"] = get_exp_fitted_data(
         period_history_data[col_to_fit].values)
 
-    days = period_history_data.shape[0]
+    days = (period_history_data.index[-1] - period_history_data.index[0]).days
 
     cagr = (period_history_data[col_to_fit].iloc[-1] / period_history_data[col_to_fit].iloc[0]) ** (
         1 / (days / 365.25)
@@ -279,6 +269,22 @@ def append_fitted_data(history_data: pd.DataFrame, selected_period: int, col_to_
     period_history_data["Date"] = period_history_data.index
 
     return period_history_data, cagr, cagr_fitted, base_over_under
+
+
+def get_period_returns(history: pd.Series, points_per_year: float) -> pd.DataFrame:
+    """Calculate rolling returns using the history's average observation frequency."""
+    returns = {}
+    windows = [
+        ("1D", 1),
+        ("1W", max(1, round(points_per_year * 7 / 365.25))),
+        ("1M", max(1, round(points_per_year / 12))),
+        ("1Q", max(1, round(points_per_year / 4))),
+        ("1Y", max(1, round(points_per_year))),
+    ]
+    for label, points in windows:
+        previous = history.shift(points)
+        returns[label] = history.div(previous.where(previous > 0)).sub(1)
+    return pd.DataFrame(returns, index=history.index)
 
 
 def create_asset_info_df(asset_info: dict) -> list[list[str]]:
@@ -526,7 +532,7 @@ def fetch_fx_rate_history(asset_currency: str, base_currency: str):
     if fx_result.error is not None:
         return fx_result.error
 
-    fx_history = fx_result.data.resample("D").ffill()
+    fx_history = fx_result.data.copy()
     fx_history.index = pd.DatetimeIndex(fx_history.index).tz_localize(None)
 
     return fx_history
@@ -547,13 +553,7 @@ def ticker_yf_history(symbol: str):
     ticker_history.index = pd.DatetimeIndex(
         ticker_history.index).tz_localize(None)
 
-    ticker_history = ticker_history.resample("D").ffill()
-
-    ticker_history = pd.concat(
-        [ticker_history, ticker_history.pct_change(365)], axis=1, keys=["value", "annual_value_return"]
-    )
-
-    return ticker_history
+    return ticker_history.to_frame(name="value")
 
 
 def localize_and_fill(ticker_history: pd.DataFrame | pd.Series):

@@ -16,7 +16,8 @@ def display_trend_go_chart(df: pd.DataFrame, base_column="base_value", fitted_co
     fig = go.Figure()
 
     fig.add_trace(
-        go.Scatter(x=df["Date"], y=df[base_column], mode="lines", name="Base Value", line={"color": "#14B3EB"})
+        go.Scatter(x=df["Date"], y=df[base_column], mode="lines",
+                   name="Actual value", line={"color": "#14B3EB"})
     )
 
     fig.add_trace(
@@ -24,13 +25,14 @@ def display_trend_go_chart(df: pd.DataFrame, base_column="base_value", fitted_co
             x=df["Date"],
             y=df[fitted_column],
             mode="lines",
-            name="Fitted Value",
+            name="Trend value",
             line={"color": "#EB4C14", "dash": "dash"},
         )
     )
 
     fig.update_layout(
-        title={"text": title_name, "x": 0.5, "y": 0.98, "xanchor": "center", "yanchor": "top"} if title_name else None,
+        title={"text": title_name, "x": 0.5, "y": 0.98,
+               "xanchor": "center", "yanchor": "top"} if title_name else None,
         xaxis_title="Date",
         yaxis_title="Value",
         template="plotly_white",
@@ -38,6 +40,10 @@ def display_trend_go_chart(df: pd.DataFrame, base_column="base_value", fitted_co
         margin={"t": 0, "b": 0, "l": 0, "r": 0},
         legend={"yanchor": "top", "y": 0.90, "xanchor": "left", "x": 0.01},
     )
+
+    start, end = df["Date"].min(), df["Date"].max()
+    if start < end:
+        fig.update_xaxes(range=[start, end + (end - start) * 0.025])
 
     return fig
 
@@ -51,7 +57,8 @@ def display_trend_go_chart_2(
     fig = go.Figure()
 
     fig.add_trace(
-        go.Scatter(x=df.index, y=df[value_column], mode="lines", name="Base Value", line={"color": "#14B3EB"})
+        go.Scatter(x=df.index, y=df[value_column], mode="lines",
+                   name="Base Value", line={"color": "#14B3EB"})
     )
 
     fig.add_trace(
@@ -78,24 +85,27 @@ def display_trend_go_chart_2(
         )
 
     if secondary_column:
-        fig.update_layout(yaxis2={"title": "Secondary Value", "overlaying": "y", "side": "right", "showgrid": False})
+        fig.update_layout(yaxis2={"title": "Secondary Value",
+                          "overlaying": "y", "side": "right", "showgrid": False})
 
     fig.update_layout(
-        title={"text": title_name, "x": 0.5, "y": 0.98, "xanchor": "center", "yanchor": "top"} if title_name else None,
+        title={"text": title_name, "x": 0.5, "y": 0.98,
+               "xanchor": "center", "yanchor": "top"} if title_name else None,
         xaxis_title="Date",
         yaxis_title="Value",
         template="plotly_white",
         height=450,
         margin={"t": 0, "b": 0, "l": 0, "r": 0},
         legend={"yanchor": "top", "y": 0.90, "xanchor": "left", "x": 0.01},
-        modebar={"remove": ["zoom", "pan", "select", "lasso", "zoomIn", "zoomOut", "autoScale", "resetScale"]},
+        modebar={"remove": ["zoom", "pan", "select", "lasso",
+                            "zoomIn", "zoomOut", "autoScale", "resetScale"]},
     )
 
     return fig
 
 
 def display_daily_annual_returns_chart(
-    df: pd.DataFrame, annual_column="annual_base_return", date_column="Date", mean_value=None
+    df: pd.DataFrame, annual_column="annual_base_return", date_column="Date", average_value=None
 ):
     """Display clean daily annual returns chart (no legend, title, or modebar)."""
     df = df.copy()
@@ -104,11 +114,11 @@ def display_daily_annual_returns_chart(
     if df.empty:
         return None
 
-    if mean_value is None:
-        mean_value = df[annual_column].mean()
+    if average_value is None:
+        average_value = df[annual_column].mean()
 
-    y_min = df[annual_column].min()
-    y_max = df[annual_column].max()
+    y_min = min(df[annual_column].min(), average_value)
+    y_max = max(df[annual_column].max(), average_value)
     padding = 0.1 * (y_max - y_min)
     y_start = y_min - padding
     y_end = y_max + padding
@@ -128,10 +138,10 @@ def display_daily_annual_returns_chart(
     fig.add_trace(
         go.Scatter(
             x=[df[date_column].min(), df[date_column].max()],
-            y=[mean_value, mean_value],
+            y=[average_value, average_value],
             mode="lines",
             line={"color": "purple", "dash": "dash"},
-            name="Mean return",
+            name="Average return",
         )
     )
 
@@ -180,7 +190,8 @@ def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[st
         if metric in df.columns.get_level_values("Metric"):
             data = df[metric][symbol]
             fig.add_trace(
-                go.Scatter(x=data.index, y=data, mode="lines", name=metric, line={"color": colors[i % len(colors)]})
+                go.Scatter(x=data.index, y=data, mode="lines", name=metric, line={
+                           "color": colors[i % len(colors)]})
             )
 
     fig.update_layout(
@@ -199,7 +210,8 @@ def display_symbol_metrics_chart(df: pd.DataFrame, symbol: str, metrics: list[st
         legend={"yanchor": "top", "y": 0.99, "xanchor": "left", "x": 0.01},
         showlegend=True,
         hovermode="x unified",
-        modebar={"remove": ["zoom", "pan", "select", "lasso", "zoomIn", "zoomOut", "autoScale", "resetScale"]},
+        modebar={"remove": ["zoom", "pan", "select", "lasso",
+                            "zoomIn", "zoomOut", "autoScale", "resetScale"]},
         dragmode=False,
     )
 
@@ -227,7 +239,8 @@ def display_scatter_chart(df: pd.DataFrame, x_column: str, y_column: str, title_
     )
 
     fig.update_layout(
-        title={"text": title_name, "x": 0.5, "y": 0.98, "xanchor": "center", "yanchor": "top"} if title_name else None,
+        title={"text": title_name, "x": 0.5, "y": 0.98,
+               "xanchor": "center", "yanchor": "top"} if title_name else None,
         xaxis_title=x_column,
         yaxis_title=y_column,
         template="plotly_white",
@@ -235,7 +248,8 @@ def display_scatter_chart(df: pd.DataFrame, x_column: str, y_column: str, title_
         margin={"t": 40, "b": 0, "l": 0, "r": 0},
         legend={"yanchor": "top", "y": 0.99, "xanchor": "left", "x": 0.01},
         showlegend=False,
-        modebar={"remove": ["zoom", "pan", "select", "lasso", "zoomIn", "zoomOut", "autoScale", "resetScale"]},
+        modebar={"remove": ["zoom", "pan", "select", "lasso",
+                            "zoomIn", "zoomOut", "autoScale", "resetScale"]},
         dragmode=False,
     )
 
@@ -291,7 +305,8 @@ def display_efficient_frontier_chart(
                 y=[benchmark_return],
                 mode="markers",
                 name=benchmark_name,
-                marker={"symbol": "star", "size": 15, "color": "#2ECC71", "line": {"color": "#27AE60", "width": 2}},
+                marker={"symbol": "star", "size": 15, "color": "#2ECC71",
+                        "line": {"color": "#27AE60", "width": 2}},
             )
         )
 
@@ -303,7 +318,8 @@ def display_efficient_frontier_chart(
                 y=[max_sharpe_return],
                 mode="markers",
                 name=max_sharpe_name,
-                marker={"symbol": "diamond", "size": 12, "color": "#9B59B6", "line": {"color": "#8E44AD", "width": 2}},
+                marker={"symbol": "diamond", "size": 12, "color": "#9B59B6", "line": {
+                    "color": "#8E44AD", "width": 2}},
             )
         )
 
@@ -325,7 +341,8 @@ def display_efficient_frontier_chart(
         )
 
     fig.update_layout(
-        title={"text": title_name, "x": 0.5, "y": 0.98, "xanchor": "center", "yanchor": "top"} if title_name else None,
+        title={"text": title_name, "x": 0.5, "y": 0.98,
+               "xanchor": "center", "yanchor": "top"} if title_name else None,
         xaxis_title="Volatility (Risk)",
         yaxis_title="Expected Return",
         template="plotly_white",
@@ -333,7 +350,8 @@ def display_efficient_frontier_chart(
         margin={"t": 40, "b": 0, "l": 0, "r": 0},
         legend={"yanchor": "top", "y": 0.99, "xanchor": "left", "x": 0.01},
         showlegend=True,
-        modebar={"remove": ["zoom", "pan", "select", "lasso", "zoomIn", "zoomOut", "autoScale", "resetScale"]},
+        modebar={"remove": ["zoom", "pan", "select", "lasso",
+                            "zoomIn", "zoomOut", "autoScale", "resetScale"]},
         dragmode=False,
     )
 
@@ -360,9 +378,11 @@ def display_multi_asset_metric_trend(
         translated_values_last = df["translated_values"].iloc[-1][asset_names]
 
         if not isinstance(translated_values_last, pd.Series):
-            raise ValueError(f"Translated values last is not a Series: {type(translated_values_last)}")
+            raise ValueError(
+                f"Translated values last is not a Series: {type(translated_values_last)}")
 
-        top_assets = translated_values_last.sort_values(ascending=False).head(max_lines).index.tolist()
+        top_assets = translated_values_last.sort_values(
+            ascending=False).head(max_lines).index.tolist()
 
         if not isinstance(top_assets, list):
             raise ValueError(f"Top assets is not a list: {type(top_assets)}")
@@ -372,11 +392,13 @@ def display_multi_asset_metric_trend(
 
     metric_df = df[selected_metric][top_assets]
     if not isinstance(metric_df, pd.DataFrame):
-        raise ValueError(f"Metric DataFrame is not a DataFrame: {type(metric_df)}")
+        raise ValueError(
+            f"Metric DataFrame is not a DataFrame: {type(metric_df)}")
 
     fig = go.Figure()
     for asset in top_assets:
-        fig.add_trace(go.Scatter(x=metric_df.index, y=metric_df[asset], mode="lines", name=asset))
+        fig.add_trace(go.Scatter(x=metric_df.index,
+                      y=metric_df[asset], mode="lines", name=asset))
     fig.update_layout(
         title=title or f"All Assets - {selected_metric.replace('_', ' ').title()} Trend",
         xaxis_title="Date",

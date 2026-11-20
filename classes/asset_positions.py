@@ -329,8 +329,11 @@ class Portfolio:
         rolling_sum_z_score = (
             rolling_sum - rolling_sum.mean()) / rolling_sum.std()
 
+        rolling_return_std = rolling_return.std(ddof=0)
         rolling_return_z_score = (
-            rolling_return - rolling_return.mean()) / rolling_return.std()
+            rolling_return - rolling_return.mean()).div(
+                rolling_return_std.where(
+                    (rolling_return_std > 0) & (rolling_return.max() != rolling_return.min())))
 
         rolling_annualised_return_z_score = (
             rolling_annualised_return - rolling_annualised_return.mean()
